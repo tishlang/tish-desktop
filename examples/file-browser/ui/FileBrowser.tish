@@ -1,0 +1,82 @@
+/** @jsxImportSource lattish */
+import { useState, useEffect } from "lattish"
+import { tw } from "tish-tailwind/tw"
+import { invoke, listen } from "@tish-desktop/desktop-api"
+import { parentPath } from "@tish-desktop/shared"
+import * as store from "./fileBrowserStore.tish"
+
+export fn FileBrowser() {
+  let [snap, setSnap] = useState(store.get())
+
+  useEffect(() => {
+    let unsub = store.subscribe(setSnap)
+    store.navigate(invoke, ".")
+    let unlisten = null
+    let timer = null
+    listen("fs:changed", () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => store.refresh(invoke), 150)
+    }).then((u) => { unlisten = u })
+    invoke("fs.watch", { path: "." }).then(() => {}, () => {})
+    return () => {
+      unsub()
+      if (unlisten) unlisten()
+      if (timer) clearTimeout(timer)
+      invoke("fs.unwatch", {}).then(() => {}, () => {})
+    }
+  }, [])
+
+  fn onOpen(entry) {
+    if (entry.kind === "dir") {
+      store.navigate(invoke, entry.path)
+    } else {
+      store.selectFile(invoke, entry)
+    }
+  }
+
+  fn onUp() {
+    if (snap.cwd === "." || snap.cwd === "") return
+    store.navigate(invoke, parentPath(snap.cwd))
+  }
+
+  return (
+    <div class="min-h-screen flex bg-slate-950 text-slate-100">
+      <aside class="w-80 border-r border-slate-800 flex flex-col">
+        <div class="p-4 border-b border-slate-800">
+          <h1 class="text-lg font-bold">Files</h1>
+          <p class="text-xs text-slate-400 truncate">{snap.cwd}</p>
+          <button class="mt-2 text-sm text-sky-400" onClick={onUp}>Up</button>
+        </div>
+        <ul class="flex-1 overflow-auto p-2">
+          {snap.entries.map((entry) => (
+            <li key={entry.path}>
+              <button
+                class={tw([
+                  "w-full text-left px-2 py-1 rounded text-sm",
+                  snap.selected?.path === entry.path ? "bg-slate-800" : "hover:bg-slate-900",
+                ])}
+                onClick={() => onOpen(entry)}
+              >
+                {entry.kind === "dir" ? "[dir] " : "[file] "}
+                {entry.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div class="p-2 text-xs text-slate-500 border-t border-slate-800">
+          {snap.status}{snap.error !== null ? " · " + snap.error : ""}
+        </div>
+      </aside>
+      <main class="flex-1 p-6 overflow-auto">
+        <h2 class="text-xl font-semibold mb-4">
+          {snap.selected !== null ? snap.selected.name : "Select a file"}
+        </h2>
+        {snap.preview !== null ? (
+          <pre class="whitespace-pre-wrap text-sm bg-slate-900 p-4 rounded-lg">{snap.preview}</pre>
+        ) : (
+          <p class="text-slate-500">Preview appears for text files under the read cap.</p>
+        )}
+      </main>
+    </div>
+  )
+}

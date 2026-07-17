@@ -1,0 +1,34 @@
+// UI façade over window.__TISH_DESKTOP__ (injected by bridge.js).
+
+fn bridge() {
+  let g = globalThis
+  if (g.__TISH_DESKTOP__ === null || g.__TISH_DESKTOP__ === undefined) {
+    console.error("tish-desktop bridge not installed — import bridge.js first")
+    return null
+  }
+  return g.__TISH_DESKTOP__
+}
+
+export fn getCurrentWindowLabel() {
+  let b = bridge()
+  if (b === null) return "main"
+  return b.getCurrentWindowLabel()
+}
+
+export fn invoke(cmd, args) {
+  let b = bridge()
+  let a = args === null || args === undefined ? {} : args
+  return b.invoke(cmd, a)
+}
+
+export fn listen(eventName, handler) {
+  let b = bridge()
+  return b.listen(eventName, handler)
+}
+
+export fn emit(eventName, payload) {
+  let b = bridge()
+  return b.emit(eventName, payload)
+}
+
+export const PROTOCOL = "desktop/v1"

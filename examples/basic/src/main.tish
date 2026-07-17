@@ -1,0 +1,35 @@
+// Basic example shell — Tish owns app logic; Tauri runs inside cargo:tish_desktop.
+import { run, handle, useExtensions, registerRustExtension, createWindow } from "cargo:tish_desktop"
+import { samplePing } from "cargo:tish_desktop_sample_ext"
+
+registerRustExtension("tish_desktop_sample_ext")
+useExtensions(["tish.ext.sample-ping"])
+
+handle("app.hello", (args) => {
+  let ping = samplePing()
+  return { ok: true, message: "hello from shell Tish", sample: ping, args: args }
+})
+
+createWindow({
+  label: "main",
+  url: "http://localhost:5173/",
+  title: "Tish Desktop — Basic",
+  width: 900,
+  height: 600,
+  titleBarStyle: "transparent"
+})
+
+// Preview is created on demand from the UI (avoids dual Vite cold-load at boot).
+
+run({
+  tickMs: 1000,
+  plugins: {
+    dialog: true,
+    tray: true,
+    menu: true,
+    deepLink: true,
+    opener: true,
+    // Off in examples so basic + file-browser can run without fighting the same app id.
+    singleInstance: false
+  }
+})

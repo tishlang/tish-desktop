@@ -1,0 +1,2 @@
+export const id = "tish.ext.file-browser"
+export const commands = ["list", "read", "watch"]

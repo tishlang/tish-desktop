@@ -1,0 +1,3 @@
+// Sample Tish extension shell entry (composed by host apps via useExtensions).
+export const id = "tish.ext.sample-ping"
+export const commands = ["hello"]

@@ -1,0 +1,26 @@
+// File browser shell — sandboxed FS root = ./fixture (run from example cwd).
+import { run, useExtensions, createWindow } from "cargo:tish_desktop"
+
+useExtensions(["tish.ext.file-browser"])
+
+createWindow({
+  label: "main",
+  url: "http://localhost:5174/",
+  title: "Tish Desktop — File Browser",
+  width: 1100,
+  height: 720,
+  titleBarStyle: "transparent",
+})
+
+run({
+  fsRoot: "./fixture",
+  plugins: {
+    dialog: true,
+    tray: true,
+    menu: true,
+    deepLink: true,
+    opener: true,
+    // Off in examples so basic + file-browser can run without fighting the same app id.
+    singleInstance: false,
+  },
+})

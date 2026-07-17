@@ -1,0 +1,18 @@
+{
+  "name": "tish-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tish-first desktop runtime on Tauri 2",
+  "scripts": {
+    "check": "cargo check -p tish_desktop",
+    "example:basic": "npm --prefix examples/basic install && npm --prefix examples/basic run dev",
+    "example:basic:rebuild": "npm --prefix examples/basic install && npm --prefix examples/basic run dev -- --rebuild",
+    "example:file-browser": "npm --prefix examples/file-browser install && npm --prefix examples/file-browser run dev",
+    "example:file-browser:rebuild": "npm --prefix examples/file-browser install && npm --prefix examples/file-browser run dev -- --rebuild",
+    "example:native-chrome": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run dev",
+    "example:native-chrome:rebuild": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run dev -- --rebuild",
+    "build:basic": "npm --prefix examples/basic install && npm --prefix examples/basic run build:ui && npm --prefix examples/basic run build:shell",
+    "build:file-browser": "npm --prefix examples/file-browser install && npm --prefix examples/file-browser run build:ui && npm --prefix examples/file-browser run build:shell",
+    "build:native-chrome": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run build:ui && npm --prefix examples/native-chrome run build:shell"
+  }
+}

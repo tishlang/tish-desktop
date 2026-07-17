@@ -1,0 +1,12 @@
+[package]
+name = "tish_desktop_sample_ext"
+version = "0.1.0"
+edition = "2021"
+description = "Sample Rust Value-ABI extension for tish-desktop"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+tishlang_core = { path = "../../../tish/crates/tish_core", features = ["send-values"] }
+serde_json = "1"

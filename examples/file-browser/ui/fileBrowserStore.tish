@@ -1,0 +1,63 @@
+let state = {
+  cwd: ".",
+  entries: [],
+  selected: null,
+  preview: null,
+  error: null,
+  status: "idle",
+}
+
+let listeners = []
+
+export fn get() {
+  return state
+}
+
+export fn subscribe(fn) {
+  listeners.push(fn)
+  return () => {
+    listeners = listeners.filter((l) => l !== fn)
+  }
+}
+
+fn emit() {
+  for (let l of listeners) l(state)
+}
+
+export fn set(partial) {
+  state = { ...state, ...partial }
+  emit()
+}
+
+export fn navigate(invoke, path) {
+  set({ status: "loading", error: null, cwd: path })
+  return invoke("fs.list", { path }).then(
+    (r) => {
+      if (r.ok !== true) {
+        set({ status: "error", error: String(r.error || "list failed") })
+        return
+      }
+      set({ entries: r.entries || [], status: "ready", selected: null, preview: null })
+    },
+    (e) => set({ status: "error", error: String(e) })
+  )
+}
+
+export fn selectFile(invoke, entry) {
+  set({ selected: entry, preview: null, error: null })
+  if (entry.kind !== "file") return null
+  return invoke("fs.readText", { path: entry.path }).then(
+    (r) => {
+      if (r.ok !== true) {
+        set({ preview: null, error: String(r.error || "read failed") })
+        return
+      }
+      set({ preview: r.text })
+    },
+    (e) => set({ preview: null, error: String(e) })
+  )
+}
+
+export fn refresh(invoke) {
+  return navigate(invoke, state.cwd)
+}

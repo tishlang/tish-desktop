@@ -1,0 +1,14 @@
+{
+  "name": "@tish-desktop/desktop-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "tish": {
+    "module": "./src/desktopHost.tish"
+  },
+  "exports": {
+    ".": { "tish": "./src/desktopHost.tish" },
+    "./desktopHost": { "tish": "./src/desktopHost.tish" },
+    "./bridge": { "import": "./src/bridge.js" }
+  }
+}

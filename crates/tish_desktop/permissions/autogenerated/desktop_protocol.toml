@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-protocol"
+description = "Enables the desktop_protocol command without any pre-configured scope."
+commands.allow = ["desktop_protocol"]
+
+[[permission]]
+identifier = "deny-desktop-protocol"
+description = "Denies the desktop_protocol command without any pre-configured scope."
+commands.deny = ["desktop_protocol"]

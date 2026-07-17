@@ -1,0 +1,14 @@
+{
+  "name": "@tish-desktop/ext-file-browser",
+  "version": "0.1.0",
+  "private": true,
+  "tish": {
+    "desktop": {
+      "id": "tish.ext.file-browser",
+      "shell": "./shell/main.tish",
+      "ui": "./ui/main.tish",
+      "commands": ["list", "read", "watch"],
+      "permissions": ["fs:scoped", "dialog"]
+    }
+  }
+}

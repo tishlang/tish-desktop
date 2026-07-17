@@ -1,0 +1,14 @@
+{
+  "name": "@tish-desktop/ext-sample-ping",
+  "version": "0.1.0",
+  "private": true,
+  "tish": {
+    "desktop": {
+      "id": "tish.ext.sample-ping",
+      "shell": "./shell/main.tish",
+      "ui": "./ui/main.tish",
+      "commands": ["hello"],
+      "permissions": ["dialog"]
+    }
+  }
+}

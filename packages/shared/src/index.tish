@@ -1,0 +1,18 @@
+// Pure shared helpers — safe for shell (native) and UI (JS) targets.
+export const PROTOCOL = "desktop/v1"
+
+export fn joinPath(base, name) {
+  if (base.endsWith("/")) return base + name
+  return base + "/" + name
+}
+
+export fn parentPath(path) {
+  let i = path.lastIndexOf("/")
+  if (i <= 0) return path
+  return path.slice(0, i)
+}
+
+export fn entrySortKey(entry) {
+  let prefix = entry.kind === "dir" ? "0" : "1"
+  return prefix + (entry.name || "").toLowerCase()
+}

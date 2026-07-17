@@ -1,0 +1,85 @@
+/** @jsxImportSource lattish */
+import { createRoot, useState, useEffect } from "lattish"
+import { invoke, listen, getCurrentWindowLabel, PROTOCOL } from "@tish-desktop/desktop-api"
+
+fn App() {
+  let [ping, setPing] = useState(null)
+  let [ticks, setTicks] = useState(0)
+  let [hello, setHello] = useState(null)
+  let [label, setLabel] = useState("?")
+  let [err, setErr] = useState(null)
+
+  useEffect(() => {
+    setLabel(getCurrentWindowLabel())
+    let unlisten = null
+    listen("tick", (_payload) => {
+      setTicks((t) => t + 1)
+    }).then((u) => {
+        unlisten = u
+      }, (e) => setErr(String(e)))
+    return () => {
+      if (unlisten) {
+        unlisten()
+      }
+    }
+  }, [])
+
+  fn onPing() {
+    invoke("ping").then((r) => {
+      setPing(r)
+      setErr(null)
+    }, (e) => setErr(String(e)))
+  }
+
+  fn onHello() {
+    invoke("app.hello", { from: label }).then((r) => {
+      setHello(r)
+      setErr(null)
+    }, (e) => setErr(String(e)))
+  }
+
+  fn openSecond() {
+    invoke("window.create", {
+      label: "preview",
+      url: "http://localhost:5173/?window=preview",
+      title: "Preview",
+      width: 480,
+      height: 360,
+      titleBarStyle: "transparent"
+    }).then(() => {
+      setErr(null)
+    }, (e) => setErr(String(e)))
+  }
+
+  return <div class="min-h-screen p-8 bg-slate-950 text-slate-100 font-sans">
+      <h1 class="text-3xl font-bold mb-2">Tish Desktop — Basic</h1>
+      <p class="text-slate-400 mb-6">
+        Window <span class="text-emerald-400">{label}</span> · protocol {PROTOCOL}
+      </p>
+      <div class="flex gap-3 mb-6 flex-wrap">
+        <button class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500" onClick={onPing}>
+          Ping
+        </button>
+        <button class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500" onClick={onHello}>
+          Shell hello
+        </button>
+        <button class="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500" onClick={openSecond}>
+          Open preview
+        </button>
+      </div>
+      <p class="mb-2">Ticks from shell: <strong>{ticks}</strong></p>
+      {err !== null ? <pre class="text-red-400 mb-4">{err}</pre> : null}
+      {ping !== null ? <pre class="bg-slate-900 p-4 rounded-lg mb-4 text-sm">{JSON.stringify(
+    ping,
+    null,
+    2
+  )}</pre> : null}
+      {hello !== null ? <pre class="bg-slate-900 p-4 rounded-lg text-sm">{JSON.stringify(
+    hello,
+    null,
+    2
+  )}</pre> : null}
+    </div>
+}
+
+createRoot(document.getElementById("root")).render(App)

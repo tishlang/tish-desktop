@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-emit-tick"
+description = "Enables the desktop_emit_tick command without any pre-configured scope."
+commands.allow = ["desktop_emit_tick"]
+
+[[permission]]
+identifier = "deny-desktop-emit-tick"
+description = "Denies the desktop_emit_tick command without any pre-configured scope."
+commands.deny = ["desktop_emit_tick"]

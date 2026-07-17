@@ -1,0 +1,2 @@
+// UI lives in examples/file-browser; this marks the extension surface.
+export const id = "tish.ext.file-browser"

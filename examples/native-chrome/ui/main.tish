@@ -1,0 +1,208 @@
+/** @jsxImportSource lattish */
+import { createRoot, useState, useEffect } from "lattish"
+import { invoke, listen } from "@tish-desktop/desktop-api"
+
+fn Section(props) {
+  return <section class="mb-8">
+      <h2 class="text-lg font-semibold mb-1">{props.title}</h2>
+      {props.hint !== null && props.hint !== undefined ? <p class="text-sm text-slate-400 mb-3">{props.hint}</p> : null}
+      <div class="flex flex-wrap gap-2">{props.children}</div>
+    </section>
+}
+
+fn Btn(props) {
+  return <button
+      class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm border border-slate-700"
+      onClick={props.onClick}
+    >
+      {props.children}
+    </button>
+}
+
+fn App() {
+  let [log, setLog] = useState([])
+  let [badge, setBadge] = useState(0)
+  let [trayTitle, setTrayTitle] = useState("")
+  let [progress, setProgress] = useState(0)
+  let [titleStyle, setTitleStyle] = useState("visible")
+  let [perm, setPerm] = useState("?")
+  let [err, setErr] = useState(null)
+
+  fn push(msg) {
+    setLog((prev) => {
+      let next = [msg]
+      let i = 0
+      while (i < prev.length && i < 11) {
+        next.push(prev[i])
+        i = i + 1
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    let u1 = null
+    let u2 = null
+    listen("menu:action", (p) => {
+      push("menu:action → " + JSON.stringify(p))
+      if (p !== null && p.id === "ctx:notify") {
+        invoke("notification.show", {
+          title: "Context menu",
+          body: "Fired from native menu item"
+        }).then(() => {}, (e) => setErr(String(e)))
+      }
+    }).then((u) => { u1 = u }, (e) => setErr(String(e)))
+    listen("tray:action", (p) => {
+      push("tray:action → " + JSON.stringify(p))
+    }).then((u) => { u2 = u }, (e) => setErr(String(e)))
+    invoke("notification.permissionState", {}).then((r) => {
+      if (r !== null && r.state !== undefined) setPerm(r.state)
+    }, () => {})
+    return () => {
+      if (u1) u1()
+      if (u2) u2()
+    }
+  }, [])
+
+  fn run(cmd, args) {
+    invoke(cmd, args === null || args === undefined ? {} : args).then((r) => {
+      setErr(null)
+      push(cmd + " → " + JSON.stringify(r))
+      if (cmd === "notification.permissionState" || cmd === "notification.requestPermission" || cmd === "notification.show") {
+        if (r !== null && r.state !== undefined) setPerm(r.state)
+        if (r !== null && r.permission !== undefined) setPerm(r.permission)
+      }
+      if (cmd === "window.titleBarStyle" && args !== null && args.style !== undefined) {
+        setTitleStyle(args.style)
+      }
+    }, (e) => {
+      setErr(String(e))
+      push(cmd + " ✗ " + String(e))
+    })
+  }
+
+  fn onContext(e) {
+    if (e && e.preventDefault) e.preventDefault()
+    run("menu.context", {
+      items: [
+        { id: "ctx:inspect", label: "Inspect selection" },
+        { id: "ctx:copy", label: "Copy path" },
+        { separator: true },
+        { id: "ctx:notify", label: "Notify from menu" },
+        { id: "ctx:disabled", label: "Disabled item", enabled: false }
+      ]
+    })
+  }
+
+  fn onToolbarDrag(e) {
+    if (e && e.button !== undefined && e.button !== 0) return
+    run("window.startDragging", {})
+  }
+
+  let overlay = titleStyle === "overlay"
+  let rootPad = overlay ? "pt-12" : "pt-8"
+
+  return <div
+      class={"min-h-screen px-8 pb-8 font-sans bg-slate-950 text-slate-100 " + rootPad}
+      onContextMenu={onContext}
+    >
+      {overlay ? <div
+          class="fixed top-0 left-0 right-0 h-12 flex items-center px-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-sm z-10 select-none"
+          onMouseDown={onToolbarDrag}
+        >
+          <span class="text-sm text-slate-300 font-medium">Custom overlay toolbar</span>
+          <span class="ml-auto text-xs text-slate-500">drag to move · traffic lights overlay content</span>
+        </div> : null}
+
+      <h1 class="text-3xl font-bold mb-1">Native Chrome</h1>
+      <p class="text-slate-400 mb-8 text-sm">
+        Dock badge, tray/status, titlebar styles, context menus, notifications —
+        right-click anywhere for a native context menu.
+      </p>
+
+      <Section title="Title bar / toolbar" hint="macOS: visible (solid), transparent (blends with window bg), overlay (custom toolbar under traffic lights)">
+        <Btn onClick={() => run("window.titleBarStyle", { style: "visible" })}>Visible</Btn>
+        <Btn onClick={() => run("window.titleBarStyle", { style: "transparent" })}>Transparent</Btn>
+        <Btn onClick={() => {
+          run("window.titleBarStyle", { style: "overlay" })
+          run("window.title", { title: " " })
+        }}>Overlay + custom bar</Btn>
+        <Btn onClick={() => run("window.title", { title: "Tish Desktop — Native Chrome" })}>Restore title</Btn>
+        <Btn onClick={() => run("window.decorations", { decorations: false })}>Decorations off</Btn>
+        <Btn onClick={() => run("window.decorations", { decorations: true })}>Decorations on</Btn>
+        <Btn onClick={() => run("window.shadow", { enable: false })}>Shadow off</Btn>
+        <Btn onClick={() => run("window.shadow", { enable: true })}>Shadow on</Btn>
+        <p class="w-full text-xs text-slate-500 mt-1">Current style: {titleStyle}</p>
+      </Section>
+
+      <Section title="Dock / badge" hint="macOS dock badge often needs notification permission first">
+        <Btn onClick={() => {
+          let n = badge + 1
+          setBadge(n)
+          run("dock.badge", { count: n })
+        }}>Badge +1 ({badge})</Btn>
+        <Btn onClick={() => {
+          setBadge(0)
+          run("dock.badge", { count: 0 })
+        }}>Clear badge</Btn>
+        <Btn onClick={() => run("dock.badgeLabel", { label: "Hi" })}>Badge label “Hi”</Btn>
+        <Btn onClick={() => run("dock.badgeLabel", { label: "" })}>Clear label</Btn>
+      </Section>
+
+      <Section title="Tray / status item" hint="Tooltip + macOS menu-bar title next to the tray icon">
+        <Btn onClick={() => {
+          let t = "Tish · " + String(Date.now() % 10000)
+          setTrayTitle(t)
+          run("tray.title", { text: t })
+        }}>Set tray title</Btn>
+        <Btn onClick={() => {
+          setTrayTitle("")
+          run("tray.title", { text: "" })
+        }}>Clear tray title</Btn>
+        <Btn onClick={() => run("tray.tooltip", { text: "Status: idle · " + trayTitle })}>Set tooltip</Btn>
+      </Section>
+
+      <Section title="Window chrome" hint="Title, dock/taskbar progress, bounce attention">
+        <Btn onClick={() => run("window.title", { title: "Working…" })}>Title: Working…</Btn>
+        <Btn onClick={() => run("window.title", { title: "Tish Desktop — Native Chrome" })}>Reset title</Btn>
+        <Btn onClick={() => {
+          let p = progress >= 100 ? 10 : progress + 20
+          setProgress(p)
+          run("window.progress", { status: "normal", progress: p })
+        }}>Progress +20 ({progress}%)</Btn>
+        <Btn onClick={() => {
+          setProgress(0)
+          run("window.progress", { status: "none" })
+        }}>Clear progress</Btn>
+        <Btn onClick={() => run("window.attention", { kind: "informational" })}>Attention bounce</Btn>
+        <Btn onClick={() => run("window.attention", { kind: "critical" })}>Critical attention</Btn>
+      </Section>
+
+      <Section title="Notifications" hint={"OS permission: " + perm + " — request before show; errors stay in the log instead of crashing"}>
+        <Btn onClick={() => run("notification.permissionState", {})}>Permission state</Btn>
+        <Btn onClick={() => run("notification.requestPermission", {})}>Request permission</Btn>
+        <Btn onClick={() => run("notification.show", {
+          title: "Tish Desktop",
+          body: "Native notification from shell broker"
+        })}>Show notification</Btn>
+        <Btn onClick={() => run("dialog.message", {
+          title: "Hello",
+          message: "Blocking message dialog via tauri-plugin-dialog"
+        })}>Message dialog</Btn>
+        <Btn onClick={() => run("opener.open", { url: "https://tishlang.com" })}>Open URL</Btn>
+      </Section>
+
+      <Section title="Context menu" hint="Or use the button; selection emits menu:action">
+        <Btn onClick={onContext}>Open context menu</Btn>
+      </Section>
+
+      {err !== null ? <pre class="text-red-400 mb-4 text-sm whitespace-pre-wrap">{err}</pre> : null}
+
+      <h2 class="text-lg font-semibold mb-2">Event log</h2>
+      <pre class="bg-slate-900 border border-slate-800 rounded-lg p-4 text-xs whitespace-pre-wrap min-h-40">
+        {log.length === 0 ? "Actions and menu/tray events appear here." : log.join("\n")}
+      </pre>
+    </div>
+}
+
+createRoot(document.getElementById("root")).render(App)

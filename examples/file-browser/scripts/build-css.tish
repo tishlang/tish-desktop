@@ -1,0 +1,8 @@
+import { emitStylesheet } from "tish-tailwind"
+
+await emitStylesheet({
+  sourceFiles: ["ui/main.tish", "ui/FileBrowser.tish"],
+  outputPath: "public/assets/app.css",
+})
+
+console.log("wrote public/assets/app.css")

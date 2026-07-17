@@ -1,0 +1,5 @@
+/** @jsxImportSource lattish */
+import { createRoot } from "lattish"
+import { FileBrowser } from "./FileBrowser.tish"
+
+createRoot(document.getElementById("root")).render(FileBrowser)

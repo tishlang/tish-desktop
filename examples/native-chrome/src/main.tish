@@ -1,0 +1,25 @@
+// Native chrome demo — dock badge, tray status, context menus, notifications.
+import { run, createWindow } from "cargo:tish_desktop"
+
+createWindow({
+  label: "main",
+  url: "http://localhost:5175/",
+  title: "Tish Desktop — Native Chrome",
+  width: 960,
+  height: 720,
+  // Start visible so the demo can switch transparent / overlay at runtime.
+  titleBarStyle: "visible",
+  hiddenTitle: false
+})
+
+run({
+  plugins: {
+    dialog: true,
+    tray: true,
+    menu: true,
+    deepLink: true,
+    opener: true,
+    notification: true,
+    singleInstance: false
+  }
+})
