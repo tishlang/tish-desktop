@@ -252,6 +252,16 @@ pub struct PendingOAuth {
     pub token_url: String,
     pub client_id: String,
     pub redirect_uri: String,
+    /// OIDC nonce when openid / explicit oidc login; checked against `id_token` payload.
+    pub nonce: Option<String>,
+    pub revocation_endpoint: Option<String>,
+}
+
+/// Persisted (in-memory) session metadata after a successful login.
+#[derive(Debug, Clone)]
+pub struct AuthSession {
+    pub client_id: String,
+    pub revocation_endpoint: Option<String>,
 }
 
 pub struct AppState {
@@ -269,6 +279,7 @@ pub struct AppState {
     /// In-memory cache of the last-issued OAuth access token: `(token, expires_at_unix_secs)`.
     pub auth_cache: Mutex<Option<(String, u64)>>,
     pub pending_oauth: Mutex<Option<PendingOAuth>>,
+    pub auth_session: Mutex<Option<AuthSession>>,
 }
 
 impl AppState {
@@ -288,6 +299,7 @@ impl AppState {
             keepawake_guard: Mutex::new(None),
             auth_cache: Mutex::new(None),
             pending_oauth: Mutex::new(None),
+            auth_session: Mutex::new(None),
         }
     }
 

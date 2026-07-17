@@ -39,7 +39,7 @@ npx tish-desktop dev
 npx tish-desktop build
 ```
 
-Install the CLI globally later via npm (`@tish-desktop/cli`) or use the Rust `tish-desktop` launcher binary (PATH / `TISH_DESKTOP_CLI` / `npx` fallback).
+Install the CLI via npm (`npx @tish-desktop/cli` / `npm i -g @tish-desktop/cli`) or use the Rust `tish-desktop` launcher binary (PATH / `TISH_DESKTOP_CLI` / `npx` fallback). Package release steps: [docs/RELEASE.md](./docs/RELEASE.md).
 
 ## Layout
 
@@ -55,7 +55,7 @@ Install the CLI globally later via npm (`@tish-desktop/cli`) or use the Rust `ti
 | `examples/file-browser` | Sandboxed FS browser (ui-theme) |
 | `examples/native-chrome` | Full OS chrome / broker demo (ui-theme) |
 | `scripts/distribute/` | Release build, sign, notarize, updater, GH release |
-| `.github/workflows/` | CI + draft release / crates publish |
+| `.github/workflows/` | CI + crates.io / npm release (on full GitHub release) + draft app distribute |
 
 ## Broker highlights
 

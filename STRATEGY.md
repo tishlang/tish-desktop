@@ -86,7 +86,7 @@ Opt-in via `run({ plugins, shellAllow, httpAllow, auth })`. Host gates with `Plu
 | Command | Plugin flag / config |
 |---------|----------------------|
 | `secrets.set` / `get` / `delete` | `auth` (keyring service `com.tishlang.desktop`) |
-| `auth.login` / `logout` / `status` / `getAccessToken` | `auth` + `auth.tokenHosts`; PKCE loopback or `tish-desktop://oauth/callback` |
+| `auth.login` / `logout` / `status` / `getAccessToken` | `auth` + `auth.tokenHosts`; PKCE loopback or `tish-desktop://oauth/callback`; OIDC `nonce` when `openid` / `oidc:true`; optional `revocationEndpoint` on logout |
 | `shell.exec` | `shell` + `shellAllow` deny-by-default |
 | `http.fetch` | `http` + `httpAllow` |
 | `power.preventSleep` / `allowSleep` | refcounted (`keepawake`) |
@@ -129,9 +129,9 @@ Wired when flags are true: `dialog`, `tray-icon`, `menu`, `deep-link`, `opener`,
 
 ## Public crate + CLI
 
-- **`tish_desktop`** — publishable library (`repository` / `readme` metadata). Locally depends on **path** `tishlang_core` so `tish build` shares one `Value` type with the CLI. For crates.io publish, switch to a versioned dep matching the CLI’s release train (do not mix path + crates.io `Value`s). Sample ext stays private.
+- **`tish_desktop`** — publishable library (`repository` / `readme` metadata). Locally depends on **path** `tishlang_core` so `tish build` shares one `Value` type with the CLI. Crates.io publish rewrites to a versioned dep in [`.github/workflows/crates-release.yml`](./.github/workflows/crates-release.yml) — see [`docs/RELEASE.md`](./docs/RELEASE.md). Sample ext stays `publish = false`.
 - **`tish-desktop` bin** — thin launcher → PATH / `TISH_DESKTOP_CLI` / `npx @tish-desktop/cli`
-- **`@tish-desktop/cli`** — Tish CLI (`cli/`) mirroring Tauri’s `init|dev|build|info|icon|distribute`
+- **`@tish-desktop/cli`** (+ `desktop-api` / `shared` / `ui-theme`) — npm OIDC publish via [`.github/workflows/npm-release.yml`](./.github/workflows/npm-release.yml)
 
 ## UI theme
 
@@ -140,7 +140,7 @@ Wired when flags are true: `dialog`, `tray-icon`, `menu`, `deep-link`, `opener`,
 ## Distribution
 
 - Scripts: `scripts/distribute/*` (`npm run distribute:build|sign|notarize|updater|release`)
-- Draft GHA: `.github/workflows/release-*.yml`, `ci.yml`, `crates-release.yml`
+- GHA: `.github/workflows/ci.yml`, `crates-release.yml`, `npm-release.yml`, draft `release-*.yml` for app distribute
 - Production: point `frontendDist` at built UI; do **not** ship Vite localhost; enable bundle + updater pubkey/endpoints when ready
 
 ## Extensions

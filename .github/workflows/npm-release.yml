@@ -1,0 +1,139 @@
+# Publish @tish-desktop/* packages to npm when a GitHub release is promoted from
+# prerelease to full release. Mirrors tish/.github/workflows/npm-release.yml.
+#
+# AUTH: npm OIDC trusted publishing (no long-lived NPM_TOKEN). One-time setup on
+# npmjs.com for EACH package below — Settings → Trusted Publisher → GitHub Actions:
+#   Organization or user: tishlang
+#   Repository:           tish-desktop
+#   Workflow filename:    npm-release.yml
+#   Environment:          (leave blank)
+# Requires npm >= 11.5.1 (upgraded below) and id-token: write.
+
+name: NPM release
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to (re)publish, e.g. v0.1.0"
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.label }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: "@tish-desktop/cli"
+            npm: "@tish-desktop/cli"
+            dir: cli
+          - label: "@tish-desktop/desktop-api"
+            npm: "@tish-desktop/desktop-api"
+            dir: packages/desktop-api
+          - label: "@tish-desktop/shared"
+            npm: "@tish-desktop/shared"
+            dir: packages/shared
+          - label: "@tish-desktop/ui-theme"
+            npm: "@tish-desktop/ui-theme"
+            dir: packages/ui-theme
+    env:
+      NPM_CONFIG_PROVENANCE: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for OIDC trusted publishing (needs >= 11.5.1)
+        run: |
+          # Pin to npm 11.x — same rationale as tish npm-release.yml (npm 12.0.0
+          # publish path is broken without bundled sigstore).
+          npm install -g "npm@^11"
+          npm --version
+
+      - name: Determine version and whether it is already published
+        id: check
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if npm view "${{ matrix.npm }}@${VERSION}" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ matrix.npm }}@${VERSION} is already published — skipping."
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish (source dir)
+        if: steps.check.outputs.already == 'false'
+        run: |
+          cp -r "${{ matrix.dir }}" /tmp/publish-pkg
+          cd /tmp/publish-pkg
+          # Monorepo copies may still carry private:true — strip for publish.
+          node -e "
+            const fs = require('fs');
+            const p = require('./package.json');
+            delete p.private;
+            p.publishConfig = Object.assign({ access: 'public' }, p.publishConfig || {});
+            fs.writeFileSync('./package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+          npm version "${{ steps.check.outputs.version }}" --no-git-tag-version --allow-same-version
+          npm publish --access public
+
+  update-release:
+    name: Update release description
+    needs: publish
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false) && github.event_name == 'release' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Update release description with npm URLs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          CLI_URL="https://www.npmjs.com/package/@tish-desktop/cli/v/${VERSION}"
+          API_URL="https://www.npmjs.com/package/@tish-desktop/desktop-api/v/${VERSION}"
+          SHARED_URL="https://www.npmjs.com/package/@tish-desktop/shared/v/${VERSION}"
+          THEME_URL="https://www.npmjs.com/package/@tish-desktop/ui-theme/v/${VERSION}"
+          CRATES_URL="https://crates.io/crates/tish_desktop/${VERSION}"
+          RELEASE_ID="${{ github.event.release.id }}"
+          REPO="${{ github.repository }}"
+          CURRENT_BODY=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${REPO}/releases/${RELEASE_ID}" | jq -r '.body // ""')
+          if printf '%s' "$CURRENT_BODY" | grep -q "Published to npm:"; then
+            echo "Release body already lists npm URLs — nothing to do."
+            exit 0
+          fi
+          NEW_BODY="${CURRENT_BODY}
+
+          ---
+          Published to npm: ${CLI_URL}
+          desktop-api: ${API_URL}
+          shared: ${SHARED_URL}
+          ui-theme: ${THEME_URL}
+          crates.io: ${CRATES_URL}"
+          curl -s -X PATCH \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPO}/releases/${RELEASE_ID}" \
+            -d "$(printf '%s' "$NEW_BODY" | jq -Rs '{body: .}')"

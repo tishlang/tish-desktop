@@ -315,14 +315,14 @@ fn App() {
           <Button variant="ghost" onClick={() => run("updater.check", {})}>Check updates</Button>
         </Section>
 
-        <Section title="Secrets / auth" hint="PKCE loopback or redirectMode: scheme → tish-desktop://oauth/callback">
+        <Section title="Secrets / auth" hint="PKCE + optional OIDC nonce (openid) + revocationEndpoint on logout">
           <Button variant="secondary" onClick={() => run("secrets.set", { key: "demo.token", value: "s3cret" })}>Set secret</Button>
           <Button variant="secondary" onClick={() => run("secrets.get", { key: "demo.token" })}>Get secret</Button>
           <Button variant="outline" onClick={() => run("secrets.delete", { key: "demo.token" })}>Delete secret</Button>
           <Button variant="outline" onClick={() => run("auth.status", {})}>Auth status</Button>
           <Button variant="ghost" onClick={() => run("auth.logout", {})}>Logout</Button>
           <p class="w-full text-xs text-muted-foreground mt-1">
-            IdP redirect URIs: http://127.0.0.1:&lt;port&gt;/callback and tish-desktop://oauth/callback
+            Redirect URIs: http://127.0.0.1:&lt;port&gt;/callback · tish-desktop://oauth/callback · pass scopes with openid for nonce
           </p>
         </Section>
 

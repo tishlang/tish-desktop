@@ -4,6 +4,12 @@
 //! - `loopback` (default): ephemeral `http://127.0.0.1:<port>/callback`
 //! - `scheme`: `tish-desktop://oauth/callback` via deep-link
 //!
+//! OIDC extras: when scopes include `openid` (or `oidc: true`), a `nonce` is sent
+//! and checked against the `id_token` payload (claim check only — JWKS signature
+//! verification is left to a future hardening pass).
+//!
+//! Logout best-effort POSTs to `revocationEndpoint` when configured.
+//!
 //! Events: `auth:changed` `{ loggedIn }`, `auth:error` `{ message }`.
 
 use base64::Engine;
@@ -14,7 +20,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 
 use super::helpers::ensure_permission;
-use crate::state::{AppState, PendingOAuth};
+use crate::state::{AppState, AuthSession, PendingOAuth};
 
 const SERVICE: &str = "com.tishlang.desktop";
 const REFRESH_TOKEN_KEY: &str = "auth:refresh_token";
@@ -31,7 +37,7 @@ pub fn try_dispatch(
         "secrets.get" => secrets_get(state, args),
         "secrets.delete" => secrets_delete(state, args),
         "auth.login" => auth_login(app, state, args),
-        "auth.logout" => auth_logout(app, state),
+        "auth.logout" => auth_logout(app, state, args),
         "auth.status" => auth_status(state),
         "auth.getAccessToken" => auth_get_access_token(app, state, args),
         _ => return None,
@@ -141,8 +147,47 @@ fn arg_scope(args: &Value) -> String {
     String::new()
 }
 
+fn wants_oidc(args: &Value, scope: &str) -> bool {
+    if args.get("oidc").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return true;
+    }
+    scope
+        .split_whitespace()
+        .any(|s| s.eq_ignore_ascii_case("openid"))
+}
+
+/// Decode JWT payload (middle segment) without signature verification.
+fn jwt_payload_unverified(id_token: &str) -> Result<Value, String> {
+    let mut parts = id_token.split('.');
+    let _header = parts.next().ok_or("invalid id_token")?;
+    let payload_b64 = parts.next().ok_or("invalid id_token")?;
+    let mut padded = payload_b64.to_string();
+    while padded.len() % 4 != 0 {
+        padded.push('=');
+    }
+    let bytes = base64::engine::general_purpose::URL_SAFE
+        .decode(padded.as_bytes())
+        .or_else(|_| base64::engine::general_purpose::STANDARD.decode(padded.as_bytes()))
+        .map_err(|e| format!("id_token payload decode: {e}"))?;
+    serde_json::from_slice(&bytes).map_err(|e| format!("id_token payload json: {e}"))
+}
+
+fn verify_id_token_nonce(id_token: &str, expected: &str) -> Result<(), String> {
+    let payload = jwt_payload_unverified(id_token)?;
+    let got = payload
+        .get("nonce")
+        .and_then(|v| v.as_str())
+        .ok_or("id_token missing nonce claim")?;
+    if got != expected {
+        return Err("id_token nonce mismatch".into());
+    }
+    Ok(())
+}
+
 fn parse_callback_query(url_str: &str) -> Result<(String, String), String> {
-    let url = if url_str.starts_with("http://") || url_str.starts_with("https://") || url_str.contains("://")
+    let url = if url_str.starts_with("http://")
+        || url_str.starts_with("https://")
+        || url_str.contains("://")
     {
         url::Url::parse(url_str).map_err(|e| e.to_string())?
     } else {
@@ -182,7 +227,20 @@ fn exchange_code(app: &AppHandle, pending: &PendingOAuth, code: &str) -> Result<
         .ok_or("no access_token in response")?
         .to_string();
     let expires_in = body.get("expires_in").and_then(|v| v.as_u64()).unwrap_or(3600);
+
+    if let Some(expected) = &pending.nonce {
+        if let Some(id_token) = body.get("id_token").and_then(|v| v.as_str()) {
+            verify_id_token_nonce(id_token, expected)?;
+        } else {
+            return Err("OIDC login expected id_token with nonce".into());
+        }
+    }
+
     *app.state::<AppState>().auth_cache.lock() = Some((access_token, now_secs() + expires_in));
+    *app.state::<AppState>().auth_session.lock() = Some(AuthSession {
+        client_id: pending.client_id.clone(),
+        revocation_endpoint: pending.revocation_endpoint.clone(),
+    });
 
     if let Some(refresh_token) = body.get("refresh_token").and_then(|v| v.as_str()) {
         keyring::Entry::new(SERVICE, REFRESH_TOKEN_KEY)
@@ -236,12 +294,24 @@ fn auth_login(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, 
         .and_then(|v| v.as_str())
         .unwrap_or("loopback")
         .to_ascii_lowercase();
+    let revocation_endpoint = args
+        .get("revocationEndpoint")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
     check_auth_host(state, &token_url)?;
+    if let Some(rev) = &revocation_endpoint {
+        check_auth_host(state, rev)?;
+    }
 
     let verifier = random_url_safe(48);
     let challenge = code_challenge_s256(&verifier);
     let csrf_state = random_url_safe(24);
+    let nonce = if wants_oidc(args, &scope) {
+        Some(random_url_safe(24))
+    } else {
+        None
+    };
 
     let (redirect_uri, loopback_server) = if redirect_mode == "scheme" {
         (OAUTH_SCHEME_REDIRECT.to_string(), None)
@@ -267,6 +337,9 @@ fn auth_login(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, 
         q.append_pair("state", &csrf_state);
         q.append_pair("code_challenge", &challenge);
         q.append_pair("code_challenge_method", "S256");
+        if let Some(n) = &nonce {
+            q.append_pair("nonce", n);
+        }
         if let Some(extra) = args.get("extraAuthParams").and_then(|v| v.as_object()) {
             for (k, v) in extra {
                 if let Some(v) = v.as_str() {
@@ -282,6 +355,8 @@ fn auth_login(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, 
         token_url,
         client_id,
         redirect_uri: redirect_uri.clone(),
+        nonce: nonce.clone(),
+        revocation_endpoint,
     };
     *state.pending_oauth.lock() = Some(pending.clone());
 
@@ -323,18 +398,62 @@ fn auth_login(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, 
         "pending": true,
         "redirectUri": redirect_uri,
         "redirectMode": redirect_mode,
+        "oidc": nonce.is_some(),
     }))
 }
 
-fn auth_logout(app: &AppHandle, state: &AppState) -> Result<Value, String> {
+fn best_effort_revoke(state: &AppState, refresh_token: &str, session: &AuthSession) {
+    let Some(endpoint) = &session.revocation_endpoint else {
+        return;
+    };
+    if check_auth_host(state, endpoint).is_err() {
+        return;
+    }
+    let client = reqwest::blocking::Client::new();
+    let _ = client
+        .post(endpoint)
+        .form(&[
+            ("token", refresh_token),
+            ("token_type_hint", "refresh_token"),
+            ("client_id", session.client_id.as_str()),
+        ])
+        .send();
+}
+
+fn auth_logout(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, String> {
     ensure_permission(state, "auth")?;
+
+    let mut session = state.auth_session.lock().take();
+    if let Some(override_ep) = args.get("revocationEndpoint").and_then(|v| v.as_str()) {
+        check_auth_host(state, override_ep)?;
+        if let Some(s) = session.as_mut() {
+            s.revocation_endpoint = Some(override_ep.to_string());
+        } else {
+            session = Some(AuthSession {
+                client_id: args
+                    .get("clientId")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                revocation_endpoint: Some(override_ep.to_string()),
+            });
+        }
+    }
+
+    let refresh = keyring::Entry::new(SERVICE, REFRESH_TOKEN_KEY)
+        .ok()
+        .and_then(|e| e.get_password().ok());
+    if let (Some(token), Some(sess)) = (refresh.as_ref(), session.as_ref()) {
+        best_effort_revoke(state, token, sess);
+    }
+
     if let Ok(entry) = keyring::Entry::new(SERVICE, REFRESH_TOKEN_KEY) {
         let _ = entry.delete_credential();
     }
     *state.auth_cache.lock() = None;
     *state.pending_oauth.lock() = None;
     let _ = app.emit("auth:changed", json!({ "loggedIn": false }));
-    Ok(json!({ "ok": true }))
+    Ok(json!({ "ok": true, "revoked": session.and_then(|s| s.revocation_endpoint).is_some() }))
 }
 
 fn auth_status(state: &AppState) -> Result<Value, String> {

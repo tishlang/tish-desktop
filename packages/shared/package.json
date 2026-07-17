@@ -1,8 +1,20 @@
 {
   "name": "@tish-desktop/shared",
   "version": "0.1.0",
-  "private": true,
+  "description": "Shared Tish helpers and desktop event name constants",
+  "license": "MIT OR Apache-2.0",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tishlang/tish-desktop.git",
+    "directory": "packages/shared"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src"
+  ],
   "tish": {
     "module": "./src/index.tish"
   },
@@ -10,5 +22,9 @@
     ".": {
       "tish": "./src/index.tish"
     }
-  }
+  },
+  "keywords": [
+    "tish",
+    "desktop"
+  ]
 }

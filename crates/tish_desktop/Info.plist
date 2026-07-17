@@ -17,5 +17,12 @@
       </array>
     </dict>
   </array>
+  <!--
+    Tray-only / agent apps: set LSUIElement to true so the process has no Dock
+    icon or menu bar app name (menu-bar status item only). Leave false/absent
+    for normal windowed desktop apps (default for tish-desktop examples).
+  -->
+  <key>LSUIElement</key>
+  <false/>
 </dict>
 </plist>

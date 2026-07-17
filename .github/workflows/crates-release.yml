@@ -1,15 +1,130 @@
-# Draft: dry-run crates.io publish. Enable when tishlang_core version strategy is settled.
-name: Crates release (draft)
+# Publish tish_desktop to crates.io when a GitHub release is promoted from
+# prerelease to full release. Mirrors tish/.github/workflows/crates-release.yml.
+#
+# Local/monorepo builds keep a path dep on tishlang_core (Value ABI). This
+# workflow rewrites that dep to a versioned crates.io line before publish —
+# see crates/tish_desktop/README.md.
+#
+# Secret: CARGO_REGISTRY_TOKEN (crates.io API token) on this repo.
+
+name: Crates.io release
 
 on:
+  release:
+    types: [published, edited]
+  # Resume a throttled / partial run: already-published versions are skipped.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to (re)publish, e.g. v0.1.0"
+        required: true
+        type: string
+      tishlang_core_version:
+        description: "crates.io tishlang_core version (semver req)"
+        required: false
+        default: "2.39"
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
-  publish-dry-run:
+  publish:
+    name: Publish to crates.io
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false }}
     runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      # Pin must match the published tish CLI / ecosystem train.
+      TISHLANG_CORE_VERSION: ${{ inputs.tishlang_core_version || '2.39' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Publish dry-run
-        run: cargo publish -p tish_desktop --dry-run
-        continue-on-error: true
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set version and crates.io tishlang_core dep
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          VERSION="${TAG#v}"
+          CORE="${TISHLANG_CORE_VERSION}"
+          sed -i.bak "s/^version = .*/version = \"$VERSION\"/" crates/tish_desktop/Cargo.toml
+          # Path dep → versioned crates.io (cargo publish rejects path deps).
+          perl -i -0pe "s/tishlang_core = \\{ path = \"[^\"]+\", features = \\[\"send-values\"\\] \\}/tishlang_core = { version = \"$CORE\", features = [\"send-values\"] }/s" \
+            crates/tish_desktop/Cargo.toml
+          rm -f crates/tish_desktop/Cargo.toml.bak
+          grep -E '^(version|name) =|tishlang_core' crates/tish_desktop/Cargo.toml
+
+      - name: Publish tish_desktop
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          VERSION="${TAG#v}"
+          CRATE=tish_desktop
+          UA="tish-desktop-release/1.0 (https://github.com/tishlang/tish-desktop)"
+
+          if curl -sSf -o /dev/null -A "$UA" "https://crates.io/api/v1/crates/${CRATE}/${VERSION}"; then
+            echo "Skipping $CRATE v${VERSION} (already published)"
+            exit 0
+          fi
+
+          publish_with_retry() {
+            local max="${PUBLISH_MAX_ATTEMPTS:-6}" attempt log after tgt now wait
+            log=$(mktemp)
+            for attempt in $(seq 1 "$max"); do
+              if cargo publish -p "$CRATE" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty >"$log" 2>&1; then
+                cat "$log"; rm -f "$log"; return 0
+              fi
+              cat "$log"
+              if ! grep -qiE '429|too many|rate.?limit|try again (later|after)' "$log"; then
+                echo "::error::cargo publish $CRATE failed (not a rate limit) — see log above"
+                rm -f "$log"; return 1
+              fi
+              after=$(grep -oiE 'try again after [^.]*(GMT|UTC)' "$log" | head -1 | sed -E 's/.*try again after //I' || true)
+              wait=""
+              if [ -n "$after" ]; then
+                now=$(date -u +%s)
+                tgt=$(date -u -d "$after" +%s 2>/dev/null || echo "")
+                [ -n "$tgt" ] && wait=$(( tgt - now + 5 ))
+              fi
+              if [ -z "$wait" ] || [ "$wait" -lt 1 ]; then wait=60; fi
+              if [ "$wait" -gt 180 ]; then wait=180; fi
+              echo "::warning::$CRATE hit a crates.io rate limit (attempt ${attempt}/${max}); waiting ${wait}s then retrying"
+              sleep "$wait"
+            done
+            echo "::error::$CRATE still rate-limited after ${max} attempts. Re-dispatch (Actions → Crates.io release → Run workflow, tag=${TAG})."
+            rm -f "$log"; return 1
+          }
+
+          echo "Publishing $CRATE v${VERSION} (tishlang_core ${TISHLANG_CORE_VERSION})..."
+          publish_with_retry
+
+      - name: Update release description with crates.io URL
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          VERSION="${TAG#v}"
+          CRATES_URL="https://crates.io/crates/tish_desktop/${VERSION}"
+          RELEASE_ID="${{ github.event.release.id }}"
+          REPO="${{ github.repository }}"
+          CURRENT_BODY=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${REPO}/releases/${RELEASE_ID}" | jq -r '.body // ""')
+          if printf '%s' "$CURRENT_BODY" | grep -q "crates.io/crates/tish_desktop"; then
+            echo "Release body already has crates.io link"
+          else
+            NEW_BODY="${CURRENT_BODY}
+
+          ---
+          Published to crates.io: ${CRATES_URL}"
+            curl -s -X PATCH \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${REPO}/releases/${RELEASE_ID}" \
+              -d "$(printf '%s' "$NEW_BODY" | jq -Rs '{body: .}')"
+          fi
