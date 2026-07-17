@@ -1,0 +1,180 @@
+// Path / argv helpers for the CLI.
+import { argv, cwd, env } from "tish:process"
+import { fileExists, isDir, readFile } from "tish:fs"
+
+export fn pathExists(p) {
+  return fileExists(p)
+}
+
+export fn joinPath(a, b) {
+  if (a === null || a === "") return b
+  if (b === null || b === "") return a
+  if (a === ".") return b
+  if (a.endsWith("/")) return a + b
+  return a + "/" + b
+}
+
+export fn dirname(p) {
+  if (p === null || p === "") return "."
+  let i = p.lastIndexOf("/")
+  if (i < 0) return "."
+  if (i === 0) return "/"
+  return p.slice(0, i)
+}
+
+export fn basename(p) {
+  if (p === null || p === "") return ""
+  let i = p.lastIndexOf("/")
+  if (i < 0) return p
+  return p.slice(i + 1)
+}
+
+export fn q(s) {
+  return "'" + String(s).split("'").join("'\\''") + "'"
+}
+
+/** User-facing args after the binary / script path. */
+export fn userArgs() {
+  let out = []
+  let i = 1
+  if (argv.length >= 2 && argv[1] !== null && String(argv[1]).endsWith(".tish")) {
+    i = 2
+  }
+  while (i < argv.length) {
+    out.push(argv[i])
+    i = i + 1
+  }
+  return out
+}
+
+export fn hasFlag(args, flag) {
+  let i = 0
+  while (i < args.length) {
+    if (args[i] === flag) return true
+    i = i + 1
+  }
+  return false
+}
+
+export fn flagValue(args, flag) {
+  let i = 0
+  while (i < args.length) {
+    if (args[i] === flag && i + 1 < args.length) return args[i + 1]
+    if (String(args[i]).startsWith(flag + "=")) {
+      return String(args[i]).slice(flag.length + 1)
+    }
+    i = i + 1
+  }
+  return null
+}
+
+export fn firstPositional(args) {
+  let i = 0
+  while (i < args.length) {
+    let a = args[i]
+    if (!String(a).startsWith("-")) return a
+    if ((a === "--example" || a === "--dir" || a === "--out") && i + 1 < args.length) {
+      i = i + 2
+      continue
+    }
+    i = i + 1
+  }
+  return null
+}
+
+fn looksLikeCliRoot(dir) {
+  let pkg = joinPath(dir, "package.json")
+  if (!pathExists(pkg)) return false
+  let text = readFile(pkg)
+  if (text === null || String(text).startsWith("Error:")) return false
+  return String(text).indexOf("@tish-desktop/cli") >= 0
+}
+
+fn looksLikeRepoRoot(dir) {
+  return pathExists(joinPath(dir, "crates/tish_desktop")) && pathExists(joinPath(dir, "examples"))
+}
+
+/** Resolve the cli/ package directory (absolute when possible). */
+export fn cliRoot() {
+  let here = cwd()
+  let candidate = null
+  if (argv.length >= 2 && argv[1] !== null && String(argv[1]).endsWith(".tish")) {
+    let script = String(argv[1])
+    if (!script.startsWith("/")) script = joinPath(here, script)
+    let srcDir = dirname(script)
+    let root = dirname(srcDir)
+    if (looksLikeCliRoot(root)) candidate = root
+  }
+  if (candidate === null && argv.length >= 1 && argv[0] !== null) {
+    let exe = String(argv[0])
+    if (exe.indexOf("tish-desktop") >= 0) {
+      let dist = dirname(exe)
+      let root = dirname(dist)
+      if (looksLikeCliRoot(root)) candidate = root
+    }
+  }
+  if (candidate === null) {
+    if (looksLikeCliRoot(here)) candidate = here
+    else if (looksLikeCliRoot(joinPath(here, "cli"))) candidate = joinPath(here, "cli")
+  }
+  if (candidate === null) {
+    let walk = here
+    let n = 0
+    while (n < 8) {
+      if (looksLikeCliRoot(walk)) {
+        candidate = walk
+        break
+      }
+      if (looksLikeCliRoot(joinPath(walk, "cli"))) {
+        candidate = joinPath(walk, "cli")
+        break
+      }
+      let parent = dirname(walk)
+      if (parent === walk) break
+      walk = parent
+      n = n + 1
+    }
+  }
+  if (candidate === null) candidate = here
+  if (candidate === "." || !String(candidate).startsWith("/")) {
+    if (candidate === "." || candidate === "") return here
+    return joinPath(here, candidate)
+  }
+  return candidate
+}
+
+/** Resolve the tish-desktop repo root (parent of cli/). */
+export fn repoRoot() {
+  let cli = cliRoot()
+  let parent = dirname(cli)
+  if (looksLikeRepoRoot(parent)) return parent
+  let here = cwd()
+  if (looksLikeRepoRoot(here)) return here
+  let walk = here
+  let n = 0
+  while (n < 8) {
+    if (looksLikeRepoRoot(walk)) return walk
+    let parent2 = dirname(walk)
+    if (parent2 === walk) break
+    walk = parent2
+    n = n + 1
+  }
+  return parent
+}
+
+export fn resolveTish() {
+  let home = ""
+  if (env !== null) {
+    let h = env["HOME"]
+    if (h !== null && h !== "") home = String(h)
+  }
+  if (home !== "") {
+    let cargoTish = home + "/.cargo/bin/tish"
+    if (fileExists(cargoTish)) return cargoTish
+  }
+  return "tish"
+}
+
+export fn isDirPath(p) {
+  return isDir(p)
+}

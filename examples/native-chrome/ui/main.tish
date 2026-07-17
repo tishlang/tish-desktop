@@ -1,23 +1,7 @@
 /** @jsxImportSource lattish */
 import { createRoot, useState, useEffect } from "lattish"
 import { invoke, listen } from "@tish-desktop/desktop-api"
-
-fn Section(props) {
-  return <section class="mb-8">
-      <h2 class="text-lg font-semibold mb-1">{props.title}</h2>
-      {props.hint !== null && props.hint !== undefined ? <p class="text-sm text-slate-400 mb-3">{props.hint}</p> : null}
-      <div class="flex flex-wrap gap-2">{props.children}</div>
-    </section>
-}
-
-fn Btn(props) {
-  return <button
-      class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm border border-slate-700"
-      onClick={props.onClick}
-    >
-      {props.children}
-    </button>
-}
+import { Button, Section, Badge } from "@tish-desktop/ui-theme"
 
 fn App() {
   let [log, setLog] = useState([])
@@ -26,13 +10,15 @@ fn App() {
   let [progress, setProgress] = useState(0)
   let [titleStyle, setTitleStyle] = useState("visible")
   let [perm, setPerm] = useState("?")
+  let [clipText, setClipText] = useState("Hello from Tish Desktop")
+  let [dropPaths, setDropPaths] = useState([])
   let [err, setErr] = useState(null)
 
   fn push(msg) {
     setLog((prev) => {
       let next = [msg]
       let i = 0
-      while (i < prev.length && i < 11) {
+      while (i < prev.length && i < 40) {
         next.push(prev[i])
         i = i + 1
       }
@@ -41,26 +27,62 @@ fn App() {
   }
 
   useEffect(() => {
-    let u1 = null
-    let u2 = null
-    listen("menu:action", (p) => {
+    let offs = []
+    fn track(p) {
+      p.then((u) => { if (u) offs.push(u) }, (e) => setErr(String(e)))
+    }
+    track(listen("menu:action", (p) => {
       push("menu:action → " + JSON.stringify(p))
-      if (p !== null && p.id === "ctx:notify") {
+      if (p === null || p.id === null || p.id === undefined) return
+      if (p.id === "ctx:inspect") {
+        invoke("window.openDevtools", {}).then(() => {}, (e) => setErr(String(e)))
+        return
+      }
+      if (p.id === "ctx:reload") {
+        invoke("window.reload", {}).then(() => {}, (e) => setErr(String(e)))
+        return
+      }
+      if (p.id === "ctx:notify") {
         invoke("notification.show", {
           title: "Context menu",
           body: "Fired from native menu item"
         }).then(() => {}, (e) => setErr(String(e)))
       }
-    }).then((u) => { u1 = u }, (e) => setErr(String(e)))
-    listen("tray:action", (p) => {
+    }))
+    track(listen("tray:action", (p) => {
       push("tray:action → " + JSON.stringify(p))
-    }).then((u) => { u2 = u }, (e) => setErr(String(e)))
+    }))
+    track(listen("file-drop", (p) => {
+      push("file-drop → " + JSON.stringify(p))
+      if (p !== null && p.paths !== null && p.paths !== undefined) setDropPaths(p.paths)
+    }))
+    track(listen("theme:changed", (p) => {
+      push("theme:changed → " + JSON.stringify(p))
+    }))
+    track(listen("auth:changed", (p) => {
+      push("auth:changed → " + JSON.stringify(p))
+    }))
+    track(listen("auth:error", (p) => {
+      push("auth:error → " + JSON.stringify(p))
+    }))
+    track(listen("updater:progress", (p) => {
+      push("updater:progress → " + JSON.stringify(p))
+    }))
+    track(listen("deep-link", (p) => {
+      push("deep-link → " + JSON.stringify(p))
+    }))
+    track(listen("shortcut:demo", (p) => {
+      push("shortcut:demo → " + JSON.stringify(p))
+    }))
     invoke("notification.permissionState", {}).then((r) => {
       if (r !== null && r.state !== undefined) setPerm(r.state)
     }, () => {})
     return () => {
-      if (u1) u1()
-      if (u2) u2()
+      let i = 0
+      while (i < offs.length) {
+        offs[i]()
+        i = i + 1
+      }
     }
   }, [])
 
@@ -75,6 +97,9 @@ fn App() {
       if (cmd === "window.titleBarStyle" && args !== null && args.style !== undefined) {
         setTitleStyle(args.style)
       }
+      if (cmd === "clipboard.readText" && r !== null && r.text !== undefined) {
+        setClipText(r.text)
+      }
     }, (e) => {
       setErr(String(e))
       push(cmd + " ✗ " + String(e))
@@ -85,9 +110,10 @@ fn App() {
     if (e && e.preventDefault) e.preventDefault()
     run("menu.context", {
       items: [
-        { id: "ctx:inspect", label: "Inspect selection" },
-        { id: "ctx:copy", label: "Copy path" },
+        { id: "ctx:inspect", label: "Inspect Element" },
+        { id: "ctx:reload", label: "Reload" },
         { separator: true },
+        { id: "ctx:copy", label: "Copy path" },
         { id: "ctx:notify", label: "Notify from menu" },
         { id: "ctx:disabled", label: "Disabled item", enabled: false }
       ]
@@ -100,108 +126,232 @@ fn App() {
   }
 
   let overlay = titleStyle === "overlay"
-  let rootPad = overlay ? "pt-12" : "pt-8"
+  let mainPad = overlay ? "pt-12" : "pt-8"
 
   return <div
-      class={"min-h-screen px-8 pb-8 font-sans bg-slate-950 text-slate-100 " + rootPad}
+      class="nc-shell font-sans bg-background text-foreground"
       onContextMenu={onContext}
     >
       {overlay ? <div
-          class="fixed top-0 left-0 right-0 h-12 flex items-center px-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-sm z-10 select-none"
+          class="fixed top-0 left-0 right-0 h-12 flex items-center px-20 border-b border-border bg-background/80 backdrop-blur-sm z-20 select-none"
           onMouseDown={onToolbarDrag}
         >
-          <span class="text-sm text-slate-300 font-medium">Custom overlay toolbar</span>
-          <span class="ml-auto text-xs text-slate-500">drag to move · traffic lights overlay content</span>
+          <span class="text-sm text-muted-foreground font-medium">Custom overlay toolbar</span>
+          <span class="ml-auto text-xs text-muted-foreground">drag to move · traffic lights overlay content</span>
         </div> : null}
 
-      <h1 class="text-3xl font-bold mb-1">Native Chrome</h1>
-      <p class="text-slate-400 mb-8 text-sm">
-        Dock badge, tray/status, titlebar styles, context menus, notifications —
-        right-click anywhere for a native context menu.
-      </p>
+      <main class={"nc-main px-8 " + mainPad}>
+        <div class="flex items-center gap-3 mb-1">
+          <h1 class="text-3xl font-bold tracking-tight">Native Chrome</h1>
+          <Badge>desktop/v1</Badge>
+        </div>
+        <p class="text-muted-foreground mb-8 text-sm max-w-2xl">
+          Broker demos for OS chrome, clipboard, shortcuts, prefs, auth, power, and allowlisted shell/http.
+          Right-click anywhere for a native context menu. Drop files onto the window for <code class="text-xs">file-drop</code>.
+        </p>
 
-      <Section title="Title bar / toolbar" hint="macOS: visible (solid), transparent (blends with window bg), overlay (custom toolbar under traffic lights)">
-        <Btn onClick={() => run("window.titleBarStyle", { style: "visible" })}>Visible</Btn>
-        <Btn onClick={() => run("window.titleBarStyle", { style: "transparent" })}>Transparent</Btn>
-        <Btn onClick={() => {
-          run("window.titleBarStyle", { style: "overlay" })
-          run("window.title", { title: " " })
-        }}>Overlay + custom bar</Btn>
-        <Btn onClick={() => run("window.title", { title: "Tish Desktop — Native Chrome" })}>Restore title</Btn>
-        <Btn onClick={() => run("window.decorations", { decorations: false })}>Decorations off</Btn>
-        <Btn onClick={() => run("window.decorations", { decorations: true })}>Decorations on</Btn>
-        <Btn onClick={() => run("window.shadow", { enable: false })}>Shadow off</Btn>
-        <Btn onClick={() => run("window.shadow", { enable: true })}>Shadow on</Btn>
-        <p class="w-full text-xs text-slate-500 mt-1">Current style: {titleStyle}</p>
-      </Section>
+        <Section title="Title bar / toolbar" hint="macOS: visible, transparent, overlay">
+          <Button variant="secondary" onClick={() => run("window.titleBarStyle", { style: "visible" })}>Visible</Button>
+          <Button variant="secondary" onClick={() => run("window.titleBarStyle", { style: "transparent" })}>Transparent</Button>
+          <Button variant="secondary" onClick={() => {
+            run("window.titleBarStyle", { style: "overlay" })
+            run("window.title", { title: " " })
+          }}>Overlay + custom bar</Button>
+          <Button variant="outline" onClick={() => run("window.title", { title: "Tish Desktop — Native Chrome" })}>Restore title</Button>
+          <Button variant="ghost" onClick={() => run("window.decorations", { decorations: false })}>Decorations off</Button>
+          <Button variant="ghost" onClick={() => run("window.decorations", { decorations: true })}>Decorations on</Button>
+          <p class="w-full text-xs text-muted-foreground mt-1">Current style: {titleStyle}</p>
+        </Section>
 
-      <Section title="Dock / badge" hint="macOS dock badge often needs notification permission first">
-        <Btn onClick={() => {
-          let n = badge + 1
-          setBadge(n)
-          run("dock.badge", { count: n })
-        }}>Badge +1 ({badge})</Btn>
-        <Btn onClick={() => {
-          setBadge(0)
-          run("dock.badge", { count: 0 })
-        }}>Clear badge</Btn>
-        <Btn onClick={() => run("dock.badgeLabel", { label: "Hi" })}>Badge label “Hi”</Btn>
-        <Btn onClick={() => run("dock.badgeLabel", { label: "" })}>Clear label</Btn>
-      </Section>
+        <Section title="Window geometry / lifecycle" hint="minimize, maximize, size, position, focus, print">
+          <Button variant="secondary" onClick={() => run("window.minimize", {})}>Minimize</Button>
+          <Button variant="secondary" onClick={() => run("window.maximize", {})}>Maximize</Button>
+          <Button variant="secondary" onClick={() => run("window.unmaximize", {})}>Unmaximize</Button>
+          <Button variant="secondary" onClick={() => run("window.fullscreen", { fullscreen: true })}>Fullscreen</Button>
+          <Button variant="secondary" onClick={() => run("window.fullscreen", { fullscreen: false })}>Exit fullscreen</Button>
+          <Button variant="outline" onClick={() => run("window.center", {})}>Center</Button>
+          <Button variant="outline" onClick={() => run("window.setSize", { width: 1000, height: 740 })}>Size 1000×740</Button>
+          <Button variant="outline" onClick={() => run("window.getSize", {})}>Get size</Button>
+          <Button variant="outline" onClick={() => run("window.getPosition", {})}>Get position</Button>
+          <Button variant="outline" onClick={() => run("window.setAlwaysOnTop", { alwaysOnTop: true })}>Always on top</Button>
+          <Button variant="outline" onClick={() => run("window.setAlwaysOnTop", { alwaysOnTop: false })}>Not on top</Button>
+          <Button variant="outline" onClick={() => run("window.setFocus", {})}>Focus</Button>
+          <Button variant="outline" onClick={() => run("window.print", {})}>Print</Button>
+          <Button variant="ghost" onClick={() => run("windowState.save", {})}>Save window state</Button>
+          <Button variant="ghost" onClick={() => run("windowState.restore", {})}>Restore window state</Button>
+          <Button variant="ghost" onClick={() => run("windowState.enabled", {})}>Window state enabled?</Button>
+        </Section>
 
-      <Section title="Tray / status item" hint="Tooltip + macOS menu-bar title next to the tray icon">
-        <Btn onClick={() => {
-          let t = "Tish · " + String(Date.now() % 10000)
-          setTrayTitle(t)
-          run("tray.title", { text: t })
-        }}>Set tray title</Btn>
-        <Btn onClick={() => {
-          setTrayTitle("")
-          run("tray.title", { text: "" })
-        }}>Clear tray title</Btn>
-        <Btn onClick={() => run("tray.tooltip", { text: "Status: idle · " + trayTitle })}>Set tooltip</Btn>
-      </Section>
+        <Section title="OS / displays" hint="os.info, os.theme, display.list — theme:changed on OS theme switch">
+          <Button variant="secondary" onClick={() => run("os.info", {})}>OS info</Button>
+          <Button variant="secondary" onClick={() => run("os.theme", {})}>Theme</Button>
+          <Button variant="outline" onClick={() => run("display.list", {})}>Displays</Button>
+          <Button variant="outline" onClick={() => run("display.primary", {})}>Primary display</Button>
+        </Section>
 
-      <Section title="Window chrome" hint="Title, dock/taskbar progress, bounce attention">
-        <Btn onClick={() => run("window.title", { title: "Working…" })}>Title: Working…</Btn>
-        <Btn onClick={() => run("window.title", { title: "Tish Desktop — Native Chrome" })}>Reset title</Btn>
-        <Btn onClick={() => {
-          let p = progress >= 100 ? 10 : progress + 20
-          setProgress(p)
-          run("window.progress", { status: "normal", progress: p })
-        }}>Progress +20 ({progress}%)</Btn>
-        <Btn onClick={() => {
-          setProgress(0)
-          run("window.progress", { status: "none" })
-        }}>Clear progress</Btn>
-        <Btn onClick={() => run("window.attention", { kind: "informational" })}>Attention bounce</Btn>
-        <Btn onClick={() => run("window.attention", { kind: "critical" })}>Critical attention</Btn>
-      </Section>
+        <Section title="Clipboard" hint="clipboard.readText / writeText / clear">
+          <Button variant="secondary" onClick={() => run("clipboard.writeText", { text: clipText })}>Write text</Button>
+          <Button variant="secondary" onClick={() => run("clipboard.readText", {})}>Read text</Button>
+          <Button variant="outline" onClick={() => run("clipboard.clear", {})}>Clear</Button>
+          <p class="w-full text-xs text-muted-foreground mt-1 truncate">Buffer: {clipText}</p>
+        </Section>
 
-      <Section title="Notifications" hint={"OS permission: " + perm + " — request before show; errors stay in the log instead of crashing"}>
-        <Btn onClick={() => run("notification.permissionState", {})}>Permission state</Btn>
-        <Btn onClick={() => run("notification.requestPermission", {})}>Request permission</Btn>
-        <Btn onClick={() => run("notification.show", {
-          title: "Tish Desktop",
-          body: "Native notification from shell broker"
-        })}>Show notification</Btn>
-        <Btn onClick={() => run("dialog.message", {
-          title: "Hello",
-          message: "Blocking message dialog via tauri-plugin-dialog"
-        })}>Message dialog</Btn>
-        <Btn onClick={() => run("opener.open", { url: "https://tishlang.com" })}>Open URL</Btn>
-      </Section>
+        <Section title="Global shortcuts" hint="Registers CmdOrCtrl+Shift+T → shortcut:demo">
+          <Button variant="secondary" onClick={() => run("shortcut.register", {
+            id: "demo",
+            accelerator: "CommandOrControl+Shift+T"
+          })}>Register demo</Button>
+          <Button variant="outline" onClick={() => run("shortcut.isRegistered", { id: "demo" })}>Is registered?</Button>
+          <Button variant="ghost" onClick={() => run("shortcut.unregister", { id: "demo" })}>Unregister</Button>
+          <Button variant="ghost" onClick={() => run("shortcut.unregisterAll", {})}>Unregister all</Button>
+        </Section>
 
-      <Section title="Context menu" hint="Or use the button; selection emits menu:action">
-        <Btn onClick={onContext}>Open context menu</Btn>
-      </Section>
+        <Section title="Dialogs" hint="message, open, save, confirm, ask; directory picker">
+          <Button variant="secondary" onClick={() => run("dialog.message", {
+            title: "Hello",
+            message: "Blocking message dialog"
+          })}>Message</Button>
+          <Button variant="secondary" onClick={() => run("dialog.open", {})}>Open file</Button>
+          <Button variant="secondary" onClick={() => run("dialog.open", { directory: true })}>Open folder</Button>
+          <Button variant="secondary" onClick={() => run("dialog.open", {
+            multiple: true,
+            filters: [{ name: "Text", extensions: ["txt", "md"] }]
+          })}>Open multi + filters</Button>
+          <Button variant="outline" onClick={() => run("dialog.save", {
+            filters: [{ name: "Text", extensions: ["txt"] }]
+          })}>Save</Button>
+          <Button variant="outline" onClick={() => run("dialog.confirm", {
+            title: "Confirm",
+            message: "Proceed?"
+          })}>Confirm</Button>
+          <Button variant="outline" onClick={() => run("dialog.ask", {
+            title: "Ask",
+            message: "Yes / No / Cancel?"
+          })}>Ask</Button>
+        </Section>
 
-      {err !== null ? <pre class="text-red-400 mb-4 text-sm whitespace-pre-wrap">{err}</pre> : null}
+        <Section title="Shell reveal / open" hint="opener-backed reveal + openPath">
+          <Button variant="secondary" onClick={() => run("shell.reveal", { path: "." })}>Reveal cwd</Button>
+          <Button variant="outline" onClick={() => run("shell.openPath", { path: "." })}>Open path</Button>
+          <Button variant="ghost" onClick={() => run("opener.open", { url: "https://tishlang.com" })}>Open URL</Button>
+        </Section>
 
-      <h2 class="text-lg font-semibold mb-2">Event log</h2>
-      <pre class="bg-slate-900 border border-slate-800 rounded-lg p-4 text-xs whitespace-pre-wrap min-h-40">
-        {log.length === 0 ? "Actions and menu/tray events appear here." : log.join("\n")}
-      </pre>
+        <Section title="Menu.set" hint="Requires { menus: [{ label, items }] }; actions emit menu:action">
+          <Button variant="secondary" onClick={() => run("menu.set", {
+            menus: [
+              {
+                label: "Native Chrome",
+                items: [
+                  { id: "app:about", label: "About Native Chrome" },
+                  { separator: true },
+                  { id: "app:quit", label: "Quit" }
+                ]
+              }
+            ]
+          })}>Set app menu</Button>
+          <Button variant="outline" onClick={onContext}>Context menu</Button>
+        </Section>
+
+        <Section title="Dock / badge" hint="macOS dock badge often needs notification permission">
+          <Button variant="secondary" onClick={() => {
+            let n = badge + 1
+            setBadge(n)
+            run("dock.badge", { count: n })
+          }}>Badge +1 ({badge})</Button>
+          <Button variant="outline" onClick={() => {
+            setBadge(0)
+            run("dock.badge", { count: 0 })
+          }}>Clear badge</Button>
+          <Button variant="ghost" onClick={() => run("dock.badgeLabel", { label: "Hi" })}>Badge label</Button>
+        </Section>
+
+        <Section title="Tray / status item" hint="Tooltip + macOS menu-bar title">
+          <Button variant="secondary" onClick={() => {
+            let t = "Tish · " + String(Date.now() % 10000)
+            setTrayTitle(t)
+            run("tray.title", { text: t })
+          }}>Set tray title</Button>
+          <Button variant="outline" onClick={() => {
+            setTrayTitle("")
+            run("tray.title", { text: "" })
+          }}>Clear title</Button>
+          <Button variant="ghost" onClick={() => run("tray.tooltip", { text: "Status: idle · " + trayTitle })}>Tooltip</Button>
+        </Section>
+
+        <Section title="Window chrome" hint="Title, progress, attention">
+          <Button variant="secondary" onClick={() => {
+            let p = progress >= 100 ? 10 : progress + 20
+            setProgress(p)
+            run("window.progress", { status: "normal", progress: p })
+          }}>Progress +20 ({progress}%)</Button>
+          <Button variant="outline" onClick={() => {
+            setProgress(0)
+            run("window.progress", { status: "none" })
+          }}>Clear progress</Button>
+          <Button variant="ghost" onClick={() => run("window.attention", { kind: "informational" })}>Attention</Button>
+        </Section>
+
+        <Section title="Notifications" hint={"OS permission: " + perm}>
+          <Button variant="secondary" onClick={() => run("notification.permissionState", {})}>Permission</Button>
+          <Button variant="secondary" onClick={() => run("notification.requestPermission", {})}>Request</Button>
+          <Button onClick={() => run("notification.show", {
+            title: "Tish Desktop",
+            body: "Native notification from shell broker"
+          })}>Show</Button>
+        </Section>
+
+        <Section title="Preferences (store)" hint="Non-secret prefs via tauri-plugin-store">
+          <Button variant="secondary" onClick={() => run("store.set", { key: "demo.theme", value: "dark" })}>Set demo.theme</Button>
+          <Button variant="secondary" onClick={() => run("store.get", { key: "demo.theme" })}>Get demo.theme</Button>
+          <Button variant="outline" onClick={() => run("store.keys", {})}>Keys</Button>
+          <Button variant="ghost" onClick={() => run("store.delete", { key: "demo.theme" })}>Delete</Button>
+        </Section>
+
+        <Section title="Autostart / updater" hint="Updater emits updater:progress during download">
+          <Button variant="secondary" onClick={() => run("autostart.isEnabled", {})}>Autostart?</Button>
+          <Button variant="outline" onClick={() => run("autostart.enable", {})}>Enable</Button>
+          <Button variant="outline" onClick={() => run("autostart.disable", {})}>Disable</Button>
+          <Button variant="ghost" onClick={() => run("updater.currentVersion", {})}>Current version</Button>
+          <Button variant="ghost" onClick={() => run("updater.check", {})}>Check updates</Button>
+        </Section>
+
+        <Section title="Secrets / auth" hint="PKCE loopback or redirectMode: scheme → tish-desktop://oauth/callback">
+          <Button variant="secondary" onClick={() => run("secrets.set", { key: "demo.token", value: "s3cret" })}>Set secret</Button>
+          <Button variant="secondary" onClick={() => run("secrets.get", { key: "demo.token" })}>Get secret</Button>
+          <Button variant="outline" onClick={() => run("secrets.delete", { key: "demo.token" })}>Delete secret</Button>
+          <Button variant="outline" onClick={() => run("auth.status", {})}>Auth status</Button>
+          <Button variant="ghost" onClick={() => run("auth.logout", {})}>Logout</Button>
+          <p class="w-full text-xs text-muted-foreground mt-1">
+            IdP redirect URIs: http://127.0.0.1:&lt;port&gt;/callback and tish-desktop://oauth/callback
+          </p>
+        </Section>
+
+        <Section title="File drop / power / process" hint="Drop files on the window; sleep block is refcounted">
+          <Button variant="secondary" onClick={() => run("power.preventSleep", {})}>Prevent sleep</Button>
+          <Button variant="outline" onClick={() => run("power.allowSleep", {})}>Allow sleep</Button>
+          <Button variant="ghost" onClick={() => run("process.pid", {})}>PID</Button>
+          <p class="w-full text-xs text-muted-foreground mt-1">
+            Last drop: {dropPaths.length === 0 ? "(none yet)" : dropPaths.join(", ")}
+          </p>
+        </Section>
+
+        <Section title="Allowlisted shell / http" hint="shellAllow echo · httpAllow example.com">
+          <Button variant="secondary" onClick={() => run("shell.exec", { name: "echo", args: ["hello-from-tish"] })}>shell.exec echo</Button>
+          <Button variant="outline" onClick={() => run("http.fetch", { url: "https://example.com" })}>http.fetch example.com</Button>
+        </Section>
+      </main>
+
+      <footer class="nc-log">
+        <div class="flex items-center gap-3 px-4 py-2 border-b border-border shrink-0">
+          <h2 class="text-sm font-semibold tracking-tight">Event log</h2>
+          <Badge tone="outline">{String(log.length)}</Badge>
+          {err !== null ? <span class="text-xs text-destructive truncate flex-1">{err}</span> : <span class="text-xs text-muted-foreground flex-1">invoke + listen stream</span>}
+          <Button variant="ghost" size="sm" onClick={() => { setLog([]); setErr(null) }}>Clear</Button>
+        </div>
+        <pre class="nc-log-body px-4 py-3 text-xs whitespace-pre-wrap font-mono leading-relaxed">
+          {log.length === 0 ? "Actions and events appear here." : log.join("\n")}
+        </pre>
+      </footer>
     </div>
 }
 

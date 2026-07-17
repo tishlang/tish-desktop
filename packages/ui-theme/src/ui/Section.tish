@@ -1,0 +1,16 @@
+/** @jsxImportSource lattish */
+
+fn cx(base, extra) {
+  if (extra === null || extra === undefined || extra === "") return base
+  return base + " " + extra
+}
+
+export fn Section(props) {
+  let hint = props.hint
+  let hasHint = hint !== null && hint !== undefined && hint !== ""
+  return <section class={cx("mb-8", props.class)}>
+      {props.title !== null && props.title !== undefined ? <h2 class="text-lg font-semibold mb-1 text-foreground">{props.title}</h2> : null}
+      {hasHint ? <p class="text-sm text-muted-foreground mb-3">{hint}</p> : null}
+      <div class="flex flex-wrap gap-2">{props.children}</div>
+    </section>
+}

@@ -22,14 +22,10 @@ pub struct WindowSpec {
     pub width: f64,
     #[serde(default = "default_height")]
     pub height: f64,
-    /// macOS title bar: `visible` | `transparent` | `overlay`. Default `transparent`
-    /// so the bar blends with the window background (matches prior chrome).
     #[serde(default = "default_title_bar_style")]
     pub title_bar_style: String,
-    /// Hide the native title text (useful with `overlay` + a custom toolbar).
     #[serde(default)]
     pub hidden_title: bool,
-    /// Native window decorations (traffic lights / borders). Default true.
     #[serde(default = "default_true")]
     pub decorations: bool,
 }
@@ -42,6 +38,22 @@ fn default_height() -> f64 {
 }
 fn default_title_bar_style() -> String {
     "transparent".into()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShellAllowEntry {
+    pub name: String,
+    pub cmd: String,
+    #[serde(default)]
+    pub args_prefix: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthConfig {
+    #[serde(default)]
+    pub token_hosts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,12 +73,31 @@ pub struct PluginFlags {
     pub single_instance: bool,
     #[serde(default = "default_true")]
     pub notification: bool,
+    #[serde(default = "default_true")]
+    pub clipboard: bool,
+    #[serde(default = "default_true")]
+    pub global_shortcut: bool,
+    #[serde(default = "default_true")]
+    pub window_state: bool,
+    #[serde(default = "default_true")]
+    pub os: bool,
+    #[serde(default = "default_true")]
+    pub store: bool,
+    #[serde(default = "default_true")]
+    pub autostart: bool,
+    #[serde(default)]
+    pub updater: bool,
+    #[serde(default = "default_true")]
+    pub process: bool,
+    #[serde(default)]
+    pub shell: bool,
+    #[serde(default)]
+    pub http: bool,
+    #[serde(default = "default_true")]
+    pub auth: bool,
 }
 
 impl Default for PluginFlags {
-    /// All plugins on — must match serde defaults. `#[derive(Default)]` would
-    /// zero bools to false and, via pending `createWindow` + AND-merge, disable
-    /// every plugin (including notification → `state() called before manage()`).
     fn default() -> Self {
         Self {
             dialog: true,
@@ -76,6 +107,17 @@ impl Default for PluginFlags {
             opener: true,
             single_instance: true,
             notification: true,
+            clipboard: true,
+            global_shortcut: true,
+            window_state: true,
+            os: true,
+            store: true,
+            autostart: true,
+            updater: false,
+            process: true,
+            shell: false,
+            http: false,
+            auth: true,
         }
     }
 }
@@ -95,9 +137,14 @@ pub struct RunConfig {
     pub fs_root: Option<String>,
     #[serde(default)]
     pub extensions: Vec<String>,
-    /// Tish numbers are f64 → JSON floats; accept both integer and float forms.
     #[serde(default, deserialize_with = "deserialize_opt_u64_from_number")]
     pub tick_ms: Option<u64>,
+    #[serde(default)]
+    pub shell_allow: Vec<ShellAllowEntry>,
+    #[serde(default)]
+    pub http_allow: Vec<String>,
+    #[serde(default)]
+    pub auth: Option<AuthConfig>,
 }
 
 fn deserialize_opt_u64_from_number<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
@@ -113,6 +160,63 @@ where
             .or_else(|| n.as_f64().map(|f| f.max(0.0) as u64)),
         Some(_) => None,
     })
+}
+
+pub fn permissions_from_plugins(p: &PluginFlags) -> Vec<String> {
+    let mut perms = vec!["fs:scoped".into()];
+    if p.dialog {
+        perms.push("dialog".into());
+    }
+    if p.tray {
+        perms.push("tray".into());
+    }
+    if p.menu {
+        perms.push("menu".into());
+    }
+    if p.deep_link {
+        perms.push("deep-link".into());
+    }
+    if p.opener {
+        perms.push("opener".into());
+    }
+    if p.notification {
+        perms.push("notification".into());
+    }
+    if p.clipboard {
+        perms.push("clipboard".into());
+    }
+    if p.global_shortcut {
+        perms.push("global-shortcut".into());
+    }
+    if p.window_state {
+        perms.push("window-state".into());
+    }
+    if p.os {
+        perms.push("os".into());
+    }
+    if p.store {
+        perms.push("store".into());
+    }
+    if p.autostart {
+        perms.push("autostart".into());
+    }
+    if p.updater {
+        perms.push("updater".into());
+    }
+    if p.process {
+        perms.push("process".into());
+    }
+    if p.shell {
+        perms.push("shell".into());
+    }
+    if p.http {
+        perms.push("http".into());
+    }
+    if p.auth {
+        perms.push("auth".into());
+        perms.push("secrets".into());
+    }
+    perms
 }
 
 #[cfg(test)]
@@ -134,10 +238,20 @@ mod tests {
         });
         let cfg: RunConfig = serde_json::from_value(v).expect("parse");
         assert_eq!(cfg.tick_ms, Some(1000));
-        // Omitted keys use serde default_true — and Default must match.
         assert!(cfg.plugins.notification);
         assert!(PluginFlags::default().notification);
+        assert!(PluginFlags::default().opener);
     }
+}
+
+/// In-flight OAuth PKCE session awaiting a redirect callback (loopback or scheme).
+#[derive(Debug, Clone)]
+pub struct PendingOAuth {
+    pub verifier: String,
+    pub csrf_state: String,
+    pub token_url: String,
+    pub client_id: String,
+    pub redirect_uri: String,
 }
 
 pub struct AppState {
@@ -147,31 +261,33 @@ pub struct AppState {
     pub permissions: Mutex<Vec<String>>,
     pub extensions: Mutex<Vec<String>>,
     pub config: Mutex<RunConfig>,
-    /// Status-item / tray icon (set during setup when tray plugin enabled).
     pub tray: Mutex<Option<tauri::tray::TrayIcon>>,
+    pub sleep_blocks: Mutex<u32>,
+    pub shortcuts: Mutex<HashMap<String, String>>,
+    /// Held while `sleep_blocks > 0`; dropping it re-allows the system to sleep.
+    pub keepawake_guard: Mutex<Option<keepawake::KeepAwake>>,
+    /// In-memory cache of the last-issued OAuth access token: `(token, expires_at_unix_secs)`.
+    pub auth_cache: Mutex<Option<(String, u64)>>,
+    pub pending_oauth: Mutex<Option<PendingOAuth>>,
 }
 
 impl AppState {
     pub fn new(config: RunConfig) -> Self {
-        let fs_root = config
-            .fs_root
-            .as_ref()
-            .map(PathBuf::from);
+        let fs_root = config.fs_root.as_ref().map(PathBuf::from);
+        let permissions = permissions_from_plugins(&config.plugins);
         Self {
             fs_root: Mutex::new(fs_root),
             fs_watcher: FsWatcher::default(),
             handlers: Mutex::new(HashMap::new()),
-            permissions: Mutex::new(vec![
-                "dialog".into(),
-                "tray".into(),
-                "menu".into(),
-                "deep-link".into(),
-                "notification".into(),
-                "fs:scoped".into(),
-            ]),
+            permissions: Mutex::new(permissions),
             extensions: Mutex::new(config.extensions.clone()),
             config: Mutex::new(config),
             tray: Mutex::new(None),
+            sleep_blocks: Mutex::new(0),
+            shortcuts: Mutex::new(HashMap::new()),
+            keepawake_guard: Mutex::new(None),
+            auth_cache: Mutex::new(None),
+            pending_oauth: Mutex::new(None),
         }
     }
 
@@ -179,14 +295,19 @@ impl AppState {
         self.handlers.lock().insert(name, f);
     }
 
-    pub fn call_handler(&self, name: &str, args_json: serde_json::Value) -> Result<serde_json::Value, String> {
+    pub fn call_handler(
+        &self,
+        name: &str,
+        args_json: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
         let handlers = self.handlers.lock();
         let Some(f) = handlers.get(name) else {
             return Err(format!("unknown command: {name}"));
         };
         let arg = crate::value_util::json_to_value(&args_json);
         let result = value_call(&Value::Function(Arc::clone(f)), &[arg]);
-        crate::value_util::value_to_json(&result).ok_or_else(|| "handler returned non-JSON value".into())
+        crate::value_util::value_to_json(&result)
+            .ok_or_else(|| "handler returned non-JSON value".into())
     }
 
     pub fn has_permission(&self, perm: &str) -> bool {
@@ -194,7 +315,6 @@ impl AppState {
     }
 }
 
-/// Pending run config set from Tish before `run()` blocks.
 pub static PENDING_CONFIG: once_cell::sync::Lazy<Mutex<Option<RunConfig>>> =
     once_cell::sync::Lazy::new(|| Mutex::new(None));
 

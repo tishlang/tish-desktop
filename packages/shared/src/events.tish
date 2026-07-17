@@ -1,0 +1,11 @@
+// Shared desktop event name constants (UI + docs).
+export const EVT_TICK = "tick"
+export const EVT_MENU_ACTION = "menu:action"
+export const EVT_TRAY_ACTION = "tray:action"
+export const EVT_DEEP_LINK = "deep-link"
+export const EVT_FS_CHANGED = "fs:changed"
+export const EVT_THEME_CHANGED = "theme:changed"
+export const EVT_FILE_DROP = "file-drop"
+export const EVT_AUTH_CHANGED = "auth:changed"
+export const EVT_AUTH_ERROR = "auth:error"
+export const EVT_UPDATER_PROGRESS = "updater:progress"

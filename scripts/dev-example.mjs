@@ -71,6 +71,35 @@ function waitForHttp(url, timeoutMs = 60000) {
   })
 }
 
+function newestMtimeMs(dir) {
+  let newest = 0
+  if (!fs.existsSync(dir)) return 0
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, ent.name)
+    if (ent.isDirectory()) {
+      if (ent.name === "target" || ent.name === "gen") continue
+      newest = Math.max(newest, newestMtimeMs(p))
+    } else {
+      newest = Math.max(newest, fs.statSync(p).mtimeMs)
+    }
+  }
+  return newest
+}
+
+function shellNeedsRebuild() {
+  if (!fs.existsSync(shellPath)) return true
+  const shellMtime = fs.statSync(shellPath).mtimeMs
+  const hostSrc = path.join(root, "crates/tish_desktop/src")
+  const hostToml = path.join(root, "crates/tish_desktop/Cargo.toml")
+  const shellSrc = path.join(exampleDir, "src")
+  const newest = Math.max(
+    newestMtimeMs(hostSrc),
+    fs.existsSync(hostToml) ? fs.statSync(hostToml).mtimeMs : 0,
+    newestMtimeMs(shellSrc)
+  )
+  return newest > shellMtime
+}
+
 function buildShell(tishBin) {
   console.log(`[dev] building shell with ${tishBin} → ${shellOut}`)
   const result = spawnSync(
@@ -198,7 +227,10 @@ async function warmupVite(baseUrl) {
 await warmupVite(`http://localhost:${port}`)
 
 const tishBin = resolveTish()
-if (forceRebuild || !fs.existsSync(shellPath)) {
+if (forceRebuild || shellNeedsRebuild()) {
+  if (!forceRebuild && fs.existsSync(shellPath)) {
+    console.log(`[dev] host/shell sources newer than ${shellOut} — rebuilding`)
+  }
   buildShell(tishBin)
 } else {
   console.log(`[dev] using existing shell ${shellOut} (pass --rebuild to recompile)`)

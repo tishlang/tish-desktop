@@ -1,5 +1,17 @@
 // Pure shared helpers — safe for shell (native) and UI (JS) targets.
 export const PROTOCOL = "desktop/v1"
+export {
+  EVT_TICK,
+  EVT_MENU_ACTION,
+  EVT_TRAY_ACTION,
+  EVT_DEEP_LINK,
+  EVT_FS_CHANGED,
+  EVT_THEME_CHANGED,
+  EVT_FILE_DROP,
+  EVT_AUTH_CHANGED,
+  EVT_AUTH_ERROR,
+  EVT_UPDATER_PROGRESS,
+} from "./events.tish"
 
 export fn joinPath(base, name) {
   if (base.endsWith("/")) return base + name

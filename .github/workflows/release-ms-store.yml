@@ -1,0 +1,20 @@
+# Draft — MSIX artifact; Partner Center submit is manual.
+name: Release MS Store
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package MSIX
+        shell: pwsh
+        run: ./scripts/distribute/package-msstore.ps1
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msix
+          path: dist/release/windows-msstore/**
+        continue-on-error: true

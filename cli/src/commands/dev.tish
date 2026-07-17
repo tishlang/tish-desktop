@@ -1,0 +1,215 @@
+// Port of scripts/dev-example.mjs — Tish-first via tish:process + tish:fs.
+// tish:process has exec (blocking) but no spawn; long-running Vite is
+// backgrounded with `sh -c '… &'`. Pass --legacy-node to call the Node script.
+import { exit, cwd, exec, env } from "tish:process"
+import { readFile } from "tish:fs"
+import {
+  flagValue,
+  firstPositional,
+  hasFlag,
+  joinPath,
+  pathExists,
+  q,
+  repoRoot,
+  resolveTish,
+} from "../paths.tish"
+
+fn examplePort(name) {
+  if (name === "file-browser") return 5174
+  if (name === "native-chrome") return 5175
+  return 5173
+}
+
+fn exampleShellOut(name) {
+  if (name === "basic") return "dist/basic-shell"
+  if (name === "file-browser") return "dist/file-browser-shell"
+  if (name === "native-chrome") return "dist/native-chrome-shell"
+  return "dist/" + name + "-shell"
+}
+
+fn sleepMs(ms) {
+  exec("sleep " + String(ms / 1000))
+}
+
+fn httpCode(url) {
+  let out = "/tmp/tish-desktop-http-code.txt"
+  exec("curl -s -o /dev/null -w '%{http_code}' " + q(url) + " > " + q(out) + " 2>/dev/null || echo 000 > " + q(out))
+  if (!pathExists(out)) return "000"
+  return String(readFile(out)).trim()
+}
+
+fn waitForHttp(url, timeoutMs) {
+  let maxTries = Math.floor(timeoutMs / 250)
+  if (maxTries < 1) maxTries = 1
+  let n = 0
+  while (n < maxTries) {
+    let code = httpCode(url)
+    let num = Number(code)
+    if (num >= 200 && num < 500) return true
+    sleepMs(250)
+    n = n + 1
+  }
+  return false
+}
+
+fn warmupVite(baseUrl) {
+  let urls = [
+    baseUrl + "/",
+    baseUrl + "/assets/app.css",
+    baseUrl + "/bridge-boot.js",
+    baseUrl + "/ui/main.tish",
+  ]
+  let i = 0
+  while (i < urls.length) {
+    exec("curl -s -o /dev/null " + q(urls[i]) + " >/dev/null 2>&1 || true")
+    i = i + 1
+  }
+  let bodyFile = "/tmp/tish-desktop-vite-main.txt"
+  exec(
+    "curl -s -H 'Accept: text/javascript' " + q(baseUrl + "/ui/main.tish") +
+      " > " + q(bodyFile) + " 2>/dev/null || true"
+  )
+  if (pathExists(bodyFile)) {
+    let text = String(readFile(bodyFile))
+    let parts = text.split('from "')
+    let p = 1
+    while (p < parts.length) {
+      let rest = parts[p]
+      let end = rest.indexOf('"')
+      if (end > 0) {
+        let spec = rest.slice(0, end)
+        let next = null
+        if (spec.startsWith("./")) {
+          next = baseUrl + "/ui/" + spec.slice(2)
+        } else if (spec.startsWith("/")) {
+          next = baseUrl + spec
+        }
+        if (next !== null) {
+          exec(
+            "curl -s -o /dev/null -H 'Accept: text/javascript' " + q(next) +
+              " >/dev/null 2>&1 || true"
+          )
+        }
+      }
+      p = p + 1
+    }
+  }
+  console.log("[dev] warmed key Vite modules via curl")
+}
+
+fn buildShell(tishBin, exampleDir, shellOut, shellPath) {
+  console.log("[dev] building shell with " + tishBin + " → " + shellOut)
+  let code = exec(
+    "cd " + q(exampleDir) + " && " + q(tishBin) +
+      " build --target native --native-backend rust src/main.tish -o " + q(shellOut)
+  )
+  if (code !== 0) {
+    console.error("[dev] shell build failed (exit " + String(code) + ")")
+    exit(code)
+  }
+  if (!pathExists(shellPath)) {
+    console.error("[dev] shell binary missing after build: " + shellPath)
+    exit(1)
+  }
+}
+
+fn shellNeedsRebuild(root, exampleDir, shellPath) {
+  if (!pathExists(shellPath)) return true
+  // Recursive: any file under host/shell sources newer than the binary.
+  let marker = "/tmp/tish-desktop-shell-stale.txt"
+  let hostSrc = joinPath(root, "crates/tish_desktop/src")
+  let hostToml = joinPath(root, "crates/tish_desktop/Cargo.toml")
+  let shellSrc = joinPath(exampleDir, "src")
+  exec(
+    "if [ -n \"$(find " + q(hostSrc) + " " + q(shellSrc) + " " + q(hostToml) +
+      " -type f -newer " + q(shellPath) + " 2>/dev/null | head -1)\" ]; then echo yes; else echo no; fi > " +
+      q(marker)
+  )
+  if (!pathExists(marker)) return true
+  return String(readFile(marker)).trim() === "yes"
+}
+
+fn killVite(port) {
+  exec("pkill -f " + q("vite --port " + String(port)) + " >/dev/null 2>&1 || true")
+}
+
+export fn runDev(args) {
+  let root = repoRoot()
+  let forceRebuild = hasFlag(args, "--rebuild")
+  let legacyNode = hasFlag(args, "--legacy-node")
+  if (env !== null && env["TISH_DESKTOP_DEV_LEGACY"] === "1") {
+    legacyNode = true
+  }
+
+  let name = flagValue(args, "--example")
+  if (name === null) name = firstPositional(args)
+  if (name === null) name = "basic"
+
+  if (legacyNode) {
+    let script = joinPath(root, "scripts/dev-example.mjs")
+    console.log("[dev] --legacy-node → node " + script)
+    let rebuildFlag = forceRebuild ? " --rebuild" : ""
+    let code = exec("node " + q(script) + " " + q(name) + rebuildFlag)
+    exit(code)
+  }
+
+  let exampleDir = joinPath(root, "examples/" + name)
+  if (!pathExists(exampleDir)) {
+    let here = cwd()
+    if (pathExists(joinPath(here, "src/main.tish")) && pathExists(joinPath(here, "package.json"))) {
+      exampleDir = here
+      name = "app"
+    } else {
+      console.error("[dev] example not found: " + exampleDir)
+      console.error("      pass --example basic|file-browser|native-chrome, or run inside an app dir")
+      exit(1)
+    }
+  }
+
+  let port = examplePort(name)
+  if (name === "app") port = 5173
+  let shellOut = exampleShellOut(name)
+  if (name === "app") shellOut = "dist/app-shell"
+  let shellPath = joinPath(exampleDir, shellOut)
+
+  console.log("[dev] " + name + " — starting Vite :" + String(port) + ", then native desktop shell")
+
+  let cssCode = exec(
+    "cd " + q(exampleDir) + " && tish run --feature fs scripts/build-css.tish"
+  )
+  if (cssCode !== 0) {
+    console.log("[dev] build-css failed (continuing; styles may be stale)")
+  }
+
+  killVite(port)
+  let viteCmd =
+    "cd " + q(exampleDir) +
+    " && npx vite --port " + String(port) + " --strictPort >/tmp/tish-desktop-vite-" +
+    String(port) + ".log 2>&1 &"
+  exec(viteCmd)
+
+  let baseUrl = "http://localhost:" + String(port)
+  if (!waitForHttp(baseUrl + "/", 60000)) {
+    console.error("[dev] timed out waiting for " + baseUrl + "/")
+    killVite(port)
+    exit(1)
+  }
+  console.log("[dev] Vite is ready at " + baseUrl + "/")
+  warmupVite(baseUrl)
+
+  let tishBin = resolveTish()
+  if (forceRebuild || shellNeedsRebuild(root, exampleDir, shellPath)) {
+    if (!forceRebuild && pathExists(shellPath)) {
+      console.log("[dev] host/shell sources newer than " + shellOut + " — rebuilding")
+    }
+    buildShell(tishBin, exampleDir, shellOut, shellPath)
+  } else {
+    console.log("[dev] using existing shell " + shellOut + " (pass --rebuild to recompile)")
+  }
+
+  console.log("[dev] launching desktop app: " + shellOut)
+  let appCode = exec("cd " + q(exampleDir) + " && " + q(shellPath))
+  console.log("[dev] desktop app exited (code=" + String(appCode) + ")")
+  killVite(port)
+  exit(appCode)
+}

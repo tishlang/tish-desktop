@@ -3,6 +3,7 @@ import { useState, useEffect } from "lattish"
 import { tw } from "tish-tailwind/tw"
 import { invoke, listen } from "@tish-desktop/desktop-api"
 import { parentPath } from "@tish-desktop/shared"
+import { Button, ScrollArea } from "@tish-desktop/ui-theme"
 import * as store from "./fileBrowserStore.tish"
 
 export fn FileBrowser() {
@@ -40,30 +41,34 @@ export fn FileBrowser() {
   }
 
   return (
-    <div class="min-h-screen flex bg-slate-950 text-slate-100">
-      <aside class="w-80 border-r border-slate-800 flex flex-col">
-        <div class="p-4 border-b border-slate-800">
-          <h1 class="text-lg font-bold">Files</h1>
-          <p class="text-xs text-slate-400 truncate">{snap.cwd}</p>
-          <button class="mt-2 text-sm text-sky-400" onClick={onUp}>Up</button>
+    <div class="min-h-screen flex bg-background text-foreground font-sans">
+      <aside class="w-80 border-r border-border flex flex-col bg-sidebar text-sidebar-foreground">
+        <div class="p-4 border-b border-sidebar-border">
+          <h1 class="text-lg font-bold tracking-tight">Files</h1>
+          <p class="text-xs text-muted-foreground truncate">{snap.cwd}</p>
+          <Button variant="ghost" size="sm" class="mt-2 px-0" onClick={onUp}>Up</Button>
         </div>
-        <ul class="flex-1 overflow-auto p-2">
-          {snap.entries.map((entry) => (
-            <li key={entry.path}>
-              <button
-                class={tw([
-                  "w-full text-left px-2 py-1 rounded text-sm",
-                  snap.selected?.path === entry.path ? "bg-slate-800" : "hover:bg-slate-900",
-                ])}
-                onClick={() => onOpen(entry)}
-              >
-                {entry.kind === "dir" ? "[dir] " : "[file] "}
-                {entry.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <div class="p-2 text-xs text-slate-500 border-t border-slate-800">
+        <ScrollArea class="flex-1 p-2">
+          <ul>
+            {snap.entries.map((entry) => (
+              <li key={entry.path}>
+                <button
+                  class={tw([
+                    "w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors",
+                    snap.selected?.path === entry.path
+                      ? "bg-accent text-accent-foreground"
+                      : "hover:bg-accent/60",
+                  ])}
+                  onClick={() => onOpen(entry)}
+                >
+                  {entry.kind === "dir" ? "[dir] " : "[file] "}
+                  {entry.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
+        <div class="p-2 text-xs text-muted-foreground border-t border-sidebar-border">
           {snap.status}{snap.error !== null ? " · " + snap.error : ""}
         </div>
       </aside>
@@ -72,9 +77,9 @@ export fn FileBrowser() {
           {snap.selected !== null ? snap.selected.name : "Select a file"}
         </h2>
         {snap.preview !== null ? (
-          <pre class="whitespace-pre-wrap text-sm bg-slate-900 p-4 rounded-lg">{snap.preview}</pre>
+          <pre class="whitespace-pre-wrap text-sm bg-card text-card-foreground border border-border p-4 rounded-lg">{snap.preview}</pre>
         ) : (
-          <p class="text-slate-500">Preview appears for text files under the read cap.</p>
+          <p class="text-muted-foreground">Preview appears for text files under the read cap.</p>
         )}
       </main>
     </div>

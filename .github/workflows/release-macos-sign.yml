@@ -1,0 +1,20 @@
+# Draft — requires Apple secrets. workflow_dispatch only.
+name: Release macOS sign
+
+on:
+  workflow_dispatch:
+
+# Secrets: APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_TEAM_ID,
+# APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_API_KEY_P8
+
+jobs:
+  sign:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign
+        run: bash scripts/distribute/sign-macos.sh
+        continue-on-error: true
+      - name: Notarize
+        run: bash scripts/distribute/notarize-macos.sh
+        continue-on-error: true

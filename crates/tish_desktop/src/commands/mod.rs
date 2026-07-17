@@ -1,3 +1,18 @@
+//! Broker dispatch: the webview calls `desktop_invoke(cmd, args)` which routes
+//! to a Tish-registered handler, one of the extra command modules below, or
+//! the built-in match arms at the bottom of `dispatch`.
+
+mod clipboard;
+mod dialog_extra;
+mod helpers;
+mod menu_set;
+mod power_process;
+pub(crate) mod secrets_auth;
+mod shell_os;
+mod shortcut;
+mod store_auto;
+mod window_extra;
+
 use serde_json::json;
 use tauri::menu::{Menu, MenuItem};
 use tauri::plugin::PermissionState;
@@ -11,47 +26,7 @@ use crate::fs_sandbox;
 use crate::state::AppState;
 use crate::windows;
 
-fn catch_err<T>(label: &str, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
-        Ok(r) => r,
-        Err(_) => Err(format!(
-            "{label} panicked — on macOS, allow notifications for this app (System Settings → Notifications)"
-        )),
-    }
-}
-
-fn permission_state_str(state: PermissionState) -> &'static str {
-    match state {
-        PermissionState::Granted => "granted",
-        PermissionState::Denied => "denied",
-        PermissionState::Prompt | PermissionState::PromptWithRationale => "prompt",
-    }
-}
-
-fn ensure_notification_plugin(app: &AppHandle, state: &AppState) -> Result<(), String> {
-    if !state.has_permission("notification") {
-        return Err("notification permission denied".into());
-    }
-    // Avoid NotificationExt::notification() → state() panic when plugin wasn't .init()'d.
-    if app
-        .try_state::<tauri_plugin_notification::Notification<tauri::Wry>>()
-        .is_none()
-    {
-        return Err(
-            "notification plugin not enabled — set plugins.notification: true in run()".into(),
-        );
-    }
-    Ok(())
-}
-
-fn window_for<'a>(app: &'a AppHandle, args: &serde_json::Value) -> Result<tauri::WebviewWindow, String> {
-    let label = args
-        .get("label")
-        .and_then(|v| v.as_str())
-        .unwrap_or("main");
-    app.get_webview_window(label)
-        .ok_or_else(|| format!("window not found: {label}"))
-}
+use helpers::{catch_err, ensure_notification, ensure_opener, permission_state_str, window_for};
 
 #[tauri::command]
 pub fn desktop_protocol() -> serde_json::Value {
@@ -69,6 +44,23 @@ pub fn desktop_invoke(
     dispatch(&app, &state, &cmd, args)
 }
 
+/// Extra command modules, tried in order before falling back to the built-in
+/// match below. Each returns `None` if it doesn't own `cmd`.
+type ExtraDispatch =
+    fn(&AppHandle, &AppState, &str, &serde_json::Value) -> Option<Result<serde_json::Value, String>>;
+
+const EXTRA_MODULES: &[ExtraDispatch] = &[
+    window_extra::try_dispatch,
+    dialog_extra::try_dispatch,
+    clipboard::try_dispatch,
+    shortcut::try_dispatch,
+    shell_os::try_dispatch,
+    store_auto::try_dispatch,
+    power_process::try_dispatch,
+    secrets_auth::try_dispatch,
+    menu_set::try_dispatch,
+];
+
 fn dispatch(
     app: &AppHandle,
     state: &AppState,
@@ -78,6 +70,12 @@ fn dispatch(
     // Custom Tish-registered handlers first
     if state.handlers.lock().contains_key(cmd) {
         return state.call_handler(cmd, args);
+    }
+
+    for try_dispatch in EXTRA_MODULES {
+        if let Some(result) = try_dispatch(app, state, cmd, &args) {
+            return result;
+        }
     }
 
     match cmd {
@@ -165,24 +163,6 @@ fn dispatch(
                 .buttons(MessageDialogButtons::Ok)
                 .blocking_show();
             Ok(json!({ "ok": true }))
-        }
-        "dialog.open" => {
-            if !state.has_permission("dialog") {
-                return Err("dialog permission denied".into());
-            }
-            let directory = args
-                .get("directory")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let mut builder = app.dialog().file();
-            if directory {
-                builder = builder.set_directory("/");
-            }
-            let picked = builder.blocking_pick_file();
-            Ok(json!({
-                "ok": true,
-                "path": picked.and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string()),
-            }))
         }
 
         // ── Dock / taskbar badge (macOS often requires notification authorization) ──
@@ -373,7 +353,7 @@ fn dispatch(
 
         // ── Native notifications ──
         "notification.permissionState" => {
-            ensure_notification_plugin(app, state)?;
+            ensure_notification(app, state)?;
             let state = catch_err("notification.permissionState", || {
                 app.notification()
                     .permission_state()
@@ -382,7 +362,7 @@ fn dispatch(
             Ok(json!({ "state": permission_state_str(state) }))
         }
         "notification.requestPermission" => {
-            ensure_notification_plugin(app, state)?;
+            ensure_notification(app, state)?;
             let state = catch_err("notification.requestPermission", || {
                 app.notification()
                     .request_permission()
@@ -391,7 +371,7 @@ fn dispatch(
             Ok(json!({ "state": permission_state_str(state) }))
         }
         "notification.show" => {
-            ensure_notification_plugin(app, state)?;
+            ensure_notification(app, state)?;
             let title = args
                 .get("title")
                 .and_then(|v| v.as_str())
@@ -445,6 +425,7 @@ fn dispatch(
 
         // ── Opener ──
         "opener.open" => {
+            ensure_opener(app, state)?;
             let url = args
                 .get("url")
                 .and_then(|v| v.as_str())

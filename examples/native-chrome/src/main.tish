@@ -1,4 +1,4 @@
-// Native chrome demo — dock badge, tray status, context menus, notifications.
+// Native chrome demo — full broker surface for OS chrome + advanced APIs.
 import { run, createWindow } from "cargo:tish_desktop"
 
 createWindow({
@@ -7,7 +7,6 @@ createWindow({
   title: "Tish Desktop — Native Chrome",
   width: 960,
   height: 720,
-  // Start visible so the demo can switch transparent / overlay at runtime.
   titleBarStyle: "visible",
   hiddenTitle: false
 })
@@ -20,6 +19,23 @@ run({
     deepLink: true,
     opener: true,
     notification: true,
+    clipboard: true,
+    globalShortcut: true,
+    windowState: true,
+    os: true,
+    store: true,
+    autostart: true,
+    process: true,
+    shell: true,
+    http: true,
+    auth: true,
     singleInstance: false
+  },
+  shellAllow: [
+    { name: "echo", cmd: "echo", argsPrefix: [] }
+  ],
+  httpAllow: ["example.com"],
+  auth: {
+    tokenHosts: ["oauth2.googleapis.com", "github.com", "login.microsoftonline.com"]
   }
 })

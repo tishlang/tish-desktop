@@ -1,0 +1,12 @@
+/** @jsxImportSource lattish */
+
+fn cx(base, extra) {
+  if (extra === null || extra === undefined || extra === "") return base
+  return base + " " + extra
+}
+
+export fn ScrollArea(props) {
+  return <div class={cx("relative overflow-auto", props.class)}>
+      {props.children}
+    </div>
+}

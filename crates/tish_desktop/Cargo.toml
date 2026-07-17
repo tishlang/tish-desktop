@@ -4,15 +4,27 @@ version = "0.1.0"
 edition = "2021"
 description = "cargo:tish_desktop — Tauri 2 host for Tish-first desktop apps"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/tishlang/tish-desktop"
+homepage = "https://tishlang.com"
+readme = "README.md"
+keywords = ["tish", "tauri", "desktop", "webview"]
+categories = ["gui", "development-tools"]
 
 [lib]
 name = "tish_desktop"
 crate-type = ["rlib"]
 
+[[bin]]
+name = "tish-desktop"
+path = "src/bin/tish_desktop.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+# Must match the `tish` CLI's Value ABI (same physical crate). Path for monorepo
+# `tish build`; for crates.io publish, switch to a versioned line that matches the
+# published tishlang_core the CLI was built against (ecosystem 2.39.x today).
 tishlang_core = { path = "../../../tish/crates/tish_core", features = ["send-values"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -21,9 +33,26 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-store = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-http = "2"
 notify = "6"
 parking_lot = "0.12"
 once_cell = "1"
 url = "2"
-tauri-plugin-notification = "2"
 notify-rust = "4"
+keyring = "3"
+keepawake = "0.5"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+tiny_http = "0.12"

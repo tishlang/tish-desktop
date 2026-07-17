@@ -1,0 +1,42 @@
+import { exit, cwd, exec } from "tish:process"
+import { mkdir, writeFile } from "tish:fs"
+import { firstPositional, joinPath, pathExists, q } from "../paths.tish"
+
+export fn runIcon(args) {
+  let dir = firstPositional(args)
+  let projectDir = cwd()
+  if (dir !== null) {
+    if (String(dir).startsWith("/")) projectDir = dir
+    else projectDir = joinPath(cwd(), dir)
+  }
+
+  let iconsDir = joinPath(projectDir, "icons")
+  mkdir(iconsDir, true)
+
+  // Minimal placeholder SVG icon set. Real raster generation can land later
+  // (sips / ImageMagick) once distribute scripts ship.
+  let svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">' +
+    '<rect width="1024" height="1024" rx="192" fill="#18181b"/>' +
+    '<circle cx="512" cy="512" r="280" fill="#10b981"/>' +
+    '<text x="512" y="580" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="320" font-weight="700" fill="#ffffff">T</text>' +
+    "</svg>"
+
+  let svgPath = joinPath(iconsDir, "icon.svg")
+  writeFile(svgPath, svg)
+  console.log("[icon] wrote " + svgPath)
+
+  // Best-effort PNG via `sips` on macOS when available.
+  let pngPath = joinPath(iconsDir, "icon.png")
+  let code = exec(
+    "command -v sips >/dev/null 2>&1 && sips -s format png " +
+      q(svgPath) + " --out " + q(pngPath) + " >/dev/null 2>&1"
+  )
+  if (code === 0 && pathExists(pngPath)) {
+    console.log("[icon] wrote " + pngPath)
+  } else {
+    console.log("[icon] PNG skipped (install sips/ImageMagick or convert icon.svg manually)")
+  }
+
+  console.log("[icon] place platform icons under " + iconsDir + " and point tauri.conf / bundler at them")
+}

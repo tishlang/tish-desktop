@@ -30,7 +30,8 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "entitlements": "entitlements/app.entitlements"
     }
   },
   "plugins": {
@@ -38,6 +39,14 @@
       "desktop": {
         "schemes": ["tish-desktop"]
       }
+    },
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://releases.example.com/tish-desktop/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "dialog": true,
+      "pubkey": "REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY"
     }
   }
 }

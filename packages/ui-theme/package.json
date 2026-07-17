@@ -1,0 +1,18 @@
+{
+  "name": "@tish-desktop/ui-theme",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared shadcn-like theme tokens and lattish UI primitives for Tish Desktop",
+  "tish": {
+    "module": "./src/index.tish"
+  },
+  "exports": {
+    ".": {
+      "tish": "./src/index.tish"
+    },
+    "./theme.css": "./src/theme.css",
+    "./theme-utilities.css": "./src/theme-utilities.css",
+    "./fonts.css": "./src/fonts.css"
+  }
+}

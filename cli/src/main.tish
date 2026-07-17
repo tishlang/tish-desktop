@@ -1,0 +1,76 @@
+// tish-desktop CLI entry — Tauri-like subcommands, Tish-first (scii-style).
+//
+//   tish run src/main.tish --feature process,fs -- <cmd> [args]
+//   ./dist/tish-desktop <cmd> [args]
+//   npx tish-desktop <cmd> [args]
+import { exit } from "tish:process"
+import { userArgs } from "./paths.tish"
+import { runInit } from "./commands/init.tish"
+import { runDev } from "./commands/dev.tish"
+import { runBuild } from "./commands/build.tish"
+import { runInfo } from "./commands/info.tish"
+import { runIcon } from "./commands/icon.tish"
+import { runDistribute } from "./commands/distribute.tish"
+
+fn usage() {
+  console.log("tish-desktop — Tish Desktop CLI")
+  console.log("")
+  console.log("Usage: tish-desktop <command> [options]")
+  console.log("")
+  console.log("Commands:")
+  console.log("  init [dir]              Scaffold a minimal desktop app")
+  console.log("  dev [--example name]    Vite UI + native shell (parity with scripts/dev-example.mjs)")
+  console.log("  build [dir]             Production UI + native shell → dist/")
+  console.log("  info                    Print tish / rustc / platform summary")
+  console.log("  icon [dir]              Generate icon set into project icons/")
+  console.log("  distribute <step>       Run scripts/distribute/* (build|sign|notarize|updater|release)")
+  console.log("  help                    Show this message")
+  console.log("")
+  console.log("Dev options:")
+  console.log("  --example <name>        Example under examples/ (basic|file-browser|native-chrome)")
+  console.log("  --rebuild               Force rebuild the native shell")
+  console.log("  --legacy-node           Transitional: call node scripts/dev-example.mjs")
+}
+
+let args = userArgs()
+let cmd = args.length > 0 ? args[0] : "help"
+let rest = []
+let i = 1
+while (i < args.length) {
+  rest.push(args[i])
+  i = i + 1
+}
+
+if (cmd === "help" || cmd === "--help" || cmd === "-h") {
+  usage()
+  exit(0)
+}
+
+if (cmd === "init") {
+  runInit(rest)
+  exit(0)
+}
+if (cmd === "dev") {
+  runDev(rest)
+  exit(0)
+}
+if (cmd === "build") {
+  runBuild(rest)
+  exit(0)
+}
+if (cmd === "info") {
+  runInfo(rest)
+  exit(0)
+}
+if (cmd === "icon") {
+  runIcon(rest)
+  exit(0)
+}
+if (cmd === "distribute") {
+  runDistribute(rest)
+  exit(0)
+}
+
+console.error("unknown command: " + cmd)
+usage()
+exit(1)

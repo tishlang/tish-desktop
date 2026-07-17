@@ -1,0 +1,55 @@
+import { exit, cwd, exec } from "tish:process"
+import {
+  firstPositional,
+  joinPath,
+  pathExists,
+  q,
+  repoRoot,
+  resolveTish,
+} from "../paths.tish"
+
+fn sh(cmd) {
+  console.log("-> " + cmd)
+  let code = exec(cmd)
+  if (code !== 0) {
+    console.error("x failed (exit " + String(code) + "): " + cmd)
+    exit(code)
+  }
+}
+
+export fn runBuild(args) {
+  let root = repoRoot()
+  let name = firstPositional(args)
+  let projectDir = cwd()
+
+  if (name !== null && pathExists(joinPath(root, "examples/" + name))) {
+    projectDir = joinPath(root, "examples/" + name)
+  } else if (name !== null) {
+    let candidate = name
+    if (!String(name).startsWith("/")) candidate = joinPath(cwd(), name)
+    if (pathExists(candidate)) projectDir = candidate
+  }
+
+  if (!pathExists(joinPath(projectDir, "package.json"))) {
+    console.error("build: no package.json in " + projectDir)
+    exit(1)
+  }
+
+  let tishBin = resolveTish()
+  console.log("[build] project " + projectDir)
+
+  sh("cd " + q(projectDir) + " && npm run build:ui")
+
+  // Prefer package script; fall back to a conventional shell output path.
+  let shellCode = exec("cd " + q(projectDir) + " && npm run build:shell")
+  if (shellCode !== 0) {
+    let out = "dist/app-shell"
+    console.log("[build] npm run build:shell missing/failed — compiling " + out)
+    sh(
+      "cd " + q(projectDir) + " && " + q(tishBin) +
+        " build --target native --native-backend rust src/main.tish -o " + q(out)
+    )
+  }
+
+  console.log("[build] done → " + projectDir + "/dist/")
+}

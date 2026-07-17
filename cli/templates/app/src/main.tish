@@ -1,0 +1,27 @@
+// Minimal Tish Desktop shell — Tauri runs inside cargo:tish_desktop.
+import { run, handle, createWindow } from "cargo:tish_desktop"
+
+handle("app.hello", (args) => {
+  return { ok: true, message: "hello from shell Tish", args: args }
+})
+
+createWindow({
+  label: "main",
+  url: "http://localhost:__DEV_PORT__/",
+  title: "__APP_NAME__",
+  width: 900,
+  height: 600,
+  titleBarStyle: "transparent"
+})
+
+run({
+  tickMs: 1000,
+  plugins: {
+    dialog: true,
+    tray: true,
+    menu: true,
+    deepLink: true,
+    opener: true,
+    singleInstance: false
+  }
+})

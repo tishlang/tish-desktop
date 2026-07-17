@@ -1,0 +1,15 @@
+# Draft — Azure Trusted Signing or PFX secrets. workflow_dispatch only.
+name: Release Windows sign
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sign:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign
+        shell: pwsh
+        run: ./scripts/distribute/sign-windows.ps1
+        continue-on-error: true

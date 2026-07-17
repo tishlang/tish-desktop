@@ -1,0 +1,23 @@
+/** @jsxImportSource lattish */
+
+fn cx(base, extra) {
+  if (extra === null || extra === undefined || extra === "") return base
+  return base + " " + extra
+}
+
+export fn Input(props) {
+  let className = cx(
+    "flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+    props.class
+  )
+  return <input
+      type={props.type !== null && props.type !== undefined ? props.type : "text"}
+      class={className}
+      value={props.value}
+      placeholder={props.placeholder}
+      disabled={props.disabled}
+      onInput={props.onInput}
+      onChange={props.onChange}
+      onKeyDown={props.onKeyDown}
+    />
+}

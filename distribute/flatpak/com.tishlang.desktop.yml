@@ -1,0 +1,7 @@
+# Flathub stub — fill in when publishing to Flathub.
+app-id: com.tishlang.desktop
+runtime: org.freedesktop.Platform
+runtime-version: "23.08"
+sdk: org.freedesktop.Sdk
+command: tish-desktop
+modules: []

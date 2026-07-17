@@ -1,0 +1,68 @@
+import { cwd, exec, env } from "tish:process"
+import { readFile } from "tish:fs"
+import { joinPath, pathExists, repoRoot, resolveTish, cliRoot, q } from "../paths.tish"
+
+fn trim(s) {
+  return String(s).trim()
+}
+
+fn capture(cmd) {
+  let out = "/tmp/tish-desktop-info-capture.txt"
+  let code = exec(cmd + " > " + q(out) + " 2>&1")
+  let text = ""
+  if (pathExists(out)) {
+    text = String(readFile(out))
+  }
+  return { code: code, text: trim(text) }
+}
+
+fn versionLine(label, cmd) {
+  let r = capture(cmd)
+  if (r.text !== "") {
+    let line = r.text.split("\n")[0]
+    console.log(label + ": " + line)
+  } else {
+    console.log(label + ": not found (exit " + String(r.code) + ")")
+  }
+}
+
+export fn runInfo(_args) {
+  let root = repoRoot()
+  let tishBin = resolveTish()
+  console.log("tish-desktop info")
+  console.log("repo: " + root)
+  console.log("cli:  " + cliRoot())
+  console.log("cwd:  " + cwd())
+  console.log("")
+  versionLine("tish", q(tishBin) + " --version")
+  versionLine("rustc", "rustc --version")
+  versionLine("cargo", "cargo --version")
+  versionLine("node", "node --version")
+
+  let crateToml = joinPath(root, "crates/tish_desktop/Cargo.toml")
+  if (pathExists(crateToml)) {
+    let text = String(readFile(crateToml))
+    let lines = text.split("\n")
+    let i = 0
+    while (i < lines.length) {
+      let line = trim(lines[i])
+      if (line.startsWith("version")) {
+        console.log("tish_desktop crate: " + line)
+        break
+      }
+      i = i + 1
+    }
+  }
+
+  let platform = "unknown"
+  if (env !== null && env["OSTYPE"] !== null && env["OSTYPE"] !== undefined) {
+    platform = String(env["OSTYPE"])
+  } else {
+    let u = capture("uname -s")
+    if (u.text !== "") platform = u.text.split("\n")[0]
+  }
+  console.log("platform: " + platform)
+  console.log("")
+  console.log("Plugins (host defaults): dialog, tray, menu, deepLink, opener, notifications")
+  console.log("Broker protocol: desktop/v1")
+}

@@ -5,6 +5,11 @@
   "description": "Tish-first desktop runtime on Tauri 2",
   "scripts": {
     "check": "cargo check -p tish_desktop",
+    "tish-desktop": "node cli/bin/tish-desktop.js",
+    "format": "tish-format examples packages cli scripts 2>/dev/null || npx --yes @tishlang/tish-format examples packages cli",
+    "format:check": "tish-format --check examples packages cli 2>/dev/null || npx --yes @tishlang/tish-format --check examples packages cli",
+    "lint:tish": "tish-lint examples packages cli 2>/dev/null || npx --yes @tishlang/tish-lint examples packages cli",
+    "lint:rust": "cargo fmt -p tish_desktop -- --check && cargo clippy -p tish_desktop -- -D warnings",
     "example:basic": "npm --prefix examples/basic install && npm --prefix examples/basic run dev",
     "example:basic:rebuild": "npm --prefix examples/basic install && npm --prefix examples/basic run dev -- --rebuild",
     "example:file-browser": "npm --prefix examples/file-browser install && npm --prefix examples/file-browser run dev",
@@ -13,6 +18,15 @@
     "example:native-chrome:rebuild": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run dev -- --rebuild",
     "build:basic": "npm --prefix examples/basic install && npm --prefix examples/basic run build:ui && npm --prefix examples/basic run build:shell",
     "build:file-browser": "npm --prefix examples/file-browser install && npm --prefix examples/file-browser run build:ui && npm --prefix examples/file-browser run build:shell",
-    "build:native-chrome": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run build:ui && npm --prefix examples/native-chrome run build:shell"
+    "build:native-chrome": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run build:ui && npm --prefix examples/native-chrome run build:shell",
+    "distribute:build": "node scripts/distribute/build-release.mjs",
+    "distribute:sign": "bash scripts/distribute/sign-macos.sh",
+    "distribute:notarize": "bash scripts/distribute/notarize-macos.sh",
+    "distribute:updater": "node scripts/distribute/publish-updater.mjs",
+    "distribute:release": "node scripts/distribute/build-release.mjs && node scripts/distribute/publish-github-release.mjs"
+  },
+  "devDependencies": {
+    "@tishlang/tish-format": "^2.39.0",
+    "@tishlang/tish-lint": "^2.39.0"
   }
 }

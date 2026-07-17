@@ -1,0 +1,14 @@
+/** @jsxImportSource lattish */
+
+fn cx(base, extra) {
+  if (extra === null || extra === undefined || extra === "") return base
+  return base + " " + extra
+}
+
+export fn Separator(props) {
+  let vertical = props.orientation === "vertical"
+  let className = vertical
+    ? "shrink-0 bg-border w-px h-full"
+    : "shrink-0 bg-border h-px w-full"
+  return <div role="separator" class={cx(className, props.class)} />
+}

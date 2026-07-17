@@ -1,0 +1,15 @@
+# Draft: dry-run crates.io publish. Enable when tishlang_core version strategy is settled.
+name: Crates release (draft)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish dry-run
+        run: cargo publish -p tish_desktop --dry-run
+        continue-on-error: true

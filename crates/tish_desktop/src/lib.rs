@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, WindowEvent};
 use tishlang_core::{value_call, NativeFn, Value};
 
 use crate::state::{AppState, PluginFlags, RunConfig, PENDING_CONFIG, PENDING_HANDLERS};
@@ -206,6 +206,30 @@ fn build_and_run(
     if plugins.notification {
         builder = builder.plugin(tauri_plugin_notification::init());
     }
+    if plugins.clipboard {
+        builder = builder.plugin(tauri_plugin_clipboard_manager::init());
+    }
+    if plugins.global_shortcut {
+        builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
+    }
+    if plugins.window_state {
+        builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    }
+    if plugins.os {
+        builder = builder.plugin(tauri_plugin_os::init());
+    }
+    if plugins.store {
+        builder = builder.plugin(tauri_plugin_store::Builder::default().build());
+    }
+    if plugins.autostart {
+        builder = builder.plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ));
+    }
+    if plugins.updater {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
 
     builder
         .manage(state)
@@ -214,6 +238,15 @@ fn build_and_run(
             commands::desktop_invoke,
             commands::desktop_emit_tick,
         ])
+        .on_window_event(|window, event| {
+            if let WindowEvent::ThemeChanged(theme) = event {
+                let theme = format!("{theme:?}").to_lowercase();
+                let _ = window.app_handle().emit(
+                    "theme:changed",
+                    serde_json::json!({ "theme": theme }),
+                );
+            }
+        })
         .setup(move |app| {
             let handle = app.handle().clone();
 
@@ -222,7 +255,11 @@ fn build_and_run(
                 let dl = handle.clone();
                 app.deep_link().on_open_url(move |event| {
                     for url in event.urls() {
-                        let _ = dl.emit("deep-link", serde_json::json!({ "url": url.to_string() }));
+                        let s = url.to_string();
+                        if commands::secrets_auth::is_oauth_scheme_callback(&s) {
+                            let _ = commands::secrets_auth::complete_oauth_callback(&dl, &s);
+                        }
+                        let _ = dl.emit("deep-link", serde_json::json!({ "url": s }));
                     }
                 });
             }

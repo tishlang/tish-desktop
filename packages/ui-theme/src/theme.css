@@ -1,0 +1,122 @@
+/*
+ * shadcn-style design tokens for Tish Desktop.
+ * Dark is the default on :root (zinc/slate neutrals + emerald accent).
+ * Opt into light with :root.light or html.light.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+
+  --card: 240 6% 7%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 240 6% 7%;
+  --popover-foreground: 0 0% 98%;
+
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 240 4% 16%;
+  --secondary-foreground: 0 0% 98%;
+
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 64.9%;
+
+  --accent: 240 4% 18%;
+  --accent-foreground: 0 0% 98%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 240 4% 18%;
+  --input: 240 4% 18%;
+  --ring: 160 84% 39%;
+
+  --sidebar: 240 8% 5%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-border: 240 4% 14%;
+  --sidebar-accent: 240 4% 14%;
+  --sidebar-accent-foreground: 0 0% 98%;
+
+  --radius: 0.5rem;
+}
+
+:root.light,
+html.light {
+  color-scheme: light;
+
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 6% 10%;
+
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
+
+  --accent: 240 5% 96%;
+  --accent-foreground: 240 6% 10%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 240 6% 90%;
+  --input: 240 6% 90%;
+  --ring: 160 84% 39%;
+
+  --sidebar: 240 5% 96%;
+  --sidebar-foreground: 240 10% 3.9%;
+  --sidebar-border: 240 6% 90%;
+  --sidebar-accent: 240 5% 92%;
+  --sidebar-accent-foreground: 240 6% 10%;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 240 6% 7%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 6% 7%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 4% 16%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 64.9%;
+  --accent: 240 4% 18%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 4% 18%;
+  --input: 240 4% 18%;
+  --ring: 160 84% 39%;
+  --sidebar: 240 8% 5%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-border: 240 4% 14%;
+  --sidebar-accent: 240 4% 14%;
+  --sidebar-accent-foreground: 0 0% 98%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}

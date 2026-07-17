@@ -1,0 +1,56 @@
+import { exit, exec } from "tish:process"
+import { firstPositional, joinPath, pathExists, q, repoRoot } from "../paths.tish"
+
+fn usage() {
+  console.log("Usage: tish-desktop distribute <step>")
+  console.log("")
+  console.log("Steps (scripts under scripts/distribute/):")
+  console.log("  build      node scripts/distribute/build-release.mjs")
+  console.log("  sign       bash scripts/distribute/sign-macos.sh")
+  console.log("  notarize   bash scripts/distribute/notarize-macos.sh")
+  console.log("  updater    node scripts/distribute/publish-updater.mjs")
+  console.log("  release    build-release + publish-github-release")
+  console.log("  github     node scripts/distribute/publish-github-release.mjs")
+}
+
+export fn runDistribute(args) {
+  let step = firstPositional(args)
+  if (step === null || step === "help" || step === "--help") {
+    usage()
+    exit(step === null ? 1 : 0)
+  }
+
+  let root = repoRoot()
+  let distDir = joinPath(root, "scripts/distribute")
+  if (!pathExists(distDir)) {
+    console.error("distribute: missing " + distDir)
+    console.error("  (scripts land in Phase 6 — create them or run from a complete checkout)")
+    exit(1)
+  }
+
+  let cmd = null
+  if (step === "build") {
+    cmd = "node " + q(joinPath(distDir, "build-release.mjs"))
+  } else if (step === "sign") {
+    cmd = "bash " + q(joinPath(distDir, "sign-macos.sh"))
+  } else if (step === "notarize") {
+    cmd = "bash " + q(joinPath(distDir, "notarize-macos.sh"))
+  } else if (step === "updater") {
+    cmd = "node " + q(joinPath(distDir, "publish-updater.mjs"))
+  } else if (step === "github") {
+    cmd = "node " + q(joinPath(distDir, "publish-github-release.mjs"))
+  } else if (step === "release") {
+    cmd =
+      "node " + q(joinPath(distDir, "build-release.mjs")) +
+      " && node " + q(joinPath(distDir, "publish-github-release.mjs"))
+  } else {
+    console.error("unknown distribute step: " + step)
+    usage()
+    exit(1)
+  }
+
+  console.log("[distribute] " + step)
+  console.log("-> " + cmd)
+  let code = exec("cd " + q(root) + " && " + cmd)
+  exit(code)
+}

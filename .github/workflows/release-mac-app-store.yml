@@ -1,0 +1,19 @@
+# Draft — stops at uploadable pkg; human submits via Transporter.
+name: Release Mac App Store
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package MAS
+        run: bash scripts/distribute/package-macos-appstore.sh
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mas-pkg
+          path: dist/release/macos-mas/**
+        continue-on-error: true

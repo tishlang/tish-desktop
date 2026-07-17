@@ -5,7 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Native Chrome</title>
     <style>
-      html, body, #root { margin: 0; min-height: 100%; background: #020617; color: #f1f5f9; }
+      html, body, #root {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: hsl(240 10% 3.9%);
+        color: hsl(0 0% 98%);
+      }
+      .nc-shell {
+        height: 100%;
+        overflow: hidden;
+      }
+      .nc-main {
+        height: 100%;
+        overflow-y: auto;
+        box-sizing: border-box;
+        /* room for fixed event-log footer (~11.5rem) */
+        padding-bottom: 12.5rem;
+      }
+      .nc-log {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 40;
+        max-height: 45vh;
+        display: flex;
+        flex-direction: column;
+        background: hsl(var(--card, 240 6% 7%));
+        color: hsl(var(--card-foreground, 0 0% 98%));
+        border-top: 1px solid hsl(var(--border, 240 4% 18%));
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+      }
+      .nc-log-body {
+        height: 10rem;
+        overflow: auto;
+        margin: 0;
+      }
     </style>
     <link rel="stylesheet" href="/assets/app.css" />
   </head>

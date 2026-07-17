@@ -18,6 +18,10 @@ export default defineConfig({
         "../../packages/desktop-api/src/desktopHost.tish"
       ),
       "@tish-desktop/shared": path.resolve(__dirname, "../../packages/shared/src/index.tish"),
+      "@tish-desktop/ui-theme": path.resolve(
+        __dirname,
+        "../../packages/ui-theme/src/index.tish"
+      ),
       lattish: path.resolve(__dirname, "../../../lattish/src/Lattish.tish"),
       "lattish/jsx-runtime": path.resolve(__dirname, "../../../lattish/src/jsx-runtime.tish"),
       "tish-tailwind/tw": path.resolve(__dirname, "../../../tish-tailwind/src/tw.tish"),

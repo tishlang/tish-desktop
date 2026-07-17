@@ -1,5 +1,6 @@
+use serde_json::json;
 use tauri::webview::{PageLoadEvent, PageLoadPayload};
-use tauri::{AppHandle, Manager, TitleBarStyle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, TitleBarStyle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri::window::Color;
 
 use crate::state::WindowSpec;
@@ -56,6 +57,22 @@ pub fn create_from_spec(app: &AppHandle, spec: &WindowSpec) -> Result<(), String
 
     let win = builder.build().map_err(|e| e.to_string())?;
 
+    let label_for_drop = spec.label.clone();
+    let app_for_drop = app.clone();
+    win.on_webview_event(move |event| {
+        use tauri::{DragDropEvent, WebviewEvent};
+        if let WebviewEvent::DragDrop(DragDropEvent::Drop { paths, .. }) = event {
+            let paths: Vec<String> = paths
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
+            let _ = app_for_drop.emit(
+                "file-drop",
+                json!({ "paths": paths, "label": label_for_drop }),
+            );
+        }
+    });
+
     // Safety: if the page never reaches Finished, still surface the window.
     let label = spec.label.clone();
     let app2 = app.clone();
@@ -66,7 +83,6 @@ pub fn create_from_spec(app: &AppHandle, spec: &WindowSpec) -> Result<(), String
         }
     });
 
-    let _ = win;
     Ok(())
 }
 

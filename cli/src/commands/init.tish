@@ -1,0 +1,149 @@
+import { exit, cwd } from "tish:process"
+import { mkdir, readFile, writeFile, readDir, isDir } from "tish:fs"
+import {
+  basename,
+  cliRoot,
+  firstPositional,
+  joinPath,
+  pathExists,
+  q,
+  repoRoot,
+} from "../paths.tish"
+
+fn relPath(fromDir, toDir) {
+  if (fromDir === toDir) return "."
+  let prefix = fromDir
+  if (!prefix.endsWith("/")) prefix = prefix + "/"
+  if (String(toDir).startsWith(prefix)) {
+    return String(toDir).slice(prefix.length)
+  }
+  // Prefer absolute when the scaffold is outside the repo tree.
+  let rootPrefix = toDir
+  if (!rootPrefix.endsWith("/")) rootPrefix = rootPrefix + "/"
+  if (!String(fromDir).startsWith(rootPrefix) && !String(fromDir).startsWith(String(toDir))) {
+    return toDir
+  }
+  let fromParts = String(fromDir).split("/")
+  let toParts = String(toDir).split("/")
+  let i = 0
+  while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) {
+    i = i + 1
+  }
+  let parts = []
+  let ups = 0
+  let u = i
+  while (u < fromParts.length) {
+    if (fromParts[u] !== "") {
+      parts.push("..")
+      ups = ups + 1
+    }
+    u = u + 1
+  }
+  // Too many hops → absolute (avoids ../../Users/... from /tmp).
+  if (ups > 3) return toDir
+  let d = i
+  while (d < toParts.length) {
+    if (toParts[d] !== "") parts.push(toParts[d])
+    d = d + 1
+  }
+  if (parts.length === 0) return "."
+  return parts.join("/")
+}
+
+fn replaceAll(text, from, to) {
+  return String(text).split(from).join(to)
+}
+
+fn applyReplacements(text, appName, relRoot, shellOut, port) {
+  let out = String(text)
+  out = replaceAll(out, "__APP_NAME__", appName)
+  out = replaceAll(out, "__ROOT__", relRoot)
+  out = replaceAll(out, "__SHELL_OUT__", shellOut)
+  out = replaceAll(out, "__DEV_PORT__", port)
+  return out
+}
+
+fn copyTemplateFile(src, dest, appName, relRoot, shellOut, port) {
+  let text = readFile(src)
+  if (text === null || String(text).startsWith("Error:")) {
+    console.error("init: failed to read template " + src)
+    exit(1)
+  }
+  let out = applyReplacements(text, appName, relRoot, shellOut, port)
+  let slash = dest.lastIndexOf("/")
+  if (slash > 0) {
+    let parent = dest.slice(0, slash)
+    if (parent !== "" && !pathExists(parent)) {
+      mkdir(parent, true)
+    }
+  }
+  writeFile(dest, out)
+  console.log("  wrote " + dest)
+}
+
+fn walkCopy(srcDir, destDir, appName, relRoot, shellOut, port) {
+  if (!pathExists(srcDir)) {
+    console.error("init: template missing: " + srcDir)
+    exit(1)
+  }
+  mkdir(destDir, true)
+  let entries = readDir(srcDir)
+  if (entries === null) {
+    console.error("init: cannot readDir " + srcDir)
+    exit(1)
+  }
+  let i = 0
+  while (i < entries.length) {
+    let name = String(entries[i])
+    if (name === "." || name === "..") {
+      i = i + 1
+      continue
+    }
+    let src = joinPath(srcDir, name)
+    let dest = joinPath(destDir, name)
+    if (isDir(src)) {
+      walkCopy(src, dest, appName, relRoot, shellOut, port)
+    } else {
+      copyTemplateFile(src, dest, appName, relRoot, shellOut, port)
+    }
+    i = i + 1
+  }
+}
+
+export fn runInit(args) {
+  let dirArg = firstPositional(args)
+  if (dirArg === null) dirArg = "my-desktop-app"
+  let here = cwd()
+  let target = dirArg
+  if (!String(dirArg).startsWith("/")) {
+    target = joinPath(here, dirArg)
+  }
+  if (pathExists(target) && isDir(target)) {
+    let pkg = joinPath(target, "package.json")
+    if (pathExists(pkg)) {
+      console.error("init: directory already has package.json: " + target)
+      exit(1)
+    }
+  }
+
+  let root = repoRoot()
+  let templates = joinPath(cliRoot(), "templates/app")
+  let appName = basename(target)
+  if (appName === "" || appName === "." || appName === "/") appName = "my-desktop-app"
+
+  let relRoot = relPath(target, root)
+  let shellOut = "dist/" + appName + "-shell"
+  let port = "5173"
+
+  console.log("[init] scaffolding " + target)
+  console.log("[init] repo root → " + relRoot)
+  mkdir(target, true)
+  walkCopy(templates, target, appName, relRoot, shellOut, port)
+
+  console.log("")
+  console.log("Next:")
+  console.log("  cd " + q(target))
+  console.log("  npm install")
+  console.log("  npx tish-desktop dev")
+  console.log("  # or: npm run dev")
+}

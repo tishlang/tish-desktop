@@ -1,0 +1,27 @@
+name: Release publish GitHub
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Set true to publish"
+        required: true
+        default: "false"
+
+jobs:
+  publish:
+    if: github.event.inputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Publish GitHub release + updater
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          node scripts/distribute/publish-github-release.mjs
+          node scripts/distribute/publish-updater.mjs
+        continue-on-error: true
