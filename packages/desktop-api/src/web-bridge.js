@@ -82,6 +82,13 @@ async function invokeState(cmd, args = {}) {
     }
     return { ok: true, deleted, revision: rev };
   }
+  if (cmd === "state.surfaces") {
+    // Pure web has no native surface registry; expose the logical web surface.
+    return {
+      ok: true,
+      surfaces: [{ id: "web", kind: "web", label: "web" }],
+    };
+  }
   return null;
 }
 

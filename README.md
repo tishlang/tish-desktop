@@ -2,7 +2,7 @@
 
 Cross-device **Tish app runtime** (umbrella): shell Tish + BrokerCore (`state.*` / `desktop/v1`) + Tauri desktop webviews. **Lattish is optional** — use BYO UI or `init --template bare`. Apple native stays on **tish-apple**. Public shell entry: `cargo:tish_app` (alias of `cargo:tish_desktop`).
 
-See [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md), [STRATEGY.md](./STRATEGY.md), [docs/UPSTREAM.md](./docs/UPSTREAM.md).
+See [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md), [docs/HYBRID.md](./docs/HYBRID.md) (native / hybrid / webview surfaces), [docs/PARITY.md](./docs/PARITY.md) (web · desktop · mobile matrix), [STRATEGY.md](./STRATEGY.md), [docs/UPSTREAM.md](./docs/UPSTREAM.md).
 
 ## Quick start
 

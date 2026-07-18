@@ -73,7 +73,7 @@ export fn firstPositional(args) {
   while (i < args.length) {
     let a = args[i]
     if (!String(a).startsWith("-")) return a
-    if ((a === "--example" || a === "--dir" || a === "--out" || a === "--template" || a === "--platform" || a === "--surface" || a === "--resolve" || a === "--importer") && i + 1 < args.length) {
+    if ((a === "--example" || a === "--dir" || a === "--out" || a === "--template" || a === "--platform" || a === "--surface" || a === "--resolve" || a === "--importer" || a === "--device" || a === "--apple") && i + 1 < args.length) {
       i = i + 2
       continue
     }

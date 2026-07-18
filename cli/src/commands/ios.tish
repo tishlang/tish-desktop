@@ -1,0 +1,124 @@
+// Launch iOS examples on the Simulator (no Xcode UI).
+// Examples live in tish-desktop; the UIKit host comes from a sibling tish-apple checkout.
+//
+//   tish-desktop ios --example hello-ios
+//   tish-desktop ios --example hello-ios --launch-only
+//   tish-desktop ios --example hello-ios --device "iPhone 16"
+import { exit, cwd, exec, env } from "tish:process"
+import {
+  flagValue,
+  firstPositional,
+  hasFlag,
+  joinPath,
+  pathExists,
+  q,
+  repoRoot,
+} from "../paths.tish"
+
+fn usage() {
+  console.log("tish-desktop ios — build + launch an iOS example on the Simulator")
+  console.log("")
+  console.log("Usage: tish-desktop ios [options]")
+  console.log("")
+  console.log("Options:")
+  console.log("  --example <name>   hello-ios (default) — under examples/")
+  console.log("  --device <name>    Preferred simulator (IOS_SIM_DEVICE)")
+  console.log("  --launch-only      Skip rebuild; only simctl install/launch")
+  console.log("  --build-only       Rust staticlib + xcodebuild (no launch)")
+  console.log("  --apple <path>     Path to tish-apple (or TISH_APPLE); required for tish-ios dep")
+  console.log("")
+  console.log("Requires Xcode CLI tools (xcodebuild, simctl). Does not open Xcode.app.")
+  console.log("Examples are owned by tish-desktop; tish-apple provides the host crate only.")
+}
+
+fn dirnameOf(p) {
+  let s = String(p)
+  let i = s.lastIndexOf("/")
+  if (i < 0) return "."
+  if (i === 0) return "/"
+  return s.slice(0, i)
+}
+
+fn resolveAppleRoot(args) {
+  let fromFlag = flagValue(args, "--apple")
+  if (fromFlag !== null) return fromFlag
+  let fromEnv = env !== null ? env["TISH_APPLE"] : null
+  if (fromEnv !== null && fromEnv !== undefined && fromEnv !== "") return fromEnv
+  let root = repoRoot()
+  let sibling = joinPath(dirnameOf(root), "tish-apple")
+  if (pathExists(joinPath(sibling, "crates/tish-ios/Cargo.toml"))) {
+    return sibling
+  }
+  let alt = joinPath(dirnameOf(dirnameOf(root)), "tish-apple")
+  if (pathExists(joinPath(alt, "crates/tish-ios/Cargo.toml"))) {
+    return alt
+  }
+  return null
+}
+
+export fn runIos(args) {
+  if (hasFlag(args, "--help") || hasFlag(args, "-h") || firstPositional(args) === "help") {
+    usage()
+    exit(0)
+  }
+
+  let example = flagValue(args, "--example")
+  if (example === null) {
+    let pos = firstPositional(args)
+    if (pos !== null && pos !== "help") {
+      example = pos
+    } else {
+      example = "hello-ios"
+    }
+  }
+
+  let root = repoRoot()
+  let exampleDir = joinPath(root, "examples/" + example)
+  if (!pathExists(joinPath(exampleDir, "package.json"))) {
+    console.error("example not found: " + exampleDir)
+    console.error("iOS demos live under tish-desktop/examples/ (not tish-apple).")
+    exit(1)
+  }
+  if (!pathExists(joinPath(exampleDir, "scripts/run-sim.sh"))) {
+    console.error("example has no scripts/run-sim.sh: " + example)
+    exit(1)
+  }
+
+  let apple = resolveAppleRoot(args)
+  if (apple === null) {
+    console.error("tish-apple checkout not found (needed for tish-ios host crate).")
+    console.error("Set TISH_APPLE or pass --apple /path/to/tish-apple")
+    exit(1)
+  }
+  // Ensure npm file: dep resolves (package.json expects ../../../tish-apple from examples/*).
+  let expectedApple = joinPath(dirnameOf(root), "tish-apple")
+  if (apple !== expectedApple && !pathExists(joinPath(exampleDir, "node_modules/tish-ios"))) {
+    console.log("note: tish-apple at " + apple)
+    console.log("package.json file: dep expects sibling " + expectedApple)
+    console.log("If npm install fails, symlink or set the path accordingly.")
+  }
+
+  let device = flagValue(args, "--device")
+  let envPrefix = ""
+  if (device !== null) {
+    envPrefix = "IOS_SIM_DEVICE=" + q(device) + " "
+  }
+
+  console.log("example:    " + exampleDir)
+  console.log("tish-apple: " + apple)
+
+  exec("cd " + q(exampleDir) + " && npm install --silent")
+
+  if (hasFlag(args, "--launch-only")) {
+    exec("cd " + q(exampleDir) + " && " + envPrefix + "npm run launch:sim")
+    exit(0)
+  }
+  if (hasFlag(args, "--build-only")) {
+    exec("cd " + q(exampleDir) + " && npm run build")
+    exec("cd " + q(exampleDir) + " && " + envPrefix + "npm run xcodebuild:sim")
+    exit(0)
+  }
+
+  exec("cd " + q(exampleDir) + " && " + envPrefix + "npm run run")
+  exit(0)
+}

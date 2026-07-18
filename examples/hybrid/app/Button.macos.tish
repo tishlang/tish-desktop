@@ -1,0 +1,5 @@
+// AppKit Button — same exports as Button.web / Button.webview.
+export fn Button(props) {
+  let title = props.title === null ? "Button" : props.title
+  return <button title={title} onClick={props.onPress} />
+}

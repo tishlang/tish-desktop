@@ -1,0 +1,134 @@
+// hello-ios — switch between full Native and full Webview surfaces.
+// Both panes exercise the same BrokerCore features (state.*, dialog.*, notification.*).
+// No Tauri / no createSurface — ios.run only.
+//
+// From `examples/hello-ios/`: `npm install` then `npm run run`
+
+import { ios, invoke, useState } from "tish:ios"
+import { NativePane } from "./NativePane"
+import { demoWebviewHtml } from "./webviewDemo"
+
+fn App() {
+  let [mode, setMode] = useState("native")
+  let [count, setCount] = useState(0)
+  let [docId, setDocId] = useState("a")
+  let [shared, setShared] = useState(null)
+  let [note, setNote] = useState("")
+  let [flag, setFlag] = useState(false)
+
+  let persist = (path, value) => {
+    invoke("state.set", { path: path, value: value })
+  }
+
+  let hydrate = () => {
+    let r = invoke("state.get", { path: "selection.docId" })
+    if (r && r.value !== null) {
+      setShared(r.value)
+      setDocId(r.value)
+    }
+    let c = invoke("state.get", { path: "demo.count" })
+    if (c && c.value !== null) {
+      setCount(c.value)
+    }
+    let n = invoke("state.get", { path: "demo.note" })
+    if (n && n.value !== null) {
+      setNote(n.value)
+    }
+    let f = invoke("state.get", { path: "demo.flag" })
+    if (f && f.value !== null) {
+      setFlag(f.value === true)
+    }
+  }
+
+  let select = (id) => {
+    persist("selection.docId", id)
+    setDocId(id)
+    setShared(id)
+  }
+
+  let notify = () => {
+    invoke("notification.requestPermission", {})
+    invoke("notification.show", {
+      title: "Hello iOS",
+      body: "doc " + docId + " · count " + count,
+    })
+  }
+
+  let alert = () => {
+    invoke("dialog.message", {
+      title: "Hello iOS",
+      message: "doc " + docId + " · note " + note + " · flag " + flag,
+    })
+  }
+
+  let goNative = () => {
+    hydrate()
+    setMode("native")
+  }
+
+  let goWebview = () => {
+    // Push current local state into the broker so the webview seeds / stays in sync.
+    persist("demo.count", count)
+    persist("demo.note", note)
+    persist("demo.flag", flag)
+    persist("selection.docId", docId)
+    setMode("webview")
+  }
+
+  let modeBar = (
+    <div>
+      <span>{"Surface: " + mode + " (same features in both)"}</span>
+      <row>
+        <button onClick={goNative}>{"Native"}</button>
+        <button onClick={goWebview}>{"Webview"}</button>
+      </row>
+      <rule />
+    </div>
+  )
+
+  if (mode === "webview") {
+    let html = demoWebviewHtml({
+      count: count,
+      note: note,
+      flag: flag,
+      docId: docId,
+    })
+    return (
+      <column>
+        {modeBar}
+        <webview
+          id={"demo-main"}
+          bridge={true}
+          height={560}
+          html={html}
+          onBridgeInvoke={(msg) => invoke(msg.cmd, msg.args ?? {})}
+        />
+      </column>
+    )
+  }
+
+  return (
+    <scrollable height={640}>
+      {modeBar}
+      <NativePane
+        count={count}
+        setCount={setCount}
+        note={note}
+        setNote={setNote}
+        flag={flag}
+        setFlag={setFlag}
+        docId={docId}
+        shared={shared}
+        onSelect={select}
+        onRefresh={hydrate}
+        onNotify={notify}
+        onAlert={alert}
+        onCount={(n) => persist("demo.count", n)}
+        onNote={(v) => persist("demo.note", v)}
+        onFlag={(v) => persist("demo.flag", v)}
+      />
+    </scrollable>
+  )
+}
+
+ios.run(App)

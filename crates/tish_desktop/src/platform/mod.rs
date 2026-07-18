@@ -1,12 +1,15 @@
-//! PlatformHost — thin adapters over native UI hosts (apple / future ms / lin).
+//! PlatformHost — thin adapters over native UI hosts (apple / ms / lin / android).
 
 use serde_json::Value;
 use tishlang_core::Value as TishValue;
 
+mod android;
 mod apple;
 mod lin;
 mod ms;
 
+#[allow(unused_imports)]
+pub use android::AndroidPlatformHost;
 #[allow(unused_imports)]
 pub use apple::ApplePlatformHost;
 #[allow(unused_imports)]
@@ -19,6 +22,7 @@ pub enum PlatformId {
     Apple,
     Ms,
     Lin,
+    Android,
     DesktopTauri,
 }
 
@@ -37,7 +41,7 @@ pub trait PlatformHost: Send + Sync {
     }
 }
 
-/// Active host for the current build (apple when feature enabled + macOS).
+/// Active host for the current build (apple / ms / lin when feature + OS match).
 pub fn current_host() -> Box<dyn PlatformHost> {
     #[cfg(all(feature = "platform-apple", target_os = "macos"))]
     {
@@ -50,6 +54,29 @@ pub fn current_host() -> Box<dyn PlatformHost> {
     #[cfg(all(feature = "platform-lin", target_os = "linux"))]
     {
         return Box::new(LinPlatformHost);
+    }
+    // Feature enabled off-target (CI): still prefer the named host for attach contracts.
+    #[cfg(all(feature = "platform-ms", not(target_os = "windows"), not(all(feature = "platform-apple", target_os = "macos"))))]
+    {
+        return Box::new(MsPlatformHost);
+    }
+    #[cfg(all(feature = "platform-lin", not(target_os = "linux"), not(feature = "platform-ms"), not(all(feature = "platform-apple", target_os = "macos"))))]
+    {
+        return Box::new(LinPlatformHost);
+    }
+    #[cfg(all(feature = "platform-android", target_os = "android"))]
+    {
+        return Box::new(AndroidPlatformHost);
+    }
+    #[cfg(all(
+        feature = "platform-android",
+        not(target_os = "android"),
+        not(feature = "platform-ms"),
+        not(feature = "platform-lin"),
+        not(all(feature = "platform-apple", target_os = "macos"))
+    ))]
+    {
+        return Box::new(AndroidPlatformHost);
     }
     Box::new(DesktopOnlyHost)
 }

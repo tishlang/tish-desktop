@@ -1,0 +1,4 @@
+// Universal fallback — native shell may queue createSurface without AppKit tags.
+export fn Sidebar() {
+  return null
+}

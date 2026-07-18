@@ -15,9 +15,24 @@ Umbrella repo: **tish-desktop**. Public shell entry: `cargo:tish_app` (alias of 
 
 | Surface | Host | Build |
 |---------|------|-------|
-| `native` | tish-apple (macOS/iOS) / future ms/lin | `--surface native` |
-| `webview` | Tauri or WKWebView + bridge | `--surface webview` |
+| `native` | tish-apple (macOS/iOS), tish-ms, tish-lin, tish-android | `--surface native` |
+| `webview` | Tauri (desktop) or WKWebView + bridge | `--surface webview` |
 | `web` | Vite only | `--surface web` + `web-bridge.js` |
+
+**Authoring layers** (canonical BYO — no required JSX Surface components):
+
+1. **Shell registration** — `createSurface({ kind: "native"|"webview"|"web", id, url?, root? })` then `run()` (desktop).
+2. **In-tree embed** — host tag `<webview bridge … />` inside a native tree (macOS / iOS).
+
+Use **Surface** vocabulary (`SurfaceKind`, `createSurface`, `--surface`). Do **not** name product APIs `NativeView` / `WebView` (RN `View` is a lattish layout adapter). Optional later lattish sugar: `NativeSurface` / `WebSurface` over (1)/(2) only — see [LATTISH.md](./LATTISH.md).
+
+| Mode | macOS | iOS (no Tauri) |
+|------|-------|----------------|
+| Full native | `createSurface(native)` / `macos.run` | `ios.run` host tags |
+| Full webview | `createSurface(webview)` via Tauri | `ios.run` root `<webview bridge>` |
+| Hybrid | Multi-window Tauri surfaces and/or native + nested `<webview>` | Native chrome + nested `<webview>` |
+
+Details: [HYBRID.md](./HYBRID.md). **Parity matrix:** [PARITY.md](./PARITY.md).
 
 ## State
 
@@ -28,9 +43,25 @@ Umbrella repo: **tish-desktop**. Public shell entry: `cargo:tish_app` (alias of 
 
 Dispatch order: shell `handle` → `state.*` → CapProviders → legacy modules.
 
+In-process (shell / WK bridge): `brokerInvoke(cmd, args)` — same handlers + `state.*` without Tauri IPC.
+
 ## Caps
 
-App code calls `invoke("notification.show", …)`. Desktop uses Tauri-backed CapProviders; pure web uses stubs (`code: "unsupported"` when unavailable).
+App code calls `invoke("notification.show", …)`. Desktop uses Tauri CapProviders; `platform-apple` / `platform-ms` / `platform-lin` use native backends via `local_invoke`; iOS staticlib uses `tish_broker` + `UNUserNotificationCenter`. Pure web stubs return `code: "unsupported"` when unavailable.
+
+**iOS profile:** BrokerCore (`tish-desktop/crates/tish_broker`, standalone crate — not the language) is linked via `tish-ios` — no Tauri. Caps: `notification.*`, `dialog.*`. Hosts may path-depend on the `tish_broker` crate only, not on `tish_desktop`.
+
+| Demo | Repo | What |
+|------|------|------|
+| Pure-native hello | **tish-apple** `examples/hello-ios` | `ios.run` + host tags only |
+| Native ↔ webview parity | **tish-desktop** `examples/hello-ios` | BrokerCore + surface switcher |
+
+```bash
+# parity (this repo)
+npm run example:hello-ios
+# pure native (sibling apple)
+cd ../tish-apple/examples/hello-ios && npm run run
+```
 
 ## Platform files
 
@@ -38,16 +69,19 @@ Owned by **tish** (`--platform` / `--surface`, `tish resolve-id`). Desktop does 
 
 ## Hybrid (v1)
 
-Dual coordinated windows until WK script bridge lands in tish-apple:
+Dual coordinated windows + WK script bridge in tish-apple. Canonical shell API is imperative `createSurface` (not Surface JSX):
 
 ```tish
 import { run, createSurface, stateSet } from "cargo:tish_app"
 
 createSurface({ id: "main", kind: "webview", url: "http://localhost:5173/" })
 // Native chrome: macos.attach(Sidebar, { outerHost: true }) when platform-apple is enabled
+// In-tree WK (tish-apple): <webview bridge={true} onBridgeInvoke={…} /> + macos.webviewPostMessage
 
 run({ plugins: { notification: true, store: true } })
 ```
+
+See [HYBRID.md](./HYBRID.md) for multi-window vs one-window and iOS modes.
 
 ## Typed shell
 
@@ -55,4 +89,4 @@ Prefer typed params/returns in shell / native modules; build with `tish build --
 
 ## Lattish
 
-Optional. React-like hooks/components/adapters live in **lattish**, not tish upstream. Core never depends on lattish. See [LATTISH.md](./LATTISH.md).
+Optional. React-like hooks/components/adapters live in **lattish**, not tish upstream. Core never depends on lattish. Surface composition stays `createSurface` + host `<webview>` until optional lattish `NativeSurface` / `WebSurface` sugar lands. See [LATTISH.md](./LATTISH.md).

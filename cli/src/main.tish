@@ -12,6 +12,7 @@ import { runInfo } from "./commands/info.tish"
 import { runIcon } from "./commands/icon.tish"
 import { runDistribute } from "./commands/distribute.tish"
 import { runDoctor } from "./commands/doctor.tish"
+import { runIos } from "./commands/ios.tish"
 
 fn usage() {
   console.log("tish-desktop — Tish Desktop CLI")
@@ -22,6 +23,7 @@ fn usage() {
   console.log("  init [dir]              Scaffold a desktop app")
   console.log("  dev [--example name]    Vite UI + native shell (parity with scripts/dev-example.mjs)")
   console.log("  build [dir]             Production UI + native shell → dist/")
+  console.log("  ios [--example name]    Build + launch iOS example on Simulator (no Xcode UI)")
   console.log("  doctor                  Platform/surface, resolve probe, cap support summary")
   console.log("  info                    Print tish / rustc / platform summary")
   console.log("  icon [dir]              Generate icon set into project icons/")
@@ -40,6 +42,13 @@ fn usage() {
   console.log("  --example <name>        basic|file-browser|native-chrome|byo-ui|hybrid")
   console.log("  --rebuild               Force rebuild the native shell")
   console.log("  --legacy-node           Transitional: call node scripts/dev-example.mjs")
+  console.log("")
+  console.log("iOS options:")
+  console.log("  --example <name>        hello-ios (default); requires sibling tish-apple")
+  console.log("  --device <name>         Preferred simulator (or IOS_SIM_DEVICE)")
+  console.log("  --launch-only           Skip rebuild")
+  console.log("  --build-only            Staticlib + xcodebuild only")
+  console.log("  --apple <path>          tish-apple checkout (or TISH_APPLE)")
 }
 
 let args = userArgs()
@@ -66,6 +75,10 @@ if (cmd === "dev") {
 }
 if (cmd === "build") {
   runBuild(rest)
+  exit(0)
+}
+if (cmd === "ios") {
+  runIos(rest)
   exit(0)
 }
 if (cmd === "doctor") {

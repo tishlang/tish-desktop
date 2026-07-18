@@ -15,6 +15,8 @@ impl CapabilityProvider for NotificationProvider {
     }
 
     fn supported(&self) -> CapSupport {
+        // Tauri path via chrome::try_dispatch. Shell/WK local_invoke uses
+        // tish_macos UNUserNotificationCenter when `platform-apple` is enabled.
         CapSupport::Full
     }
 

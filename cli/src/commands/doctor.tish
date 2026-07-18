@@ -10,11 +10,11 @@ import {
 
 export fn runDoctor(args) {
   let platform = flagValue(args, "--platform")
-  if (platform === null) platform = env("TISH_PLATFORM")
-  if (platform === null) platform = "macos"
+  if (platform === null && env !== null) platform = env["TISH_PLATFORM"]
+  if (platform === null || platform === undefined) platform = "macos"
   let surface = flagValue(args, "--surface")
-  if (surface === null) surface = env("TISH_SURFACE")
-  if (surface === null) surface = "webview"
+  if (surface === null && env !== null) surface = env["TISH_SURFACE"]
+  if (surface === null || surface === undefined) surface = "webview"
 
   let tish = resolveTish()
   console.log("tish-desktop doctor")
@@ -39,12 +39,16 @@ export fn runDoctor(args) {
 
   console.log("")
   console.log("Caps (desktop host):")
-  console.log("  notification.*  Full (Tauri) / web stub / else { code: unsupported, capability }")
-  console.log("  state.*         Full (BrokerCore; path + revision)")
+  console.log("  notification.*  Tauri / apple UN / ms·lin notify-rust / ios UN / web stub")
+  console.log("  state.*         Full (tish_broker; path + revision); ios.invoke + brokerInvoke")
   console.log("  store.*         Full when plugins.store (persisted; not state.*)")
-  console.log("  webview.*       Partial (load / postMessage events)")
+  console.log("  webview.*       Partial (Tauri load/postMessage; apple WK via macos.webview*)")
   console.log("  tray.*          Desktop-only → unsupported on web/ios")
+  console.log("  createSurface.native  platform-apple | platform-ms | platform-lin")
   console.log("")
-  console.log("See docs/UNIFIED_APP.md and docs/UPSTREAM.md")
+  console.log("Tip: alias as `tish-desktop doctor` (plan name: tish app doctor).")
+  console.log("iOS sim: tish-desktop ios --example hello-ios  (or tish-apple npm run example:hello-ios)")
+  console.log("HMR: platform file edits reload; switching TISH_PLATFORM/SURFACE needs Vite restart.")
+  console.log("See docs/UNIFIED_APP.md, docs/HYBRID.md, docs/UPSTREAM_OPEN.md")
   exit(0)
 }

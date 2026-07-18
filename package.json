@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Tish-first desktop runtime on Tauri 2",
+  "bin": {
+    "tish-desktop": "cli/bin/tish-desktop.js"
+  },
   "scripts": {
     "check": "cargo check -p tish_desktop",
     "tish-desktop": "node cli/bin/tish-desktop.js",
@@ -18,6 +21,7 @@
     "example:native-chrome:rebuild": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run dev -- --rebuild",
     "example:byo-ui": "npm --prefix examples/byo-ui install && npm --prefix examples/byo-ui run dev",
     "example:hybrid": "npm --prefix examples/hybrid install && npm --prefix examples/hybrid run dev",
+    "example:hello-ios": "node cli/bin/tish-desktop.js ios --example hello-ios",
     "check:bare-deps": "node -e \"const p=require('./examples/byo-ui/package.json'); const d={...p.dependencies,...p.devDependencies}; for (const k of Object.keys(d)) { if (k==='lattish'||k==='@tish-desktop/ui-theme') { console.error('bare example must not depend on',k); process.exit(1);} } console.log('byo-ui: no lattish/ui-theme');\"",
     "build:basic": "npm --prefix examples/basic install && npm --prefix examples/basic run build:ui && npm --prefix examples/basic run build:shell",
     "build:file-browser": "npm --prefix examples/file-browser install && npm --prefix examples/file-browser run build:ui && npm --prefix examples/file-browser run build:shell",

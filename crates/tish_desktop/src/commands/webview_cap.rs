@@ -57,7 +57,7 @@ fn webview_post_message(app: &AppHandle, args: &Value) -> Result<Value, String> 
     if app.get_webview_window(&label).is_none() {
         return Ok(broker::unsupported("webview"));
     }
-    // Event channel until WK script bridge lands in tish-apple (see docs/UPSTREAM.md).
+    // Tauri webviews: event channel. Apple WK panes use macos.webviewPostMessage (tish-apple bridge).
     app.emit(
         &format!("webview:{channel}"),
         json!({ "surfaceId": label, "channel": channel, "body": body }),

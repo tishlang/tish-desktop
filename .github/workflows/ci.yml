@@ -21,9 +21,6 @@ jobs:
       - name: Lint Tish
         run: npm run lint:tish
         continue-on-error: true
-      - name: Typed shell guidance note
-        run: |
-          echo "Prefer tish build --check warn|error for shell/native (see docs/TYPED_SHELL.md)"
       - name: Bare / BYO example must not depend on lattish
         run: npm run check:bare-deps
 
@@ -34,6 +31,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Checkout tish core (path dep)
         uses: actions/checkout@v4
         with:
@@ -44,12 +44,37 @@ jobs:
         with:
           repository: tishlang/tish-apple
           path: ../tish-apple
+      - name: Install local tish CLI
+        run: cargo install --path ../tish/crates/tish --force --bin tish
       - name: Check (default features)
         run: cargo check -p tish_desktop -p tish_app
       - name: Check platform-apple feature gates (compile metadata)
         # Full link of tish-macos needs macOS; ensure the feature resolves on Linux.
         run: cargo check -p tish_desktop --features platform-apple
         continue-on-error: true
+      - name: Checkout tish-android (optional stub host)
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: tishlang/tish-android
+          path: ../tish-android
+      - name: Check platform-android stub
+        continue-on-error: true
+        run: |
+          if [ -f ../tish-android/crates/tish-android/Cargo.toml ]; then
+            cargo check -p tish_desktop --features platform-android
+          else
+            echo "tish-android not available; skip"
+          fi
+      - name: Typed shell --check warn (byo-ui + hybrid)
+        run: |
+          npm --prefix examples/byo-ui install
+          npm --prefix examples/hybrid install
+          npm --prefix examples/byo-ui run build:shell
+          npm --prefix examples/hybrid run build:shell
+      - name: Prove attach_app wiring references
+        run: |
+          rg -n "attach_app|broadcast_event" crates/tish_desktop/src/platform/apple.rs crates/tish_desktop/src/local_invoke.rs
 
   rust-macos:
     runs-on: macos-latest
@@ -68,3 +93,12 @@ jobs:
           path: ../tish-apple
       - name: Check with platform-apple
         run: cargo check -p tish_desktop --features platform-apple -p tish_app
+      - name: Install tish CLI + hybrid apple shell build
+        run: |
+          cargo install --path ../tish/crates/tish --force --bin tish
+          npm --prefix examples/hybrid install
+          npm --prefix examples/hybrid run build:shell:apple
+      - name: hello-ios staticlib (BrokerCore + tish:ios host)
+        run: |
+          npm --prefix examples/hello-ios install
+          npm --prefix examples/hello-ios run build

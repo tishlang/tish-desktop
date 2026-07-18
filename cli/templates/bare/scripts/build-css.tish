@@ -1,25 +1,35 @@
-import { emitStylesheet } from "tish-tailwind"
-import { readFile, writeFile, mkdir } from "tish:fs"
-
-await emitStylesheet({
-  sourceFiles: [
-    "ui/main.tish",
-    "__ROOT__/packages/ui-theme/src/ui/Button.tish",
-    "__ROOT__/packages/ui-theme/src/ui/Card.tish",
-    "__ROOT__/packages/ui-theme/src/ui/Section.tish",
-    "__ROOT__/packages/ui-theme/src/ui/Input.tish",
-    "__ROOT__/packages/ui-theme/src/ui/Badge.tish",
-    "__ROOT__/packages/ui-theme/src/ui/Separator.tish",
-    "__ROOT__/packages/ui-theme/src/ui/ScrollArea.tish",
-    "__ROOT__/packages/ui-theme/src/ui/Toolbar.tish",
-  ],
-  outputPath: "public/assets/app.tw.css",
-})
+// Minimal BYO CSS — no ui-theme / lattish coupling.
+import { writeFile, mkdir } from "tish:fs"
 
 mkdir("public/assets", { recursive: true })
-let fonts = readFile("__ROOT__/packages/ui-theme/src/fonts.css")
-let theme = readFile("__ROOT__/packages/ui-theme/src/theme.css")
-let utils = readFile("__ROOT__/packages/ui-theme/src/theme-utilities.css")
-let tw = readFile("public/assets/app.tw.css")
-writeFile("public/assets/app.css", fonts + "\n" + theme + "\n" + utils + "\n" + tw)
-console.log("wrote public/assets/app.css (theme + utilities + tailwind)")
+let css = `
+:root {
+  --fg: #1a1a1a;
+  --bg: #f6f6f4;
+  --muted: #666;
+  --accent: #2563eb;
+  --border: #ddd;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 15px/1.45 ui-sans-serif, system-ui, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+button, .btn {
+  font: inherit;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+button:hover, .btn:hover { border-color: var(--accent); }
+.muted { color: var(--muted); }
+.row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; gap: 0.5rem; }
+pre { background: #fff; border: 1px solid var(--border); padding: 0.75rem; border-radius: 6px; }
+`
+writeFile("public/assets/app.css", css)
+console.log("wrote public/assets/app.css (bare BYO)")

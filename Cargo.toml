@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "crates/tish_broker",
   "crates/tish_desktop",
   "crates/tish_app",
   "crates/tish_desktop_sample_ext",

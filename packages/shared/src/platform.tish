@@ -30,6 +30,9 @@ export fn platformSelect(map) {
   if ((os === "macos" || os === "windows" || os === "linux") && m.desktop !== undefined) {
     return m.desktop
   }
+  if ((os === "ios" || os === "android") && m.mobile !== undefined) {
+    return m.mobile
+  }
   // `default` is a Tish keyword — use bracket access.
   if (m["default"] !== undefined) return m["default"]
   return null

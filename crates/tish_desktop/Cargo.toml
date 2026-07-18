@@ -24,9 +24,10 @@ default = ["webview-tauri"]
 webview-tauri = []
 # Path-depend tish-apple for native macOS attach under an outer host.
 platform-apple = ["dep:tish-macos"]
-# Future stubs (compile-time markers; no deps yet).
-platform-ms = []
-platform-lin = []
+# Path-depend sibling native hosts (real attach + notify — not forever-unsupported).
+platform-ms = ["dep:tish-ms"]
+platform-lin = ["dep:tish-lin"]
+platform-android = ["dep:tish-android"]
 caps-notification = []
 caps-store-persist = []
 
@@ -38,10 +39,14 @@ tauri-build = { version = "2", features = [] }
 # `tish build`; for crates.io publish, switch to a versioned line that matches the
 # published tishlang_core the CLI was built against (ecosystem 2.39.x today).
 tishlang_core = { path = "../../../tish/crates/tish_core", features = ["send-values"] }
+tish_broker = { path = "../tish_broker" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon", "devtools"] }
 tish-macos = { path = "../../../tish-apple/crates/tish-macos", optional = true }
+tish-ms = { path = "../../../tish-ms/crates/tish-ms", optional = true }
+tish-lin = { path = "../../../tish-lin/crates/tish-lin", optional = true }
+tish-android = { path = "../../../tish-android/crates/tish-android", optional = true }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"

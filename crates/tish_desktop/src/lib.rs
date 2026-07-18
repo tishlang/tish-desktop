@@ -5,6 +5,7 @@
 //! Shared microfrontend state is `state.*` (persisted KV remains `store.*`).
 
 mod broker;
+mod local_invoke;
 mod caps;
 mod commands;
 mod extensions;
@@ -131,17 +132,13 @@ pub fn create_surface(args: &[Value]) -> Value {
         if !host.supports_native_surface() {
             return ok_json(broker::unsupported_on("createSurface.native", host.name()));
         }
-        let attach = host
-            .attach_native(&Value::Null, &spec_json)
-            .unwrap_or_else(|e| serde_json::json!({ "ok": false, "error": e }));
         return ok_json(serde_json::json!({
             "ok": true,
             "queued": true,
             "kind": "native",
             "host": host.name(),
-            "attach": attach,
             "hasRoot": has_root,
-            "hint": "run({ platformAttach: { apple: { outerHost: true, autoRunEventLoop: false } } }); attach roots with macos.attach",
+            "hint": "run({ platformAttach: { apple: { outerHost: true } } }) drains PENDING_NATIVE_ROOTS via attach_app",
         }));
     }
 
@@ -185,8 +182,18 @@ pub fn state_set(args: &[Value]) -> Value {
         .get(1)
         .and_then(|v| value_util::value_to_json(v))
         .unwrap_or(serde_json::Value::Null);
-    let out = broker::GLOBAL_SHARED_STATE.set(path, value);
-    ok_json(out)
+    match local_invoke::invoke_local(
+        "state.set",
+        serde_json::json!({ "path": path, "value": value, "source": "shell" }),
+    ) {
+        Ok(out) => ok_json(out),
+        Err(e) => err_str(e),
+    }
+}
+
+/// `brokerInvoke(cmd, args?)` — in-process invoke for shell / WK `onBridgeInvoke`.
+pub fn broker_invoke(args: &[Value]) -> Value {
+    local_invoke::broker_invoke(args)
 }
 
 /// Shell helper: `stateGet(path)`.
@@ -282,7 +289,8 @@ pub fn run(args: &[Value]) -> Value {
         });
     }
 
-    let handlers = std::mem::take(&mut *PENDING_HANDLERS.lock());
+    // Keep PENDING_HANDLERS for brokerInvoke / WK bridge; AppState gets clones.
+    let handlers = PENDING_HANDLERS.lock().clone();
     let tick_ms = config.tick_ms.unwrap_or(0);
     if tick_ms > 0 {
         eprintln!("tish_desktop: tick loop interval {tick_ms}ms");
@@ -293,15 +301,27 @@ pub fn run(args: &[Value]) -> Value {
     let apple_attach = config
         .platform_attach
         .as_ref()
-        .and_then(|p| p.apple.as_ref());
-    if let Some(a) = apple_attach {
-        let n = broker::PENDING_NATIVE_ROOTS.lock().len();
+        .and_then(|p| p.apple.as_ref())
+        .cloned();
+    if let Some(ref a) = apple_attach {
+        let roots = std::mem::take(&mut *broker::PENDING_NATIVE_ROOTS.lock());
         eprintln!(
-            "tish_desktop: platformAttach.apple outerHost={} autoRunEventLoop={} pendingNativeRoots={}",
-            a.outer_host, a.auto_run_event_loop, n
+            "tish_desktop: platformAttach.apple outerHost={} autoRunEventLoop={} attachingNativeRoots={}",
+            a.outer_host,
+            a.auto_run_event_loop,
+            roots.len()
         );
-        // Native roots are attached from shell via macos.attach (outerHost) before/around run.
-        // Desktop does not own NSApplication — see tish-apple attach API + docs/HYBRID.md.
+        let host = platform::current_host();
+        let opts = serde_json::json!({
+            "outerHost": a.outer_host,
+            "autoRunEventLoop": a.auto_run_event_loop,
+        });
+        for (id, root) in roots {
+            match host.attach_native(&root, &opts) {
+                Ok(v) => eprintln!("tish_desktop: attached native surface id={id} → {v}"),
+                Err(e) => eprintln!("tish_desktop: attach native id={id} failed: {e}"),
+            }
+        }
     }
     let plugins = config.plugins.clone();
     let window_specs = config.windows.clone();
@@ -389,6 +409,7 @@ fn build_and_run(
         })
         .setup(move |app| {
             let handle = app.handle().clone();
+            local_invoke::set_app_handle(handle.clone());
 
             if plugins.deep_link {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -482,6 +503,10 @@ pub fn tish_desktop_object() -> Value {
         Value::native(register_rust_extension),
     );
     m.insert(Arc::from("createWindow"), Value::native(create_window));
+    m.insert(Arc::from("createSurface"), Value::native(create_surface));
+    m.insert(Arc::from("brokerInvoke"), Value::native(broker_invoke));
+    m.insert(Arc::from("stateSet"), Value::native(state_set));
+    m.insert(Arc::from("stateGet"), Value::native(state_get));
     m.insert(Arc::from("listWindows"), Value::native(list_windows));
     m.insert(Arc::from("focusWindow"), Value::native(focus_window));
     m.insert(Arc::from("closeWindow"), Value::native(close_window));

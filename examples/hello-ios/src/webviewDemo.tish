@@ -1,0 +1,86 @@
+// Full-webview demo HTML — same broker features as NativePane (state.*, dialog, notification).
+
+fn esc(s) {
+  let out = "" + s
+  // Minimal escape for embedding into a JS string literal (single-quoted).
+  out = out.replaceAll("\\", "\\\\")
+  out = out.replaceAll("'", "\\'")
+  out = out.replaceAll("\n", "\\n")
+  out = out.replaceAll("\r", "")
+  return out
+}
+
+/// Inline HTML document for `<webview html={…} />` (prefer over data: URLs on iOS WK).
+export fn demoWebviewHtml(seed) {
+  let count = seed.count !== null ? seed.count : 0
+  let note = seed.note !== null ? seed.note : ""
+  let flag = seed.flag === true
+  let docId = seed.docId !== null ? seed.docId : "a"
+  let noteJs = esc(note)
+  let docJs = esc(docId)
+
+  let html = "<!doctype html><html><head><meta charset=utf-8>"
+  html = html + "<meta name=viewport content='width=device-width,initial-scale=1'>"
+  html = html + "<style>"
+  html = html + "body{font:16px -apple-system,system-ui,sans-serif;margin:16px;color:#111;background:#f7f7f8}"
+  html = html + "h1{font-size:22px;margin:0 0 8px}p{color:#555;margin:0 0 12px;line-height:1.35}"
+  html = html + ".card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px;margin:0 0 12px}"
+  html = html + "label{display:block;font-size:13px;color:#666;margin:0 0 4px}"
+  html = html + "input[type=text]{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px;font:inherit}"
+  html = html + "button{font:inherit;padding:10px 12px;margin:4px 6px 4px 0;border:1px solid #bbb;border-radius:8px;background:#eee}"
+  html = html + "button.primary{background:#1a73e8;color:#fff;border-color:#1a73e8}"
+  html = html + "pre{background:#f0f0f2;padding:8px;border-radius:8px;white-space:pre-wrap;font-size:12px}"
+  html = html + ".row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}"
+  html = html + "</style></head><body>"
+  html = html + "<h1>Webview + Broker</h1>"
+  html = html + "<p>Same features as the Native pane via <code>__TISH_APP__</code> (no Tauri).</p>"
+  html = html + "<div class=card><label>Note</label>"
+  html = html + "<input id=note type=text placeholder=Note value='" + noteJs + "'></div>"
+  html = html + "<div class='card row'><label style='margin:0'><input id=flag type=checkbox"
+  if (flag) {
+    html = html + " checked"
+  }
+  html = html + "> Toggle</label></div>"
+  html = html + "<div class=card><div id=status></div>"
+  html = html + "<button id=inc class=primary>Increment</button></div>"
+  html = html + "<div class=card><div id=docs></div>"
+  html = html + "<button id=docA>Doc A</button><button id=docB>Doc B</button>"
+  html = html + "<button id=refresh>Refresh state</button>"
+  html = html + "<button id=notify>Notify</button><button id=alert>Alert</button></div>"
+  html = html + "<div class=card><pre id=log>ready</pre></div>"
+  html = html + "<script>"
+  html = html + "const T=window.__TISH_APP__;"
+  html = html + "let count=" + count + ",note='" + noteJs + "',flag=" + flag + ",docId='" + docJs + "',shared=null;"
+  html = html + "const log=document.getElementById('log');"
+  html = html + "const status=document.getElementById('status');"
+  html = html + "const docs=document.getElementById('docs');"
+  html = html + "function paint(){status.textContent='Count: '+count+' note='+note+' flag='+flag;"
+  html = html + "docs.textContent='docId: '+docId+' shared='+shared;}"
+  html = html + "async function setPath(path,value){const r=await T.invoke('state.set',{path,value});"
+  html = html + "log.textContent=JSON.stringify(r);return r;}"
+  html = html + "async function getPath(path){const r=await T.invoke('state.get',{path});"
+  html = html + "log.textContent=JSON.stringify(r);return r;}"
+  html = html + "document.getElementById('note').oninput=async(e)=>{note=e.target.value;await setPath('demo.note',note);paint();};"
+  html = html + "document.getElementById('flag').onchange=async(e)=>{flag=!!e.target.checked;await setPath('demo.flag',flag);paint();};"
+  html = html + "document.getElementById('inc').onclick=async()=>{count=count+1;await setPath('demo.count',count);paint();};"
+  html = html + "async function select(id){docId=id;shared=id;await setPath('selection.docId',id);paint();}"
+  html = html + "document.getElementById('docA').onclick=()=>select('a');"
+  html = html + "document.getElementById('docB').onclick=()=>select('b');"
+  html = html + "document.getElementById('refresh').onclick=async()=>{const r=await getPath('selection.docId');"
+  html = html + "if(r&&r.value!=null){docId=r.value;shared=r.value;}const c=await getPath('demo.count');"
+  html = html + "if(c&&c.value!=null)count=c.value;const n=await getPath('demo.note');"
+  html = html + "if(n&&n.value!=null){note=n.value;document.getElementById('note').value=note;}"
+  html = html + "const f=await getPath('demo.flag');if(f&&f.value!=null){flag=!!f.value;"
+  html = html + "document.getElementById('flag').checked=flag;}paint();};"
+  html = html + "document.getElementById('notify').onclick=async()=>{await T.invoke('notification.requestPermission',{});"
+  html = html + "await T.invoke('notification.show',{title:'Hello iOS',body:'doc '+docId+' · count '+count});"
+  html = html + "log.textContent='notify sent';};"
+  html = html + "document.getElementById('alert').onclick=async()=>{await T.invoke('dialog.message',"
+  html = html + "{title:'Hello iOS',message:'doc '+docId+' · note '+note+' · flag '+flag});"
+  html = html + "log.textContent='alert sent';};"
+  html = html + "T.listen('state:changed',(p)=>{log.textContent='event '+JSON.stringify(p);});"
+  html = html + "paint();"
+  html = html + "</script></body></html>"
+
+  return html
+}
