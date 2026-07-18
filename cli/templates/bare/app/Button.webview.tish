@@ -1,0 +1,11 @@
+// Webview surface Button. Omit this file to reuse Button.web.tish via cascade.
+export fn Button(props) {
+  let title = props.title === null ? "Button" : props.title
+  let el = document.createElement("button")
+  el.textContent = title
+  el.className = "btn btn-webview"
+  if (props.onPress) {
+    el.onclick = () => props.onPress()
+  }
+  return el
+}

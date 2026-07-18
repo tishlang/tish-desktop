@@ -94,6 +94,11 @@ pub fn create_surface(args: &[Value]) -> Value {
     let Some(spec_val) = args.first() else {
         return err_str("createSurface(spec) requires object");
     };
+    // Pull `root` off the live Value first — JSON conversion omits functions.
+    let root_fn = match spec_val {
+        Value::Object(o) => o.borrow().strings.get("root").cloned(),
+        _ => None,
+    };
     let Some(mut spec_json) = arg_object_json(args, 0) else {
         return err_str("createSurface(spec) requires object");
     };
@@ -103,11 +108,6 @@ pub fn create_surface(args: &[Value]) -> Value {
         .unwrap_or("webview")
         .to_string();
 
-    // Preserve Tish `root` fn (JSON round-trip drops functions).
-    let root_fn = match spec_val {
-        Value::Object(o) => o.borrow().strings.get("root").cloned(),
-        _ => None,
-    };
     let has_root = root_fn.is_some();
 
     if kind == "native" {
@@ -273,7 +273,18 @@ pub fn run(args: &[Value]) -> Value {
         }
     }
 
-    if config.windows.is_empty() {
+    let apple_attach = config
+        .platform_attach
+        .as_ref()
+        .and_then(|p| p.apple.as_ref())
+        .cloned();
+    let pending_native = broker::PENDING_NATIVE_ROOTS.lock().len();
+    // Pure-native (SC4): native createSurface + apple attach, no webview windows.
+    // Skip the default Tauri window so AppKit can own NSApplication.run.
+    let pure_native_apple =
+        apple_attach.is_some() && config.windows.is_empty() && pending_native > 0;
+
+    if config.windows.is_empty() && !pure_native_apple {
         config.windows.push(state::WindowSpec {
             label: "main".into(),
             kind: Some("webview".into()),
@@ -298,23 +309,34 @@ pub fn run(args: &[Value]) -> Value {
     if let Some(profile) = config.profile.as_deref() {
         eprintln!("tish_desktop: run profile={profile}");
     }
-    let apple_attach = config
-        .platform_attach
-        .as_ref()
-        .and_then(|p| p.apple.as_ref())
-        .cloned();
+    let plugins = config.plugins.clone();
+    let window_specs = config.windows.clone();
+
     if let Some(ref a) = apple_attach {
         let roots = std::mem::take(&mut *broker::PENDING_NATIVE_ROOTS.lock());
+        let outer_host = if pure_native_apple {
+            false
+        } else {
+            a.outer_host
+        };
+        let auto_run = if pure_native_apple {
+            true
+        } else {
+            a.auto_run_event_loop
+        };
         eprintln!(
-            "tish_desktop: platformAttach.apple outerHost={} autoRunEventLoop={} attachingNativeRoots={}",
-            a.outer_host,
-            a.auto_run_event_loop,
+            "tish_desktop: platformAttach.apple outerHost={} autoRunEventLoop={} pureNative={} attachingNativeRoots={}",
+            outer_host,
+            auto_run,
+            pure_native_apple,
             roots.len()
         );
         let host = platform::current_host();
         let opts = serde_json::json!({
-            "outerHost": a.outer_host,
-            "autoRunEventLoop": a.auto_run_event_loop,
+            "outerHost": outer_host,
+            "autoRunEventLoop": auto_run,
+            "autoShow": true,
+            "title": "Hybrid",
         });
         for (id, root) in roots {
             match host.attach_native(&root, &opts) {
@@ -322,9 +344,12 @@ pub fn run(args: &[Value]) -> Value {
                 Err(e) => eprintln!("tish_desktop: attach native id={id} failed: {e}"),
             }
         }
+        if pure_native_apple {
+            // attach_native blocked in NSApplication.run when autoRunEventLoop=true.
+            eprintln!("tish_desktop: pure native AppKit event loop exited");
+            return Value::Null;
+        }
     }
-    let plugins = config.plugins.clone();
-    let window_specs = config.windows.clone();
 
     let state = AppState::new(config);
     for (k, v) in handlers {

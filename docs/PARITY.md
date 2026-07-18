@@ -93,7 +93,9 @@ Legend applies per cell. Desktop columns = Tauri shell on that OS unless noted.
 
 | Command | web | desktop | ios | android |
 |---------|-----|---------|-----|---------|
-| `store.get/set/delete/keys/clear` | unsupported | full | unsupported | missing |
+| `store.get/set/delete/keys/clear` | unsupported | full | full† | missing |
+
+†iOS: `NSUserDefaults` JSON blob per `path` (default `store.json`); same args as desktop.
 
 ### 4.3 `notification.*`
 
@@ -117,9 +119,9 @@ Legend applies per cell. Desktop columns = Tauri shell on that OS unless noted.
 
 | Command | web | desktop | ios | android |
 |---------|-----|---------|-----|---------|
-| `webview.load` / `postMessage` / `list` | unsupported | partial | unsupported† | missing |
+| `webview.load` / `postMessage` / `list` / `eval` | unsupported | full† | full† | missing |
 
-†**Parity gap (open):** broker `webview.*` should become one invoke surface over Tauri panes **and** host WK helpers (`macos`/`ios`.webviewEval / `webviewPostMessage`). Until then, use host tag `<webview bridge>` + those helpers for nested panes; desktop Tauri windows still go through `createSurface({ kind: "webview" })`. Tracked in [UPSTREAM_OPEN.md](./UPSTREAM_OPEN.md).
+†One invoke surface: desktop Tauri panes (`createSurface({ kind: "webview" })`) **and** host WK panes (`<webview bridge id=…>`). Host helpers `macos`/`ios`.webviewEval / `webviewPostMessage` remain thin aliases of `webview.eval` / `webview.postMessage`. Args: `surfaceId` (aliases `label` / `id`); `postMessage` uses `channel`/`event` + `body`/`payload`; `load` accepts `url` and/or `html`.
 
 ### 4.6 Window / chrome / desktop-only
 
@@ -144,22 +146,25 @@ Win/lin/android native hosts have **no** JSX tag table yet (stub window only).
 | Tag | web / webview (DOM) | macos AppKit | ios UIKit | win/lin/android native |
 |-----|---------------------|--------------|-----------|-------------------------|
 | `column` / `div` / `section` | full | full | full | missing |
-| `row` | full | full | partial | missing |
+| `row` | full | full | full† | missing |
 | `zstack` | full | full | missing | missing |
 | `scrollable` | full | full | full | missing |
 | `button` | full | full | full | missing |
 | `text` (h1–h6, p, …) | full | full | full | missing |
 | `textinput` / `password` | full | full | full | missing |
-| `text_editor` / `markdown_text` | full | full | missing | missing |
+| `text_editor` / `markdown_text` | full | full | text_editor‡ | missing |
 | `checkbox` / `toggler` | full | full | full | missing |
-| `slider` / `radio` / `pick_list` | full | full | missing | missing |
+| `slider` / `radio` / `pick_list` | full | full | slider‡ | missing |
 | `progress_bar` / `list` / `tooltip` | full | full | missing | missing |
 | `image` | full | full | full | missing |
-| `tabs` / `split` / `visual_effect` | full | full | missing | missing |
+| `tabs` / `split` / `visual_effect` | full | full | tabs‡ | missing |
 | `space` / `rule` | full | full | full | missing |
 | `webview` (+ bridge) | n/a (is the surface) | full | full | missing |
 | `sidebar_window` / `macos_window` | n/a | full | n/a | missing |
 | `scene_view` / `card_art` | n/a | missing | full | missing |
+
+†iOS `row` supports equal columns + `gap` / `columnGap`.  
+‡iOS: `slider` (`UISlider`), `tabs` (`UISegmentedControl` + panes), `text_editor` (`UITextView`). Still missing: `markdown_text`, `radio`, `pick_list`, `split`, `visual_effect`.
 
 **Lattish / ui-theme components** (Button, Card, Input, …) target **web/webview**. Native parity is via platform files (`Button.macos.tish`, `Button.ios.tish`), not by running lattish inside AppKit/UIKit.
 
@@ -180,13 +185,12 @@ Protocol string: `desktop/v1` (kept for client reuse across hosts).
 
 ## 7. Priority gaps (parity roadmap)
 
-1. **iOS host tags** — `tabs`, richer `row`, `slider` / `text_editor` (textinput/toggler/image/space/rule landed)  
-2. **`store.*` on iOS** (and optional web persistence)  
-3. **Broker `webview.*` ↔ WK** — unify `webview.load` / `postMessage` / `list` with `macos`/`ios` webviewEval / webviewPostMessage (one invoke surface for nested panes; see §4.5)  
-4. **ms/lin** — real native surface or document “webview-only on win/lin”  
-5. **Android** — grow `tish-android` past attach stub (JNI / Compose / WebView host)  
-6. **Lattish** — optional native adapters + optional `NativeSurface`/`WebSurface` sugar; prefer platform files + `createSurface` / host `<webview>` for v1  
-7. **Example platform files** — `.windows` / `.linux` / `.android` fixtures for resolve CI  
+1. **iOS host tags (remaining)** — `radio` / `pick_list` / `progress_bar` / `split` / `zstack` / `markdown_text` (`slider` / `tabs` / `text_editor` / row `gap` landed)  
+2. **Web `store.*` persistence** (optional localStorage) — iOS `store.*` landed via UserDefaults  
+3. **ms/lin** — real native surface or document “webview-only on win/lin”  
+4. **Android** — grow `tish-android` past attach stub (JNI / Compose / WebView host)  
+5. **Lattish** — optional native adapters + optional `NativeSurface`/`WebSurface` sugar; prefer platform files + `createSurface` / host `<webview>` for v1  
+6. **Example platform files** — `.windows` / `.linux` / `.android` fixtures for resolve CI  
 
 ---
 

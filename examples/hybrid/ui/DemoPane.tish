@@ -1,0 +1,96 @@
+/** @jsxImportSource lattish */
+// Webview / web demo pane — lattish + ui-theme (same stack as native-chrome).
+import { useState, useEffect } from "lattish"
+import { Button, Input, Section, Badge } from "@tish-desktop/ui-theme"
+import { invoke, useSharedState, stateSet } from "@tish-desktop/app-api"
+import { Platform } from "@tish-desktop/shared"
+import { DEMO, DEMO_TITLE, DEMO_HINT } from "../app/demo.tish"
+
+export fn DemoPane() {
+  let [count, setCount] = useState(0)
+  let [note, setNote] = useState("")
+  let [flag, setFlag] = useState(false)
+  let [docId, setDocId] = useState("a")
+
+  useEffect(() => {
+    useSharedState(DEMO.count, (v) => {
+      if (v !== null && v !== undefined) setCount(v)
+    })
+    useSharedState(DEMO.note, (v) => {
+      if (v !== null && v !== undefined) setNote(String(v))
+      else setNote("")
+    })
+    useSharedState(DEMO.flag, (v) => {
+      setFlag(v === true)
+    })
+    useSharedState(DEMO.docId, (v) => {
+      if (v !== null && v !== undefined) setDocId(String(v))
+    })
+    ;[DEMO.count, DEMO.note, DEMO.flag, DEMO.docId].forEach((path) => {
+      invoke("state.get", { path: path }).then((r) => {
+        if (!r || r.value === null || r.value === undefined) return
+        if (path === DEMO.count) setCount(r.value)
+        else if (path === DEMO.note) setNote(String(r.value))
+        else if (path === DEMO.flag) setFlag(r.value === true)
+        else if (path === DEMO.docId) setDocId(String(r.value))
+      })
+    })
+  }, [])
+
+  let bump = () => {
+    let n = count + 1
+    stateSet(DEMO.count, n).then(() => setCount(n))
+  }
+
+  let onNote = (e) => {
+    let v = e && e.target ? e.target.value : ""
+    stateSet(DEMO.note, v).then(() => setNote(v))
+  }
+
+  let onFlag = () => {
+    let v = !flag
+    stateSet(DEMO.flag, v).then(() => setFlag(v))
+  }
+
+  let pick = (id) => {
+    stateSet(DEMO.docId, id).then(() => setDocId(id))
+  }
+
+  let notify = () => {
+    invoke("notification.show", {
+      title: DEMO_TITLE,
+      body: "webview · count " + count + " · doc " + docId,
+    })
+  }
+
+  let flagLabel = flag ? "on" : "off"
+
+  return (
+    <div class="p-5 font-sans text-foreground">
+      <div class="flex items-center gap-2 mb-1">
+        <h1 class="text-xl font-semibold tracking-tight">Webview</h1>
+        <Badge>desktop/v1</Badge>
+      </div>
+      <p class="text-sm text-muted-foreground mb-4">
+        {DEMO_HINT} · OS={Platform.OS} surface={Platform.surface}
+      </p>
+      <pre class="mb-4 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">
+        {"count=" + count + "  note=" + JSON.stringify(note) + "  flag=" + flagLabel + "  doc=" + docId}
+      </pre>
+
+      <Section title="Controls" hint="Writes demo.* / selection.docId">
+        <Button onClick={bump}>Increment</Button>
+        <Button variant="secondary" onClick={onFlag}>
+          {"Toggle (" + flagLabel + ")"}
+        </Button>
+        <Button variant="outline" onClick={() => pick("a")}>Doc A</Button>
+        <Button variant="outline" onClick={() => pick("b")}>Doc B</Button>
+        <Button variant="ghost" onClick={notify}>Notify</Button>
+      </Section>
+
+      <Section title="Note" hint="state path demo.note">
+        <Input value={note} placeholder="Note" onInput={onNote} class="max-w-sm" />
+      </Section>
+    </div>
+  )
+}

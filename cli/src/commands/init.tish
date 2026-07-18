@@ -128,7 +128,16 @@ export fn runInit(args) {
   }
 
   let root = repoRoot()
+  // Plan packages-dx: `init --ui none` == BYO bare (no lattish). Alias of `--template bare`.
   let templateName = flagValue(args, "--template")
+  let uiName = flagValue(args, "--ui")
+  if (uiName !== null) {
+    if (templateName !== null && templateName !== uiName) {
+      console.error("init: conflicting --template " + templateName + " and --ui " + uiName)
+      exit(1)
+    }
+    templateName = uiName
+  }
   if (templateName === null) templateName = "lattish"
   let templateDir = "templates/app"
   if (templateName === "bare" || templateName === "none" || templateName === "byo") {
@@ -136,7 +145,7 @@ export fn runInit(args) {
   } else if (templateName === "lattish" || templateName === "app" || templateName === "default") {
     templateDir = "templates/app"
   } else {
-    console.error("init: unknown --template " + templateName + " (use lattish|bare)")
+    console.error("init: unknown --template/--ui " + templateName + " (use lattish|bare|none)")
     exit(1)
   }
   let templates = joinPath(cliRoot(), templateDir)

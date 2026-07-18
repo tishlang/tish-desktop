@@ -1,5 +1,5 @@
-import { exit, env, cwd } from "tish:process"
-import { exec } from "tish:process"
+import { exit, env, cwd, exec } from "tish:process"
+import { readFile } from "tish:fs"
 import {
   flagValue,
   joinPath,
@@ -8,16 +8,46 @@ import {
   resolveTish,
 } from "../paths.tish"
 
+fn capLevel(name, surface, platform) {
+  if (name === "notification") {
+    if (surface === "web") return "Partial"
+    return "Full"
+  }
+  if (name === "store") {
+    if (surface === "web" || platform === "ios") return "Unsupported"
+    return "Full"
+  }
+  if (name === "tray") {
+    if (surface === "web" || platform === "ios" || surface === "native") return "Unsupported"
+    return "Full"
+  }
+  return "Unsupported"
+}
+
+fn capture(cmd) {
+  let out = "/tmp/tish-desktop-doctor-resolve.txt"
+  let code = exec(cmd + " > " + q(out) + " 2>&1")
+  let text = ""
+  if (pathExists(out)) {
+    text = String(readFile(out)).trim()
+  }
+  return { code: code, text: text }
+}
+
 export fn runDoctor(args) {
-  let platform = flagValue(args, "--platform")
-  if (platform === null && env !== null) platform = env["TISH_PLATFORM"]
-  if (platform === null || platform === undefined) platform = "macos"
-  let surface = flagValue(args, "--surface")
-  if (surface === null && env !== null) surface = env["TISH_SURFACE"]
-  if (surface === null || surface === undefined) surface = "webview"
+  // `--desk-platform` / `--desk-surface` are rewritten from `--platform` /
+  // `--surface` by cli/bin/tish-desktop.js so `tish run` is not disrupted.
+  let platform = flagValue(args, "--desk-platform")
+  if (platform === null) platform = flagValue(args, "--platform")
+  if (platform === null) platform = "macos"
+
+  let surface = flagValue(args, "--desk-surface")
+  if (surface === null) surface = flagValue(args, "--surface")
+  if (surface === null) surface = "webview"
 
   let tish = resolveTish()
   console.log("tish-desktop doctor")
+  console.log("  (alias of plan name: tish app doctor)")
   console.log("  platform: " + platform)
   console.log("  surface:  " + surface)
   console.log("  tish:     " + tish)
@@ -33,22 +63,29 @@ export fn runDoctor(args) {
   }
 
   console.log("  resolve:  " + probe + " (importer " + importer + ")")
-  let cmd = tish + " resolve-id " + q(probe) + " --importer " + q(importer)
-  cmd = cmd + " --platform " + q(platform) + " --surface " + q(surface)
-  exec("sh -c " + q(cmd + " || echo '(resolve-id failed — rebuild tish CLI with platform resolve)'"))
+  let resolveCmd = q(tish) + " resolve-id " + q(probe) + " --importer " + q(importer)
+  resolveCmd = resolveCmd + " --platform " + q(platform) + " --surface " + q(surface)
+  let r = capture(resolveCmd)
+  if (r.text !== "") {
+    console.log("  -> " + r.text.split("\n")[0])
+  } else {
+    console.log("  -> (resolve-id failed — rebuild tish CLI with platform resolve)")
+  }
 
   console.log("")
-  console.log("Caps (desktop host):")
-  console.log("  notification.*  Tauri / apple UN / ms·lin notify-rust / ios UN / web stub")
-  console.log("  state.*         Full (tish_broker; path + revision); ios.invoke + brokerInvoke")
-  console.log("  store.*         Full when plugins.store (persisted; not state.*)")
-  console.log("  webview.*       Partial (Tauri load/postMessage; apple WK via macos.webview*)")
-  console.log("  tray.*          Desktop-only → unsupported on web/ios")
-  console.log("  createSurface.native  platform-apple | platform-ms | platform-lin")
+  console.log("Cap matrix (sample for this profile):")
+  console.log("  notification  " + capLevel("notification", surface, platform))
+  console.log("  store         " + capLevel("store", surface, platform))
+  console.log("  tray          " + capLevel("tray", surface, platform))
   console.log("")
-  console.log("Tip: alias as `tish-desktop doctor` (plan name: tish app doctor).")
-  console.log("iOS sim: tish-desktop ios --example hello-ios  (or tish-apple npm run example:hello-ios)")
+  console.log("Notes:")
+  console.log("  state.*       Full (BrokerCore; path + revision) — not store.*")
+  console.log("  webview.*     Partial (Tauri load/postMessage; apple WK via macos.webview*)")
+  console.log("  unsupported   { ok:false, code:unsupported, capability, platform, message }")
+  console.log("")
+  console.log("Upgrade path (Web -> Webview -> Hybrid):")
+  console.log("  npm run build:web | build:shell | build:shell:apple / dev:hybrid")
+  console.log("  See docs/HYBRID.md · docs/UNIFIED_APP.md")
   console.log("HMR: platform file edits reload; switching TISH_PLATFORM/SURFACE needs Vite restart.")
-  console.log("See docs/UNIFIED_APP.md, docs/HYBRID.md, docs/UPSTREAM_OPEN.md")
   exit(0)
 }

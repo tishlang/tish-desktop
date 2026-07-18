@@ -1,8 +1,7 @@
-// Hybrid desktop — multi-window mode: dual createSurface(webview) + optional native slot (v1).
+// Hybrid desktop — multi-window mode (v1): dual createSurface(webview).
+// SC4 native+webview: `src/main.apple.tish` via `npm run build:shell:apple` / `dev:hybrid`.
 // Canonical BYO API: imperative createSurface + run() — no NativeSurface/WebSurface JSX required.
-// One-window native+WK uses host tag <webview bridge> (see docs/HYBRID.md).
 import { run, handle, createSurface, stateSet } from "cargo:tish_app"
-import { Sidebar } from "../app/Sidebar"
 
 fn scoreDoc(wordCount: number, edits: number): number {
   return wordCount * 1.5 + edits * 0.25
@@ -21,7 +20,7 @@ handle("app.openDoc", (args) => {
   return { ok: true, score: s }
 })
 
-// "Chrome" surface — second webview standing in for native sidebar until attach+WK.
+// Chrome + main — dual Tauri webviews sharing state.* (phase 0b proof).
 createSurface({
   id: "chrome",
   kind: "webview",
@@ -44,23 +43,8 @@ createSurface({
   titleBarStyle: "transparent"
 })
 
-// Native surface slot — root queued for macos.attach when platform-apple is enabled.
-createSurface({
-  id: "native-chrome",
-  kind: "native",
-  layout: "sidebar",
-  title: "Notes",
-  root: Sidebar
-})
-
 run({
   profile: "desktop",
-  platformAttach: {
-    apple: {
-      outerHost: true,
-      autoRunEventLoop: false
-    }
-  },
   plugins: {
     notification: true,
     store: true,

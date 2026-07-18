@@ -14,6 +14,7 @@ export default defineConfig({
   plugins: [
     tish({
       tishPath,
+      jsxImportSource: "lattish",
       platform: process.env.TISH_PLATFORM || "macos",
       surface: process.env.TISH_SURFACE || "webview",
     }),
@@ -30,6 +31,17 @@ export default defineConfig({
       ),
       "@tish-desktop/app-api": path.resolve(root, "packages/app-api/src/index.tish"),
       "@tish-desktop/shared": path.resolve(root, "packages/shared/src/index.tish"),
+      "@tish-desktop/ui-theme": path.resolve(
+        root,
+        "packages/ui-theme/src/index.tish"
+      ),
+      lattish: path.resolve(root, "../lattish/src/Lattish.tish"),
+      "lattish/jsx-runtime": path.resolve(
+        root,
+        "../lattish/src/jsx-runtime.tish"
+      ),
+      "tish-tailwind/tw": path.resolve(root, "../tish-tailwind/src/tw.tish"),
+      "tish-tailwind": path.resolve(root, "../tish-tailwind/src/tw.tish"),
     },
   },
   server: {

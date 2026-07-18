@@ -66,12 +66,23 @@ jobs:
           else
             echo "tish-android not available; skip"
           fi
-      - name: Typed shell --check warn (byo-ui + hybrid)
+      - name: Typed shell --check warn (byo-ui + hybrid + basic)
         run: |
           npm --prefix examples/byo-ui install
           npm --prefix examples/hybrid install
+          npm --prefix examples/basic install
           npm --prefix examples/byo-ui run build:shell
           npm --prefix examples/hybrid run build:shell
+          npm --prefix examples/basic run build:shell
+      - name: Hybrid Phase 2 tree + SC4 scripts
+        run: npm --prefix examples/hybrid run check:tree
+      - name: Doctor smoke (resolve + cap matrix)
+        working-directory: examples/hybrid
+        run: |
+          IMPORTER="$(pwd)/app/App.tish"
+          node ../../cli/bin/tish-desktop.js doctor \
+            --platform macos --surface webview \
+            --resolve ./Button --importer "$IMPORTER"
       - name: Prove attach_app wiring references
         run: |
           rg -n "attach_app|broadcast_event" crates/tish_desktop/src/platform/apple.rs crates/tish_desktop/src/local_invoke.rs
@@ -93,11 +104,13 @@ jobs:
           path: ../tish-apple
       - name: Check with platform-apple
         run: cargo check -p tish_desktop --features platform-apple -p tish_app
-      - name: Install tish CLI + hybrid apple shell build
+      - name: Install tish CLI + hybrid apple shell build (SC4)
         run: |
           cargo install --path ../tish/crates/tish --force --bin tish
           npm --prefix examples/hybrid install
+          npm --prefix examples/hybrid run check:tree
           npm --prefix examples/hybrid run build:shell:apple
+          test -x examples/hybrid/dist/hybrid-shell-apple
       - name: hello-ios staticlib (BrokerCore + tish:ios host)
         run: |
           npm --prefix examples/hello-ios install

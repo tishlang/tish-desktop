@@ -29,4 +29,4 @@ See [HYBRID.md](./HYBRID.md) · [UNIFIED_APP.md](./UNIFIED_APP.md).
 Templates:
 
 - Default examples may use lattish
-- `init --template bare` / `examples/byo-ui` — no lattish
+- `init --ui none` (or `--template bare`) / `examples/byo-ui` — no lattish

@@ -23,6 +23,7 @@
     "./desktopHost": { "tish": "./src/desktopHost.tish" },
     "./appApi": { "tish": "./src/appApi.tish" },
     "./bridge": { "import": "./src/bridge.js" },
+    "./web": { "import": "./src/web-bridge.js" },
     "./web-bridge": { "import": "./src/web-bridge.js" }
   },
   "dependencies": {

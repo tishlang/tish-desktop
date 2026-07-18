@@ -1,0 +1,46 @@
+// Native AppKit pane — host tags only (lattish does not run in AppKit).
+// Mirrors ui/DemoPane.tish controls against the same app/demo.tish paths.
+import { Button } from "./Button"
+import { DEMO } from "./demo.tish"
+
+export fn NativePane(props) {
+  let count = props.count
+  let note = props.note
+  let flag = props.flag
+  let docId = props.docId
+  let onBump = props.onBump
+  let onNote = props.onNote
+  let onFlag = props.onFlag
+  let onSelect = props.onSelect
+  let onRefresh = props.onRefresh
+  let onNotify = props.onNotify
+
+  let docLabel = docId === null ? "none" : String(docId)
+  let noteLabel = note === null ? "" : String(note)
+  let flagLabel = flag === true ? "on" : "off"
+
+  let pickA = () => {
+    if (onSelect) onSelect("a")
+  }
+  let pickB = () => {
+    if (onSelect) onSelect("b")
+  }
+
+  return (
+    <column padding={12} gap={10}>
+      <text>{"Native"}</text>
+      <text>{"count=" + count + "  flag=" + flagLabel}</text>
+      <text>{"doc=" + docLabel + "  (" + DEMO.count + ")"}</text>
+      <button onClick={onBump}>{"Increment"}</button>
+      <textinput placeholder={"Note"} value={noteLabel} onChange={onNote} />
+      <row gap={8}>
+        <text>{"Toggle"}</text>
+        <toggler checked={flag === true} onChange={onFlag} />
+      </row>
+      <button onClick={pickA}>{"Doc A"}</button>
+      <button onClick={pickB}>{"Doc B"}</button>
+      <Button title="Refresh state" onPress={onRefresh} />
+      <Button title="Notify" onPress={onNotify} />
+    </column>
+  )
+}

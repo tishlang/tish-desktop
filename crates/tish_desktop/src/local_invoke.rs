@@ -51,11 +51,15 @@ pub fn invoke_local(cmd: &str, args: Json) -> Result<Json, String> {
         return platform_notification(cmd, &args);
     }
 
-    // 4. Other desktop-only caps without AppHandle → unsupported
+    // 4. webview.* — host WK panes (Apple) when no Tauri AppHandle path
+    if cmd.starts_with("webview.") {
+        return platform_webview(cmd, &args);
+    }
+
+    // 5. Other desktop-only caps without AppHandle → unsupported
     if cmd.starts_with("tray.")
         || cmd.starts_with("dialog.")
         || cmd.starts_with("store.")
-        || cmd.starts_with("webview.")
         || cmd.starts_with("window.")
     {
         return Ok(broker::unsupported(cmd.split('.').next().unwrap_or(cmd)));
@@ -145,6 +149,17 @@ fn dispatch_state(cmd: &str, args: &Json) -> Option<Result<Json, String>> {
         }))),
         _ => None,
     }
+}
+
+fn platform_webview(cmd: &str, args: &Json) -> Result<Json, String> {
+    #[cfg(all(feature = "platform-apple", target_os = "macos"))]
+    {
+        if let Some(r) = tish_macos::webview_broker_try_invoke(cmd, args) {
+            return r;
+        }
+    }
+    let _ = (cmd, args);
+    Ok(broker::unsupported("webview"))
 }
 
 fn platform_notification(cmd: &str, args: &Json) -> Result<Json, String> {

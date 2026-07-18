@@ -13,7 +13,8 @@ cargo check -p tish_desktop
 # Create / run apps via the Tish CLI (preferred)
 node cli/bin/tish-desktop.js help
 node cli/bin/tish-desktop.js init my-app
-node cli/bin/tish-desktop.js init my-app --template bare   # no lattish
+node cli/bin/tish-desktop.js init my-app --ui none         # BYO, no lattish (`--template bare`)
+node cli/bin/tish-desktop.js doctor --platform macos --surface webview
 node cli/bin/tish-desktop.js dev --example byo-ui
 
 # Or use npm wrappers (examples call the CLI under the hood)
@@ -22,6 +23,10 @@ npm run example:file-browser
 npm run example:native-chrome
 npm run example:byo-ui
 npm run example:hybrid
+# Hybrid modes (from examples/hybrid):
+#   npm run dev:multi    — dual Tauri webviews + state.*
+#   npm run dev:hybrid   — SC4 Native/Webview switcher (macOS, hello-ios parity)
+#   npm run dev:web      — pure web + @tish-desktop/app-api/web
 
 # Force-rebuild the native shell after Rust changes
 npm run example:native-chrome:rebuild
@@ -59,7 +64,7 @@ Install the CLI via npm (`npx @tish-desktop/cli` / `npm i -g @tish-desktop/cli`)
 | `examples/file-browser` | Sandboxed FS browser (ui-theme) |
 | `examples/native-chrome` | Full OS chrome / broker demo (lattish) |
 | `examples/byo-ui` | Shell + webview + plain DOM (no lattish) |
-| `examples/hybrid` | Dual webviews + `state.*` + platform `Button.*` files |
+| `examples/hybrid` | Dual webviews **and** SC4 Native/Webview switcher; `Detail` / `Sidebar.web`; platform `Button.*` |
 | `scripts/distribute/` | Release build, sign, notarize, updater, GH release |
 | `.github/workflows/` | CI (+ tish-apple checkout) + crates/npm release |
 

@@ -1,5 +1,6 @@
 // hello-ios — switch between full Native and full Webview surfaces.
 // Both panes exercise the same BrokerCore features (state.*, dialog.*, notification.*).
+// Parent → WK: invoke("webview.postMessage"|"load"|"list"|"eval", { surfaceId: "demo-main", … }).
 // No Tauri / no createSurface — ios.run only.
 //
 // From `examples/hello-ios/`: `npm install` then `npm run run`

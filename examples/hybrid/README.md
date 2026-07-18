@@ -1,25 +1,27 @@
 # Hybrid example
 
-Proves plan gates **0b** (shared `state.*` across surfaces) and **2** scaffolding (native surface slot + `platformAttach`).
+Proves **0b** (shared `state.*`) and **SC4** (native ‖ webview on macOS) without reinventing UI kits.
 
-**Mode:** hybrid **multi-window** (desktop) — dual Tauri `createSurface({ kind: "webview" })` + optional native slot. Not one-window native+WK (that path uses host tag `<webview bridge>`; see [HYBRID.md](../../docs/HYBRID.md)).
+## Layers
 
-| Surface | Role |
-|---------|------|
-| `chrome` webview | Sidebar stand-in — picks docs → `state.set` / `app.openDoc` |
-| `main` webview | Detail — listens `state:changed`, platform-resolved `Button.*` |
-| `native-chrome` | Queued `kind: "native"` + `root: Sidebar` for `macos.attach` (`platform-apple`) |
+| Layer | Path | Stack |
+|-------|------|--------|
+| **Contract** | `app/demo.tish` | Shared `state.*` paths both panes use |
+| **Shell (SC4)** | `src/main.apple.tish` → `app/Shell.macos.tish` | `cargo:tish_app` + AppKit `<split>` + `<webview bridge>` |
+| **Native pane** | `app/NativePane.macos.tish` | AppKit host tags (`tish:macos`) |
+| **Webview pane** | `ui/DemoPane.tish` | **lattish** + **`@tish-desktop/ui-theme`** + app-api |
+| **Multi-window** | `src/main.tish` | Dual Tauri webviews (same Vite UI) |
 
-Canonical API: imperative `createSurface` + `run()` — no Surface JSX components required.
+Native and webview deliberately use **different** UI stacks (AppKit vs lattish). They share **behavior** via `app/demo.tish` + BrokerCore — not a single component tree.
 
 ```bash
 npm install
-npm run dev          # Vite :5177 + shell
-npm run build:web    # pure web profile (Button.web.tish)
-npm run build:shell        # dual-webview shell (Sidebar.tish stub)
-npm run build:shell:apple  # platform-apple + Sidebar.macos.tish + WK bridge (macOS)
+npm run build:css
+npm run check:tree
+npm run dev:hybrid          # Vite + apple shell (both panes)
+npm run dev:hybrid:rebuild  # rebuild native shell
+npm run dev:multi           # dual Tauri webviews
+npm run dev:web             # pure web + web-bridge
 ```
 
-Platform resolve: `import { Button } from "./Button"` → `Button.webview.tish` under `--surface webview`, `Button.web.tish` under `--surface web`.
-
-Open upstream items: [UPSTREAM_OPEN.md](../../docs/UPSTREAM_OPEN.md).
+See [HYBRID.md](../../docs/HYBRID.md) · [LATTISH.md](../../docs/LATTISH.md).

@@ -125,6 +125,10 @@ impl SurfaceRegistry {
         self.surfaces.lock().insert(info.id.clone(), info);
     }
 
+    pub fn unregister(&self, id: &str) -> bool {
+        self.surfaces.lock().remove(id).is_some()
+    }
+
     pub fn list(&self) -> Vec<SurfaceInfo> {
         self.surfaces.lock().values().cloned().collect()
     }

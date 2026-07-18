@@ -1,5 +1,5 @@
-// AppKit Button — same exports as Button.web / Button.webview.
+// AppKit Button — label is children text (host reads children, not title=).
 export fn Button(props) {
   let title = props.title === null ? "Button" : props.title
-  return <button title={title} onClick={props.onPress} />
+  return <button onClick={props.onPress}>{title}</button>
 }

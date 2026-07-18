@@ -1,0 +1,44 @@
+// SC4 hybrid: one native window with Native ‖ Webview side-by-side.
+import { run, handle, createSurface, stateSet } from "cargo:tish_app"
+import { Shell } from "../app/Shell"
+import { DEMO } from "../app/demo.tish"
+
+fn scoreDoc(wordCount: number, edits: number): number {
+  return wordCount * 1.5 + edits * 0.25
+}
+
+handle("app.openDoc", (args) => {
+  let id = args.id
+  let words: number = 0
+  let edits: number = 0
+  if (args.wordCount !== null) words = args.wordCount
+  if (args.edits !== null) edits = args.edits
+  let s: number = scoreDoc(words, edits)
+  stateSet(DEMO.docId, id)
+  stateSet("selection.score", s)
+  return { ok: true, score: s }
+})
+
+createSurface({
+  id: "main",
+  kind: "native",
+  title: "Hybrid",
+  root: Shell
+})
+
+run({
+  profile: "desktop",
+  platformAttach: {
+    apple: {
+      outerHost: false,
+      autoRunEventLoop: true
+    }
+  },
+  plugins: {
+    notification: true,
+    store: true,
+    menu: true,
+    tray: false,
+    singleInstance: false
+  }
+})

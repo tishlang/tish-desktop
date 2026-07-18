@@ -34,9 +34,9 @@ try {
       "native",
       "--check",
       "warn",
-      "src/main.tish",
+      "src/main.apple.tish",
       "-o",
-      "dist/hybrid-shell",
+      "dist/hybrid-shell-apple",
     ],
     { cwd: root, stdio: "inherit", env }
   )

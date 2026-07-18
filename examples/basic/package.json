@@ -14,7 +14,7 @@
     "build:css": "tish run --feature fs scripts/build-css.tish",
     "build:ui": "npm run build:css && vite build",
     "dev:ui": "npm run build:css && vite",
-    "build:shell": "tish build --target native --native-backend rust src/main.tish -o dist/basic-shell",
+    "build:shell": "tish build --target native --native-backend rust --check warn src/main.tish -o dist/basic-shell",
     "dev": "node ../../scripts/dev-example.mjs basic",
     "start": "npm run build:ui && npm run build:shell && ./dist/basic-shell"
   },

@@ -21,6 +21,7 @@
   "exports": {
     ".": { "tish": "./src/index.tish" },
     "./bridge": { "import": "../desktop-api/src/bridge.js" },
+    "./web": { "import": "../desktop-api/src/web-bridge.js" },
     "./web-bridge": { "import": "../desktop-api/src/web-bridge.js" }
   },
   "dependencies": {

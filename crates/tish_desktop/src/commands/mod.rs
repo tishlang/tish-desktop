@@ -4,7 +4,7 @@
 pub(crate) mod chrome;
 mod clipboard;
 mod core;
-mod dialog_extra;
+pub(crate) mod dialog_extra;
 mod helpers;
 mod menu_set;
 mod power_process;
@@ -12,8 +12,8 @@ pub(crate) mod secrets_auth;
 mod shell_os;
 mod shortcut;
 pub(crate) mod state_shared;
-mod store_auto;
-mod webview_cap;
+pub(crate) mod store_auto;
+pub(crate) mod webview_cap;
 mod window_extra;
 
 use serde_json::json;
@@ -41,17 +41,17 @@ pub fn desktop_invoke(
 type ExtraDispatch =
     fn(&AppHandle, &AppState, &str, &serde_json::Value) -> Option<Result<serde_json::Value, String>>;
 
-/// Legacy modules after CapProviders (migration period). `state.*` is handled earlier.
+/// Legacy modules after CapProviders. `dialog.*` / `notification.*` / `store.*` /
+/// `webview.*` are claimed by CapProviders first; chrome still owns tray/window bits
+/// and `dialog.message` fallback is routed via DialogProvider.
 const LEGACY_MODULES: &[ExtraDispatch] = &[
     core::try_dispatch,
     chrome::try_dispatch,
-    webview_cap::try_dispatch,
     window_extra::try_dispatch,
-    dialog_extra::try_dispatch,
     clipboard::try_dispatch,
     shortcut::try_dispatch,
     shell_os::try_dispatch,
-    store_auto::try_dispatch,
+    store_auto::try_dispatch, // autostart.* / updater.* (store.* already CapProvider)
     power_process::try_dispatch,
     secrets_auth::try_dispatch,
     menu_set::try_dispatch,

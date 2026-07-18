@@ -171,7 +171,8 @@ Wired when flags are true: `dialog`, `tray-icon`, `menu`, `deep-link`, `opener`,
 - **`examples/file-browser`** — sandboxed fixture browse + watch + ui-theme
 - **`examples/native-chrome`** — full broker demo surface (lattish)
 - **`examples/byo-ui`** — shell + webview + custom DOM UI, **no lattish**
-- **`examples/hybrid`** — two webviews sharing `state.*`, platform files, native surface slot
+- **`examples/hybrid`** — dual-webview (`dev:multi`) and SC4 native+webview (`dev:hybrid` / `build:shell:apple`); platform files + `Detail` / `Sidebar.web`; pure web via `app-api/web`
+- Completion of the unified host plan: both hybrid shapes first-class; doctor / Vite `package.json` platform opts / bare `app/` stubs — see [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md)
 
 ## Dry-run summary
 
