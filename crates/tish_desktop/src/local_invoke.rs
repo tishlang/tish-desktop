@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use serde_json::{json, Value as Json};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tishlang_core::{value_call, Value};
 
 use crate::broker::{self, GLOBAL_SHARED_STATE};
@@ -41,26 +41,36 @@ pub fn invoke_local(cmd: &str, args: Json) -> Result<Json, String> {
         return value_to_json(&result).ok_or_else(|| "handler returned non-JSON value".into());
     }
 
-    // 2. state.*
+    // 2. state.* (always in-process — works before/without Tauri)
     if let Some(r) = dispatch_state(cmd, &args) {
         return r;
     }
 
-    // 3. notification.* — platform native backends when no Tauri AppHandle path
-    if cmd.starts_with("notification.") {
-        return platform_notification(cmd, &args);
-    }
-
-    // 4. webview.* — host WK panes (Apple) when no Tauri AppHandle path
+    // 3. Host WK panes (nested <webview bridge>) — before Tauri CapProvider,
+    //    so webview.list/eval stay on AppKit surfaces when both hosts are live.
     if cmd.starts_with("webview.") {
         return platform_webview(cmd, &args);
     }
 
-    // 5. Other desktop-only caps without AppHandle → unsupported
+    // 4. Tauri plugin backends when desktop host is running (hybrid outerHost, multi-window).
+    if let Some(app) = APP_HANDLE.lock().clone() {
+        if let Some(state) = app.try_state::<crate::state::AppState>() {
+            return crate::commands::invoke_for_handle(&app, &*state, cmd, args);
+        }
+    }
+
+    // 5. No AppHandle — platform-native fallbacks (pure AppKit hosts)
+    if cmd.starts_with("notification.") {
+        return platform_notification(cmd, &args);
+    }
+
+    // 6. Desktop-only caps without AppHandle → unsupported
     if cmd.starts_with("tray.")
         || cmd.starts_with("dialog.")
         || cmd.starts_with("store.")
         || cmd.starts_with("window.")
+        || cmd.starts_with("clipboard.")
+        || cmd.starts_with("os.")
     {
         return Ok(broker::unsupported(cmd.split('.').next().unwrap_or(cmd)));
     }

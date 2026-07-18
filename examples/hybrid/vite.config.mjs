@@ -56,6 +56,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, "index.html"),
         chrome: path.resolve(__dirname, "chrome.html"),
+        extensions: path.resolve(__dirname, "extensions.html"),
       },
     },
   },

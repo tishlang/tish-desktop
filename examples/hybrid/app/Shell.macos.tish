@@ -1,4 +1,4 @@
-// SC4 shell root: Native ‖ Webview side-by-side (one window).
+// SC4 shell root: Native ‖ Webview + Tauri plugin demos via brokerInvoke.
 import { useState } from "tish:macos"
 import { brokerInvoke, stateSet, stateGet } from "cargo:tish_app"
 import { NativePane } from "./NativePane"
@@ -9,6 +9,7 @@ export fn Shell() {
   let [note, setNote] = useState("")
   let [flag, setFlag] = useState(false)
   let [docId, setDocId] = useState("a")
+  let [pluginLog, setPluginLog] = useState("")
 
   let readPath = (path) => {
     let r = stateGet(path)
@@ -57,6 +58,27 @@ export fn Shell() {
     })
   }
 
+  let plugin = (cmd, args) => {
+    let r = brokerInvoke(cmd, args)
+    setPluginLog(cmd + " → " + String(r))
+  }
+
+  let clipWrite = () => {
+    plugin("clipboard.writeText", { text: "hybrid-native · " + count })
+  }
+  let clipRead = () => {
+    plugin("clipboard.readText", {})
+  }
+  let dialogMsg = () => {
+    plugin("dialog.message", {
+      title: "Hybrid",
+      message: "From native pane via Tauri dialog plugin",
+    })
+  }
+  let osInfo = () => {
+    plugin("os.info", {})
+  }
+
   let onBridge = (msg) => {
     let args = {}
     if (msg.args !== null) {
@@ -70,29 +92,38 @@ export fn Shell() {
     return r
   }
 
+  // Header + fill split: Column passes remaining height to the last element child
+  // (not trailing JSX whitespace). Native pane scrolls when the window is short.
   return (
     <column padding={10} gap={8}>
-      <text>{"Hybrid — Native ‖ Webview"}</text>
+      <text>{"Hybrid — Native ‖ Webview + Tauri plugins"}</text>
       <text>{DEMO_HINT}</text>
-      <split height={560} dividerPosition={340}>
-        <NativePane
-          count={count}
-          note={note}
-          flag={flag}
-          docId={docId}
-          onBump={bump}
-          onNote={changeNote}
-          onFlag={changeFlag}
-          onSelect={select}
-          onRefresh={hydrate}
-          onNotify={notify}
-        />
+      <split height={"fill"} dividerPosition={340}>
+        <scrollable height={"fill"} direction="vertical" drawsBackground={false}>
+          <NativePane
+            count={count}
+            note={note}
+            flag={flag}
+            docId={docId}
+            pluginLog={pluginLog}
+            onBump={bump}
+            onNote={changeNote}
+            onFlag={changeFlag}
+            onSelect={select}
+            onRefresh={hydrate}
+            onNotify={notify}
+            onClipWrite={clipWrite}
+            onClipRead={clipRead}
+            onDialog={dialogMsg}
+            onOsInfo={osInfo}
+          />
+        </scrollable>
         <column padding={8} gap={6}>
           <text>{"Webview (lattish + ui-theme)"}</text>
           <webview
             id="wk-main"
             bridge={true}
-            height={520}
+            height={"fill"}
             src={"http://localhost:5177/"}
             onBridgeInvoke={onBridge}
           />

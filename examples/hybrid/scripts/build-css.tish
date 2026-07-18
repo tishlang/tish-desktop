@@ -5,6 +5,8 @@ await emitStylesheet({
   sourceFiles: [
     "ui/DemoPane.tish",
     "ui/main.tish",
+    "ui/chrome.tish",
+    "ui/Extensions.tish",
     "../../packages/ui-theme/src/ui/Button.tish",
     "../../packages/ui-theme/src/ui/Section.tish",
     "../../packages/ui-theme/src/ui/Input.tish",

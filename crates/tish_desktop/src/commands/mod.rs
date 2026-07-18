@@ -41,6 +41,16 @@ pub fn desktop_invoke(
 type ExtraDispatch =
     fn(&AppHandle, &AppState, &str, &serde_json::Value) -> Option<Result<serde_json::Value, String>>;
 
+/// In-process entry for shell / nested WK `brokerInvoke` when Tauri `AppHandle` is live.
+pub fn invoke_for_handle(
+    app: &AppHandle,
+    state: &AppState,
+    cmd: &str,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    dispatch(app, state, cmd, args)
+}
+
 /// Legacy modules after CapProviders. `dialog.*` / `notification.*` / `store.*` /
 /// `webview.*` are claimed by CapProviders first; chrome still owns tray/window bits
 /// and `dialog.message` fallback is routed via DialogProvider.

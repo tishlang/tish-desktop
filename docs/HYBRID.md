@@ -17,7 +17,7 @@ BYO apps need only these. Optional later lattish sugar (`NativeSurface` / `WebSu
 | Mode | Scripts | Surfaces |
 |------|---------|----------|
 | **Multi-window (v1)** | `npm run dev:multi` · `build:shell` | Dual Tauri `createSurface({ kind: "webview" })` — chrome + main share `state.*` |
-| **Native ‖ webview (SC4)** | `npm run dev:hybrid` · `build:shell:apple` | One window: AppKit `NativePane` + nested `<webview>` loading lattish/`ui-theme` `DemoPane` |
+| **Native ‖ webview (SC4)** | `npm run dev:hybrid` · `build:shell:apple` | AppKit + nested WK + **Tauri outerHost** (clipboard/dialog/os plugins) |
 | **Pure web** | `npm run dev:web` · `build:web` | Vite only — `installWebBridge` from `@tish-desktop/app-api/web`, `Button.web` / `Sidebar.web` |
 
 Dual-window does **not** satisfy SC4. SC4 is the apple shell path above — both surfaces visible in one window; both share BrokerCore `state.*`.
@@ -63,9 +63,10 @@ Platform resolve: `import { Button } from "./Button"` → `Button.webview.tish` 
 
 ## One-window nested WK (SC4 parallel panes)
 
-`examples/hybrid` SC4 shows **Native ‖ Webview** in a `<split>`:
-- Left: `app/NativePane.macos.tish` (AppKit host tags)
-- Right: bridged WK → `ui/DemoPane.tish` (**lattish** + **`@tish-desktop/ui-theme`**)
+`examples/hybrid` SC4 shows **Native ‖ Webview** in a `<split>`, with Tauri as **outerHost** so desktop plugins work:
+- Left: `app/NativePane.macos.tish` (AppKit + `brokerInvoke` → CapProviders)
+- Right: bridged WK → `ui/DemoPane.tish` (lattish / ui-theme; same plugin cmds)
+- Companion: `extensions.html` — direct Tauri bridge
 - Shared paths: `app/demo.tish`
 
 Invoke routes through **`brokerInvoke`**; webview `state.set` hydrates the native pane.

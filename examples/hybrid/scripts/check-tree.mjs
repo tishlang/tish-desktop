@@ -16,6 +16,8 @@ const required = [
   "src/main.tish",
   "src/main.apple.tish",
   "scripts/build-css.tish",
+  "ui/Extensions.tish",
+  "extensions.html",
 ]
 let failed = false
 for (const rel of required) {
@@ -38,6 +40,14 @@ if (!String(hybrid).includes("dev-hybrid") && !String(hybrid).includes("shell"))
 const appleMain = readFileSync(join(root, "src/main.apple.tish"), "utf8")
 if (!appleMain.includes('kind: "native"') || !appleMain.includes("Shell")) {
   console.error("main.apple.tish must create a native surface with Shell root")
+  failed = true
+}
+if (!appleMain.includes("outerHost: true") || !appleMain.includes("clipboard: true")) {
+  console.error("main.apple.tish must enable Tauri outerHost + clipboard plugin")
+  failed = true
+}
+if (!appleMain.includes("tauri-ext") && !appleMain.includes("extensions.html")) {
+  console.error("main.apple.tish must create a Tauri extensions webview surface")
   failed = true
 }
 const shell = readFileSync(join(root, "app/Shell.macos.tish"), "utf8")

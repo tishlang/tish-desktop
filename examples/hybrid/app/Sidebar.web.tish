@@ -1,34 +1,6 @@
-// Pure-web chrome (`--surface web`) — DOM mount; same module name as Sidebar.macos.tish.
-import { stateSet, invoke } from "@tish-desktop/app-api"
-
+// Pure-web leftover stub — prefer ui/DemoPane via web-main.tish.
 export fn Sidebar() {
   return null
 }
 
-export fn mountSidebar(rootEl) {
-  rootEl.innerHTML = ""
-  let h1 = document.createElement("h1")
-  h1.textContent = "Web chrome"
-  rootEl.appendChild(h1)
-  let p = document.createElement("p")
-  p.className = "muted"
-  p.textContent = "Shares state.* with the detail pane"
-  rootEl.appendChild(p)
-  let list = document.createElement("div")
-  list.className = "col"
-  let docs = ["demo-1", "demo-2", "demo-3"]
-  let i = 0
-  while (i < docs.length) {
-    let id = docs[i]
-    let b = document.createElement("button")
-    b.textContent = id
-    b.onclick = () => {
-      invoke("app.openDoc", { id: id, wordCount: 10 + i * 5, edits: i }).then(() => {
-        stateSet("selection.docId", id)
-      })
-    }
-    list.appendChild(b)
-    i = i + 1
-  }
-  rootEl.appendChild(list)
-}
+export fn mountSidebar(_rootEl) {}

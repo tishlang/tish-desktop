@@ -279,10 +279,16 @@ pub fn run(args: &[Value]) -> Value {
         .and_then(|p| p.apple.as_ref())
         .cloned();
     let pending_native = broker::PENDING_NATIVE_ROOTS.lock().len();
-    // Pure-native (SC4): native createSurface + apple attach, no webview windows.
-    // Skip the default Tauri window so AppKit can own NSApplication.run.
-    let pure_native_apple =
-        apple_attach.is_some() && config.windows.is_empty() && pending_native > 0;
+    // Pure-native: AppKit owns NSApplication.run (no Tauri). Only when the shell did not
+    // request Tauri as outerHost — hybrid SC4 with plugins uses outerHost:true + webview(s).
+    let want_tauri_host = apple_attach
+        .as_ref()
+        .map(|a| a.outer_host)
+        .unwrap_or(false);
+    let pure_native_apple = apple_attach.is_some()
+        && config.windows.is_empty()
+        && pending_native > 0
+        && !want_tauri_host;
 
     if config.windows.is_empty() && !pure_native_apple {
         config.windows.push(state::WindowSpec {

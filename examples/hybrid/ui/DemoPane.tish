@@ -37,6 +37,8 @@ export fn DemoPane() {
     })
   }, [])
 
+  let [log, setLog] = useState("")
+
   let bump = () => {
     let n = count + 1
     stateSet(DEMO.count, n).then(() => setCount(n))
@@ -61,6 +63,13 @@ export fn DemoPane() {
       title: DEMO_TITLE,
       body: "webview · count " + count + " · doc " + docId,
     })
+  }
+
+  let plugin = (cmd, args) => {
+    invoke(cmd, args === null || args === undefined ? {} : args).then(
+      (r) => setLog(cmd + " → " + JSON.stringify(r)),
+      (e) => setLog(cmd + " ✗ " + String(e))
+    )
   }
 
   let flagLabel = flag ? "on" : "off"
@@ -91,6 +100,40 @@ export fn DemoPane() {
       <Section title="Note" hint="state path demo.note">
         <Input value={note} placeholder="Note" onInput={onNote} class="max-w-sm" />
       </Section>
+
+      <Section title="Tauri extensions" hint="Same CapProviders as the companion Tauri window">
+        <Button
+          variant="secondary"
+          onClick={() =>
+            plugin("clipboard.writeText", { text: "hybrid-wk · " + count })
+          }
+        >
+          Clipboard write
+        </Button>
+        <Button variant="secondary" onClick={() => plugin("clipboard.readText", {})}>
+          Clipboard read
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() =>
+            plugin("dialog.message", {
+              title: DEMO_TITLE,
+              message: "From nested WK via Tauri dialog plugin",
+            })
+          }
+        >
+          Dialog
+        </Button>
+        <Button variant="ghost" onClick={() => plugin("os.info", {})}>
+          OS info
+        </Button>
+      </Section>
+
+      {log !== "" ? (
+        <pre class="mt-2 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground whitespace-pre-wrap">
+          {log}
+        </pre>
+      ) : null}
     </div>
   )
 }

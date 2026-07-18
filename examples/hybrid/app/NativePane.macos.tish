@@ -1,5 +1,4 @@
-// Native AppKit pane — host tags only (lattish does not run in AppKit).
-// Mirrors ui/DemoPane.tish controls against the same app/demo.tish paths.
+// Native AppKit pane — host tags + brokerInvoke into Tauri CapProviders.
 import { Button } from "./Button"
 import { DEMO } from "./demo.tish"
 
@@ -8,16 +7,22 @@ export fn NativePane(props) {
   let note = props.note
   let flag = props.flag
   let docId = props.docId
+  let pluginLog = props.pluginLog
   let onBump = props.onBump
   let onNote = props.onNote
   let onFlag = props.onFlag
   let onSelect = props.onSelect
   let onRefresh = props.onRefresh
   let onNotify = props.onNotify
+  let onClipWrite = props.onClipWrite
+  let onClipRead = props.onClipRead
+  let onDialog = props.onDialog
+  let onOsInfo = props.onOsInfo
 
   let docLabel = docId === null ? "none" : String(docId)
   let noteLabel = note === null ? "" : String(note)
   let flagLabel = flag === true ? "on" : "off"
+  let logLabel = pluginLog === null || pluginLog === "" ? "—" : String(pluginLog)
 
   let pickA = () => {
     if (onSelect) onSelect("a")
@@ -41,6 +46,12 @@ export fn NativePane(props) {
       <button onClick={pickB}>{"Doc B"}</button>
       <Button title="Refresh state" onPress={onRefresh} />
       <Button title="Notify" onPress={onNotify} />
+      <text>{"Tauri extensions"}</text>
+      <Button title="Clipboard write" onPress={onClipWrite} />
+      <Button title="Clipboard read" onPress={onClipRead} />
+      <Button title="Dialog" onPress={onDialog} />
+      <Button title="OS info" onPress={onOsInfo} />
+      <text>{logLabel}</text>
     </column>
   )
 }

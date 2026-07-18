@@ -7,12 +7,13 @@ Proves **0b** (shared `state.*`) and **SC4** (native ‖ webview on macOS) witho
 | Layer | Path | Stack |
 |-------|------|--------|
 | **Contract** | `app/demo.tish` | Shared `state.*` paths both panes use |
-| **Shell (SC4)** | `src/main.apple.tish` → `app/Shell.macos.tish` | `cargo:tish_app` + AppKit `<split>` + `<webview bridge>` |
-| **Native pane** | `app/NativePane.macos.tish` | AppKit host tags (`tish:macos`) |
-| **Webview pane** | `ui/DemoPane.tish` | **lattish** + **`@tish-desktop/ui-theme`** + app-api |
+| **Shell (SC4)** | `src/main.apple.tish` → `app/Shell.macos.tish` | AppKit `<split>` + nested WK; **Tauri outerHost** + plugins |
+| **Native pane** | `app/NativePane.macos.tish` | AppKit tags + `brokerInvoke` → Tauri CapProviders |
+| **Webview pane** | `ui/DemoPane.tish` | lattish + ui-theme + same plugin cmds |
+| **Tauri companion** | `ui/Extensions.tish` | Direct Tauri bridge (`extensions.html`) |
 | **Multi-window** | `src/main.tish` | Dual Tauri webviews (same Vite UI) |
 
-Native and webview deliberately use **different** UI stacks (AppKit vs lattish). They share **behavior** via `app/demo.tish` + BrokerCore — not a single component tree.
+Native and webview stay on different UI stacks (AppKit vs lattish). They share **behavior** via `demo.tish` + BrokerCore. On desktop, **Tauri plugins** (`clipboard`, `dialog`, `os`, …) are enabled with `platformAttach.apple.outerHost: true` — nested WK and the companion Extensions window both hit the same CapProviders.
 
 ```bash
 npm install
