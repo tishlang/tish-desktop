@@ -11,6 +11,7 @@ import { runBuild } from "./commands/build.tish"
 import { runInfo } from "./commands/info.tish"
 import { runIcon } from "./commands/icon.tish"
 import { runDistribute } from "./commands/distribute.tish"
+import { runDoctor } from "./commands/doctor.tish"
 
 fn usage() {
   console.log("tish-desktop — Tish Desktop CLI")
@@ -18,16 +19,25 @@ fn usage() {
   console.log("Usage: tish-desktop <command> [options]")
   console.log("")
   console.log("Commands:")
-  console.log("  init [dir]              Scaffold a minimal desktop app")
+  console.log("  init [dir]              Scaffold a desktop app")
   console.log("  dev [--example name]    Vite UI + native shell (parity with scripts/dev-example.mjs)")
   console.log("  build [dir]             Production UI + native shell → dist/")
+  console.log("  doctor                  Platform/surface, resolve probe, cap support summary")
   console.log("  info                    Print tish / rustc / platform summary")
   console.log("  icon [dir]              Generate icon set into project icons/")
   console.log("  distribute <step>       Run scripts/distribute/* (build|sign|notarize|updater|release)")
   console.log("  help                    Show this message")
   console.log("")
+  console.log("Init options:")
+  console.log("  --template lattish|bare  UI pack (default lattish; bare = BYO, no lattish)")
+  console.log("")
+  console.log("Doctor options:")
+  console.log("  --platform <name>       macos|ios|windows|linux|web (or TISH_PLATFORM)")
+  console.log("  --surface <name>        native|webview|web (or TISH_SURFACE)")
+  console.log("  --resolve <spec>        relative import to probe (default ./Button)")
+  console.log("")
   console.log("Dev options:")
-  console.log("  --example <name>        Example under examples/ (basic|file-browser|native-chrome)")
+  console.log("  --example <name>        basic|file-browser|native-chrome|byo-ui|hybrid")
   console.log("  --rebuild               Force rebuild the native shell")
   console.log("  --legacy-node           Transitional: call node scripts/dev-example.mjs")
 }
@@ -56,6 +66,10 @@ if (cmd === "dev") {
 }
 if (cmd === "build") {
   runBuild(rest)
+  exit(0)
+}
+if (cmd === "doctor") {
+  runDoctor(rest)
   exit(0)
 }
 if (cmd === "info") {

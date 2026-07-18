@@ -1,0 +1,69 @@
+// Hybrid desktop — dual coordinated surfaces sharing state.* (v1).
+// Native AppKit chrome: queue createSurface(kind:native) + macos.attach when platform-apple.
+// Until WK bridge lands upstream, hybrid is two windows (chrome webview + main webview).
+import { run, handle, createSurface, stateSet } from "cargo:tish_app"
+
+fn scoreDoc(wordCount: number, edits: number): number {
+  return wordCount * 1.5 + edits * 0.25
+}
+
+handle("app.openDoc", (args) => {
+  let id = args.id
+  // Avoid `=== undefined` — native codegen does not emit a Rust `undefined` binding.
+  let words: number = 0
+  let edits: number = 0
+  if (args.wordCount !== null) words = args.wordCount
+  if (args.edits !== null) edits = args.edits
+  let s: number = scoreDoc(words, edits)
+  stateSet("selection.docId", id)
+  stateSet("selection.score", s)
+  return { ok: true, score: s }
+})
+
+// "Chrome" surface — second webview standing in for native sidebar until attach+WK.
+createSurface({
+  id: "chrome",
+  kind: "webview",
+  label: "chrome",
+  url: "http://localhost:5177/chrome.html",
+  title: "Hybrid — Chrome",
+  width: 320,
+  height: 640,
+  titleBarStyle: "transparent"
+})
+
+createSurface({
+  id: "main",
+  kind: "webview",
+  label: "main",
+  url: "http://localhost:5177/",
+  title: "Hybrid — Main",
+  width: 720,
+  height: 640,
+  titleBarStyle: "transparent"
+})
+
+// Native surface slot (attach when building with --features platform-apple + macos.attach).
+createSurface({
+  id: "native-chrome",
+  kind: "native",
+  layout: "sidebar",
+  title: "Notes"
+})
+
+run({
+  profile: "desktop",
+  platformAttach: {
+    apple: {
+      outerHost: true,
+      autoRunEventLoop: false
+    }
+  },
+  plugins: {
+    notification: true,
+    store: true,
+    menu: true,
+    tray: false,
+    singleInstance: false
+  }
+})

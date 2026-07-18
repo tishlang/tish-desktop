@@ -1,8 +1,8 @@
 # Tish Desktop Strategy
 
-Tish-first desktop runtime on **Tauri 2**. Shell Tish owns application logic; Tauri owns the OS event loop inside `cargo:tish_desktop`. UI is **lattish + tish-tailwind** (+ optional `@tish-desktop/ui-theme`) in platform webviews. Dual entrypoints sync across a broker (`desktop/v1`).
+Cross-device **Tish app runtime** (repo name stays tish-desktop). Shell Tish owns application logic; **Tauri 2** owns the desktop webview event loop inside `cargo:tish_app` / `cargo:tish_desktop`. **Lattish is optional** — core is UI-kit agnostic. Surfaces (native / webview / web) sync via BrokerCore (`state.*` + `desktop/v1`). Apple native + iOS stay on **tish-apple**.
 
-See also [docs/TISH_FIRST_DX.md](./docs/TISH_FIRST_DX.md).
+See [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md), [docs/UPSTREAM.md](./docs/UPSTREAM.md), [docs/TISH_FIRST_DX.md](./docs/TISH_FIRST_DX.md).
 
 ## Ownership
 
@@ -23,15 +23,13 @@ See also [docs/TISH_FIRST_DX.md](./docs/TISH_FIRST_DX.md).
 
 ## Broker / state (microfrontend)
 
-UI state stays in the webview. Domain/OS truth stays on the shell/host. Sync is `invoke` / `listen` only — no shared lattish store across heaps.
+| API | Role |
+|-----|------|
+| **`state.*`** | Shared in-memory microfrontend state + `state:changed` (BrokerCore) |
+| **`store.*`** | Persisted KV (`store.json`) — unchanged |
+| Command / event | `invoke` / `listen` for caps and shell pushes |
 
-| Pattern | Use |
-|---------|-----|
-| Command | UI needs capability result |
-| Event | Shell pushes (`tick`, `fs:changed`, `tray:action`, …) |
-| Snapshot | Rehydrate after reload |
-
-Protocol version: **`desktop/v1`**.
+Protocol version: **`desktop/v1`**. UI kit is irrelevant to the broker.
 
 ## Command inventory (`desktop/v1`)
 
@@ -105,6 +103,7 @@ Opt-in via `run({ plugins, shellAllow, httpAllow, auth })`. Host gates with `Plu
 | `shortcut:{id}` | `{ id }` |
 | `auth:changed` / `auth:error` | session / error |
 | `updater:progress` | download progress (when configured) |
+| `state:changed` | `{ key, value }` shared microfrontend state |
 
 Constants live in `packages/shared` (`EVT_*`).
 
@@ -170,7 +169,9 @@ Wired when flags are true: `dialog`, `tray-icon`, `menu`, `deep-link`, `opener`,
 
 - **`examples/basic`** — ping, tick, second window, shell handler, Rust sample ext, `windowState`
 - **`examples/file-browser`** — sandboxed fixture browse + watch + ui-theme
-- **`examples/native-chrome`** — full broker demo surface
+- **`examples/native-chrome`** — full broker demo surface (lattish)
+- **`examples/byo-ui`** — shell + webview + custom DOM UI, **no lattish**
+- **`examples/hybrid`** — two webviews sharing `state.*`, platform files, native surface slot
 
 ## Dry-run summary
 

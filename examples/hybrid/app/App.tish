@@ -1,0 +1,48 @@
+import { Button } from "./Button"
+import { stateSet, useSharedState, invoke } from "@tish-desktop/app-api"
+import { Platform } from "@tish-desktop/shared"
+
+export fn mountApp(rootEl) {
+  rootEl.innerHTML = ""
+  let h1 = document.createElement("h1")
+  h1.textContent = "Hybrid main"
+  rootEl.appendChild(h1)
+
+  let meta = document.createElement("p")
+  meta.className = "muted"
+  meta.textContent = "OS=" + Platform.OS + " surface=" + Platform.surface
+  rootEl.appendChild(meta)
+
+  let status = document.createElement("pre")
+  status.id = "status"
+  status.textContent = "selection: none"
+  rootEl.appendChild(status)
+
+  useSharedState("selection.docId", (value, path, rev, source) => {
+    status.textContent = path + " = " + JSON.stringify(value) + " (rev " + rev + ", " + source + ")"
+  })
+
+  let row = document.createElement("div")
+  row.className = "row"
+  let pick = Button({
+    title: "Pick demo doc",
+    onPress: () => {
+      invoke("app.openDoc", { id: "demo-1", wordCount: 120, edits: 3 }).then((r) => {
+        console.log("openDoc", r)
+      })
+    },
+  })
+  row.appendChild(pick)
+  let notify = Button({
+    title: "Notify",
+    onPress: () => {
+      invoke("notification.show", { title: "Hybrid", body: "state synced across surfaces" }).then((r) => {
+        if (r.ok === false && r.code === "unsupported") {
+          status.textContent = "notification unsupported on this surface"
+        }
+      })
+    },
+  })
+  row.appendChild(notify)
+  rootEl.appendChild(row)
+}

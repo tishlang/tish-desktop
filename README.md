@@ -1,8 +1,8 @@
 # tish-desktop
 
-Tish-first desktop runtime on **Tauri 2**: shell Tish owns app logic; platform webviews host **lattish + tish-tailwind** UI. Broker protocol `desktop/v1` syncs the two heaps.
+Cross-device **Tish app runtime** (umbrella): shell Tish + BrokerCore (`state.*` / `desktop/v1`) + Tauri desktop webviews. **Lattish is optional** — use BYO UI or `init --template bare`. Apple native stays on **tish-apple**. Public shell entry: `cargo:tish_app` (alias of `cargo:tish_desktop`).
 
-See [STRATEGY.md](./STRATEGY.md) for architecture, command inventory, OAuth URIs, security, and dry-run findings. See [docs/TISH_FIRST_DX.md](./docs/TISH_FIRST_DX.md) for the Tish-only example rules.
+See [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md), [STRATEGY.md](./STRATEGY.md), [docs/UPSTREAM.md](./docs/UPSTREAM.md).
 
 ## Quick start
 
@@ -13,12 +13,15 @@ cargo check -p tish_desktop
 # Create / run apps via the Tish CLI (preferred)
 node cli/bin/tish-desktop.js help
 node cli/bin/tish-desktop.js init my-app
-node cli/bin/tish-desktop.js dev --example native-chrome
+node cli/bin/tish-desktop.js init my-app --template bare   # no lattish
+node cli/bin/tish-desktop.js dev --example byo-ui
 
 # Or use npm wrappers (examples call the CLI under the hood)
 npm run example:basic
 npm run example:file-browser
 npm run example:native-chrome
+npm run example:byo-ui
+npm run example:hybrid
 
 # Force-rebuild the native shell after Rust changes
 npm run example:native-chrome:rebuild
@@ -45,17 +48,20 @@ Install the CLI via npm (`npx @tish-desktop/cli` / `npm i -g @tish-desktop/cli`)
 
 | Path | Role |
 |------|------|
-| `crates/tish_desktop` | Public `cargo:tish_desktop` Tauri host + Value ABI |
+| `crates/tish_desktop` | `cargo:tish_desktop` host + BrokerCore + caps |
+| `crates/tish_app` | `cargo:tish_app` alias re-export |
 | `crates/tish_desktop_sample_ext` | Private sample Rust extension (not published) |
 | `cli/` | `@tish-desktop/cli` — `init\|dev\|build\|info\|icon\|distribute` |
-| `packages/shared` | Pure Tish helpers + event name constants |
-| `packages/desktop-api` | UI `desktopHost` + JS bridge |
-| `packages/ui-theme` | Design tokens + lattish primitives |
-| `examples/basic` | Ping/tick + second window (plain styles) |
+| `packages/shared` | Protocol, events, `Platform` helpers (no UI kit) |
+| `packages/desktop-api` / `app-api` | invoke / listen / `state.*` + bridge / web-bridge |
+| `packages/ui-theme` | Optional design tokens + lattish primitives |
+| `examples/basic` | Ping/tick + second window |
 | `examples/file-browser` | Sandboxed FS browser (ui-theme) |
-| `examples/native-chrome` | Full OS chrome / broker demo (ui-theme) |
+| `examples/native-chrome` | Full OS chrome / broker demo (lattish) |
+| `examples/byo-ui` | Shell + webview + plain DOM (no lattish) |
+| `examples/hybrid` | Dual webviews + `state.*` + platform `Button.*` files |
 | `scripts/distribute/` | Release build, sign, notarize, updater, GH release |
-| `.github/workflows/` | CI + crates.io / npm release (on full GitHub release) + draft app distribute |
+| `.github/workflows/` | CI (+ tish-apple checkout) + crates/npm release |
 
 ## Broker highlights
 

@@ -1,0 +1,32 @@
+{
+  "name": "tish-desktop-example-hybrid",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "tish": {
+    "source": "./src/main.tish",
+    "rustDependencies": {
+      "tish_app": { "path": "../../crates/tish_app" }
+    }
+  },
+  "scripts": {
+    "dev:web": "TISH_PLATFORM=web TISH_SURFACE=web vite --config vite.web.config.mjs",
+    "dev:ui": "TISH_PLATFORM=macos TISH_SURFACE=webview vite",
+    "dev:shell": "tish build --target native --native-backend rust --check warn src/main.tish -o dist/hybrid-shell && ./dist/hybrid-shell",
+    "dev:hybrid": "npm run dev:ui",
+    "build:web": "TISH_PLATFORM=web TISH_SURFACE=web vite build --config vite.web.config.mjs",
+    "build:ui": "TISH_PLATFORM=macos TISH_SURFACE=webview vite build",
+    "build:shell": "tish build --target native --native-backend rust --check warn src/main.tish -o dist/hybrid-shell",
+    "dev": "node ../../cli/bin/tish-desktop.js dev --example hybrid",
+    "start": "npm run build:ui && npm run build:shell && ./dist/hybrid-shell"
+  },
+  "dependencies": {
+    "@tish-desktop/app-api": "file:../../packages/app-api",
+    "@tish-desktop/desktop-api": "file:../../packages/desktop-api",
+    "@tish-desktop/shared": "file:../../packages/shared"
+  },
+  "devDependencies": {
+    "@tishlang/vite-plugin-tish": "file:../../../tish/npm/vite-plugin-tish",
+    "vite": "^6.0.0"
+  }
+}

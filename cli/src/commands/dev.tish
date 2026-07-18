@@ -17,6 +17,8 @@ import {
 fn examplePort(name) {
   if (name === "file-browser") return 5174
   if (name === "native-chrome") return 5175
+  if (name === "byo-ui") return 5176
+  if (name === "hybrid") return 5177
   return 5173
 }
 
@@ -24,6 +26,8 @@ fn exampleShellOut(name) {
   if (name === "basic") return "dist/basic-shell"
   if (name === "file-browser") return "dist/file-browser-shell"
   if (name === "native-chrome") return "dist/native-chrome-shell"
+  if (name === "byo-ui") return "dist/byo-ui-shell"
+  if (name === "hybrid") return "dist/hybrid-shell"
   return "dist/" + name + "-shell"
 }
 
@@ -161,7 +165,7 @@ export fn runDev(args) {
       name = "app"
     } else {
       console.error("[dev] example not found: " + exampleDir)
-      console.error("      pass --example basic|file-browser|native-chrome, or run inside an app dir")
+      console.error("      pass --example basic|file-browser|native-chrome|byo-ui|hybrid, or run inside an app dir")
       exit(1)
     }
   }
@@ -174,11 +178,14 @@ export fn runDev(args) {
 
   console.log("[dev] " + name + " — starting Vite :" + String(port) + ", then native desktop shell")
 
-  let cssCode = exec(
-    "cd " + q(exampleDir) + " && tish run --feature fs scripts/build-css.tish"
-  )
-  if (cssCode !== 0) {
-    console.log("[dev] build-css failed (continuing; styles may be stale)")
+  let cssScript = joinPath(exampleDir, "scripts/build-css.tish")
+  if (pathExists(cssScript)) {
+    let cssCode = exec(
+      "cd " + q(exampleDir) + " && tish run --feature fs scripts/build-css.tish"
+    )
+    if (cssCode !== 0) {
+      console.log("[dev] build-css failed (continuing; styles may be stale)")
+    }
   }
 
   killVite(port)

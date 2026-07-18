@@ -21,6 +21,11 @@ jobs:
       - name: Lint Tish
         run: npm run lint:tish
         continue-on-error: true
+      - name: Typed shell guidance note
+        run: |
+          echo "Prefer tish build --check warn|error for shell/native (see docs/TYPED_SHELL.md)"
+      - name: Bare / BYO example must not depend on lattish
+        run: npm run check:bare-deps
 
   rust:
     runs-on: ubuntu-latest
@@ -29,12 +34,37 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Checkout tish core (path dep / patch)
+      - name: Checkout tish core (path dep)
         uses: actions/checkout@v4
         with:
           repository: tishlang/tish
           path: ../tish
+      - name: Checkout tish-apple (platform-apple path dep)
+        uses: actions/checkout@v4
+        with:
+          repository: tishlang/tish-apple
+          path: ../tish-apple
+      - name: Check (default features)
+        run: cargo check -p tish_desktop -p tish_app
+      - name: Check platform-apple feature gates (compile metadata)
+        # Full link of tish-macos needs macOS; ensure the feature resolves on Linux.
+        run: cargo check -p tish_desktop --features platform-apple
         continue-on-error: true
-      - name: Check
-        run: cargo check -p tish_desktop
-        continue-on-error: true
+
+  rust-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Checkout tish core
+        uses: actions/checkout@v4
+        with:
+          repository: tishlang/tish
+          path: ../tish
+      - name: Checkout tish-apple
+        uses: actions/checkout@v4
+        with:
+          repository: tishlang/tish-apple
+          path: ../tish-apple
+      - name: Check with platform-apple
+        run: cargo check -p tish_desktop --features platform-apple -p tish_app

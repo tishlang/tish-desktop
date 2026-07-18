@@ -1,7 +1,7 @@
 {
   "name": "@tish-desktop/desktop-api",
   "version": "0.1.0",
-  "description": "UI bridge and desktopHost façade for Tish Desktop apps",
+  "description": "Core UI bridge and app-api façade (invoke, listen, state.*) — no UI kit dependency",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "repository": {
@@ -16,16 +16,22 @@
     "src"
   ],
   "tish": {
-    "module": "./src/desktopHost.tish"
+    "module": "./src/appApi.tish"
   },
   "exports": {
-    ".": { "tish": "./src/desktopHost.tish" },
+    ".": { "tish": "./src/appApi.tish" },
     "./desktopHost": { "tish": "./src/desktopHost.tish" },
-    "./bridge": { "import": "./src/bridge.js" }
+    "./appApi": { "tish": "./src/appApi.tish" },
+    "./bridge": { "import": "./src/bridge.js" },
+    "./web-bridge": { "import": "./src/web-bridge.js" }
+  },
+  "dependencies": {
+    "@tish-desktop/shared": "file:../shared"
   },
   "keywords": [
     "tish",
     "desktop",
-    "tauri"
+    "tauri",
+    "app-api"
   ]
 }

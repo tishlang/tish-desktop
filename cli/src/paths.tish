@@ -73,7 +73,7 @@ export fn firstPositional(args) {
   while (i < args.length) {
     let a = args[i]
     if (!String(a).startsWith("-")) return a
-    if ((a === "--example" || a === "--dir" || a === "--out") && i + 1 < args.length) {
+    if ((a === "--example" || a === "--dir" || a === "--out" || a === "--template" || a === "--platform" || a === "--surface" || a === "--resolve" || a === "--importer") && i + 1 < args.length) {
       i = i + 2
       continue
     }
@@ -163,6 +163,16 @@ export fn repoRoot() {
 }
 
 export fn resolveTish() {
+  // Prefer explicit override, then sibling monorepo debug build (has --platform / resolve-id).
+  if (env !== null) {
+    let custom = env["TISH_PATH"]
+    if (custom !== null && custom !== "" && fileExists(String(custom))) return String(custom)
+  }
+  let root = repoRoot()
+  let localDebug = joinPath(root, "../tish/target/debug/tish")
+  if (fileExists(localDebug)) return localDebug
+  let localRelease = joinPath(root, "../tish/target/release/tish")
+  if (fileExists(localRelease)) return localRelease
   let home = ""
   if (env !== null) {
     let h = env["HOME"]

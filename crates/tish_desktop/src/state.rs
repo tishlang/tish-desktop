@@ -6,6 +6,7 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tishlang_core::{value_call, NativeFn, Value};
 
+use crate::broker::{SharedState, SurfaceInfo, SurfaceKind, SurfaceRegistry};
 use crate::fs_sandbox::FsWatcher;
 
 pub const PROTOCOL_VERSION: &str = "desktop/v1";
@@ -14,6 +15,12 @@ pub const PROTOCOL_VERSION: &str = "desktop/v1";
 #[serde(rename_all = "camelCase")]
 pub struct WindowSpec {
     pub label: String,
+    /// Surface kind: `webview` (default) or `native` (apple attach when enabled).
+    #[serde(default)]
+    pub kind: Option<String>,
+    /// Optional stable surface id (defaults to `label`).
+    #[serde(default)]
+    pub id: Option<String>,
     #[serde(default)]
     pub url: Option<String>,
     #[serde(default)]
@@ -28,6 +35,9 @@ pub struct WindowSpec {
     pub hidden_title: bool,
     #[serde(default = "default_true")]
     pub decorations: bool,
+    /// Native layout hint: `content` | `sidebar` (apple).
+    #[serde(default)]
+    pub layout: Option<String>,
 }
 
 fn default_width() -> f64 {
@@ -126,9 +136,45 @@ fn default_true() -> bool {
     true
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppleAttachConfig {
+    /// Hybrid default: false — outer host (Tauri) owns NSApplication.run.
+    #[serde(default = "default_false")]
+    pub auto_run_event_loop: bool,
+    /// Hybrid default: true — skip apple menu/timer/activation clobber.
+    #[serde(default = "default_true")]
+    pub outer_host: bool,
+}
+
+impl Default for AppleAttachConfig {
+    fn default() -> Self {
+        Self {
+            auto_run_event_loop: false,
+            outer_host: true,
+        }
+    }
+}
+
+fn default_false() -> bool {
+    false
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformAttachConfig {
+    #[serde(default)]
+    pub apple: Option<AppleAttachConfig>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct RunConfig {
+    /// Runtime profile: `desktop` | `ios` | `web` (informational + attach defaults).
+    #[serde(default)]
+    pub profile: Option<String>,
+    #[serde(default)]
+    pub platform_attach: Option<PlatformAttachConfig>,
     #[serde(default)]
     pub windows: Vec<WindowSpec>,
     #[serde(default)]
@@ -280,12 +326,31 @@ pub struct AppState {
     pub auth_cache: Mutex<Option<(String, u64)>>,
     pub pending_oauth: Mutex<Option<PendingOAuth>>,
     pub auth_session: Mutex<Option<AuthSession>>,
+    /// Broker shared microfrontend state (`state.*`).
+    pub shared_state: Arc<SharedState>,
+    pub surfaces: Arc<SurfaceRegistry>,
 }
 
 impl AppState {
     pub fn new(config: RunConfig) -> Self {
         let fs_root = config.fs_root.as_ref().map(PathBuf::from);
         let permissions = permissions_from_plugins(&config.plugins);
+        let shared_state = Arc::clone(&crate::broker::GLOBAL_SHARED_STATE);
+        let surfaces = Arc::clone(&crate::broker::GLOBAL_SURFACES);
+        for w in &config.windows {
+            let id = w.id.clone().unwrap_or_else(|| w.label.clone());
+            let kind = match w.kind.as_deref() {
+                Some("native") => SurfaceKind::Native,
+                Some("web") => SurfaceKind::Web,
+                _ => SurfaceKind::Webview,
+            };
+            surfaces.register(SurfaceInfo {
+                id,
+                kind,
+                platform: None,
+                label: Some(w.label.clone()),
+            });
+        }
         Self {
             fs_root: Mutex::new(fs_root),
             fs_watcher: FsWatcher::default(),
@@ -300,6 +365,8 @@ impl AppState {
             auth_cache: Mutex::new(None),
             pending_oauth: Mutex::new(None),
             auth_session: Mutex::new(None),
+            shared_state,
+            surfaces,
         }
     }
 

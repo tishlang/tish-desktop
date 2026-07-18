@@ -1,0 +1,50 @@
+import { exit, env, cwd } from "tish:process"
+import { exec } from "tish:process"
+import {
+  flagValue,
+  joinPath,
+  pathExists,
+  q,
+  resolveTish,
+} from "../paths.tish"
+
+export fn runDoctor(args) {
+  let platform = flagValue(args, "--platform")
+  if (platform === null) platform = env("TISH_PLATFORM")
+  if (platform === null) platform = "macos"
+  let surface = flagValue(args, "--surface")
+  if (surface === null) surface = env("TISH_SURFACE")
+  if (surface === null) surface = "webview"
+
+  let tish = resolveTish()
+  console.log("tish-desktop doctor")
+  console.log("  platform: " + platform)
+  console.log("  surface:  " + surface)
+  console.log("  tish:     " + tish)
+
+  let probe = flagValue(args, "--resolve")
+  if (probe === null) probe = "./Button"
+  let importer = flagValue(args, "--importer")
+  if (importer === null) {
+    let here = cwd()
+    importer = joinPath(here, "src/main.tish")
+    if (!pathExists(importer)) importer = joinPath(here, "ui/main.tish")
+    if (!pathExists(importer)) importer = joinPath(here, "app/App.tish")
+  }
+
+  console.log("  resolve:  " + probe + " (importer " + importer + ")")
+  let cmd = tish + " resolve-id " + q(probe) + " --importer " + q(importer)
+  cmd = cmd + " --platform " + q(platform) + " --surface " + q(surface)
+  exec("sh -c " + q(cmd + " || echo '(resolve-id failed — rebuild tish CLI with platform resolve)'"))
+
+  console.log("")
+  console.log("Caps (desktop host):")
+  console.log("  notification.*  Full (Tauri) / web stub / else { code: unsupported, capability }")
+  console.log("  state.*         Full (BrokerCore; path + revision)")
+  console.log("  store.*         Full when plugins.store (persisted; not state.*)")
+  console.log("  webview.*       Partial (load / postMessage events)")
+  console.log("  tray.*          Desktop-only → unsupported on web/ios")
+  console.log("")
+  console.log("See docs/UNIFIED_APP.md and docs/UPSTREAM.md")
+  exit(0)
+}

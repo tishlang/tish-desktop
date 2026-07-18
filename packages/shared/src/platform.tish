@@ -1,0 +1,51 @@
+// Runtime platform facts (build-injected or broker-reported). Kit-agnostic.
+
+export const Platform = {
+  OS: "web",
+  surface: "web",
+}
+
+export fn platformIsNative() {
+  return Platform.surface === "native"
+}
+
+export fn platformIsWebview() {
+  return Platform.surface === "webview"
+}
+
+export fn platformIsWeb() {
+  return Platform.surface === "web" || Platform.OS === "web"
+}
+
+/** RN-style select — also available as Platform.select when assigned at boot.
+ *  Fallback key must be written as `"default"` (keyword; not bare `default:`). */
+export fn platformSelect(map) {
+  let m = map === null || map === undefined ? {} : map
+  let os = Platform.OS
+  let surface = Platform.surface
+  if (m[os] !== undefined) return m[os]
+  if (surface === "webview" && m.webview !== undefined) return m.webview
+  if (surface === "web" && m.web !== undefined) return m.web
+  if (surface === "native" && m.native !== undefined) return m.native
+  if ((os === "macos" || os === "windows" || os === "linux") && m.desktop !== undefined) {
+    return m.desktop
+  }
+  // `default` is a Tish keyword — use bracket access.
+  if (m["default"] !== undefined) return m["default"]
+  return null
+}
+
+// Attach select helper onto Platform for `Platform.select({ … })` call sites.
+Platform.select = platformSelect
+Platform.isNative = false
+Platform.isWebview = false
+Platform.isWeb = true
+
+export fn setPlatformFacts(os, surface) {
+  Platform.OS = os === null || os === undefined ? Platform.OS : os
+  Platform.surface = surface === null || surface === undefined ? Platform.surface : surface
+  Platform.isNative = Platform.surface === "native"
+  Platform.isWebview = Platform.surface === "webview"
+  Platform.isWeb = Platform.surface === "web" || Platform.OS === "web"
+  Platform.select = platformSelect
+}

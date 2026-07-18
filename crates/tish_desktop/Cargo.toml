@@ -2,7 +2,7 @@
 name = "tish_desktop"
 version = "0.1.0"
 edition = "2021"
-description = "cargo:tish_desktop — Tauri 2 host for Tish-first desktop apps"
+description = "cargo:tish_desktop / cargo:tish_app — cross-device Tish app runtime (Tauri desktop + platform adapters)"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/tishlang/tish-desktop"
 homepage = "https://tishlang.com"
@@ -18,6 +18,18 @@ crate-type = ["rlib"]
 name = "tish-desktop"
 path = "src/bin/tish_desktop.rs"
 
+[features]
+default = ["webview-tauri"]
+# Classic desktop webview host (Tauri). Always on by default.
+webview-tauri = []
+# Path-depend tish-apple for native macOS attach under an outer host.
+platform-apple = ["dep:tish-macos"]
+# Future stubs (compile-time markers; no deps yet).
+platform-ms = []
+platform-lin = []
+caps-notification = []
+caps-store-persist = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -29,6 +41,7 @@ tishlang_core = { path = "../../../tish/crates/tish_core", features = ["send-val
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon", "devtools"] }
+tish-macos = { path = "../../../tish-apple/crates/tish-macos", optional = true }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"

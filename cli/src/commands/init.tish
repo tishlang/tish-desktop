@@ -4,6 +4,7 @@ import {
   basename,
   cliRoot,
   firstPositional,
+  flagValue,
   joinPath,
   pathExists,
   q,
@@ -127,7 +128,18 @@ export fn runInit(args) {
   }
 
   let root = repoRoot()
-  let templates = joinPath(cliRoot(), "templates/app")
+  let templateName = flagValue(args, "--template")
+  if (templateName === null) templateName = "lattish"
+  let templateDir = "templates/app"
+  if (templateName === "bare" || templateName === "none" || templateName === "byo") {
+    templateDir = "templates/bare"
+  } else if (templateName === "lattish" || templateName === "app" || templateName === "default") {
+    templateDir = "templates/app"
+  } else {
+    console.error("init: unknown --template " + templateName + " (use lattish|bare)")
+    exit(1)
+  }
+  let templates = joinPath(cliRoot(), templateDir)
   let appName = basename(target)
   if (appName === "" || appName === "." || appName === "/") appName = "my-desktop-app"
 
@@ -135,7 +147,7 @@ export fn runInit(args) {
   let shellOut = "dist/" + appName + "-shell"
   let port = "5173"
 
-  console.log("[init] scaffolding " + target)
+  console.log("[init] scaffolding " + target + " (template=" + templateName + ")")
   console.log("[init] repo root → " + relRoot)
   mkdir(target, true)
   walkCopy(templates, target, appName, relRoot, shellOut, port)

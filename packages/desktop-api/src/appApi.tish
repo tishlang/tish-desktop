@@ -1,0 +1,66 @@
+// Core app API — invoke / listen / state.* / Platform. No lattish dependency.
+
+import { Platform, platformSelect, setPlatformFacts } from "@tish-desktop/shared"
+import { EVT_STATE_CHANGED } from "@tish-desktop/shared"
+
+fn bridge() {
+  let g = globalThis
+  let b = g.__TISH_APP__
+  if (b === null || b === undefined) b = g.__TISH_DESKTOP__
+  if (b === null || b === undefined) {
+    console.error("tish-app bridge not installed — import bridge.js or web-bridge.js first")
+    return null
+  }
+  return b
+}
+
+export fn getCurrentWindowLabel() {
+  let b = bridge()
+  if (b === null) return "main"
+  return b.getCurrentWindowLabel()
+}
+
+export fn invoke(cmd, args) {
+  let b = bridge()
+  let a = args === null || args === undefined ? {} : args
+  return b.invoke(cmd, a)
+}
+
+export fn listen(eventName, handler) {
+  let b = bridge()
+  return b.listen(eventName, handler)
+}
+
+export fn emit(eventName, payload) {
+  let b = bridge()
+  return b.emit(eventName, payload)
+}
+
+/** Plan contract: state.get({ path }) */
+export fn stateGet(path) {
+  return invoke("state.get", { path: path })
+}
+
+export fn stateSet(path, value) {
+  return invoke("state.set", { path: path, value: value })
+}
+
+export fn statePatch(path, value) {
+  return invoke("state.patch", { path: path, value: value })
+}
+
+/**
+ * Subscribe to `state:changed` for `path` (or all paths if null).
+ * Returns an unsubscribe promise/handle from listen.
+ */
+export fn useSharedState(path, onChange) {
+  return listen(EVT_STATE_CHANGED, (payload) => {
+    let p = payload.path
+    if (p === undefined) p = payload.key
+    if (path !== null && path !== undefined && p !== path) return
+    if (onChange) onChange(payload.value, p, payload.revision, payload.source)
+  })
+}
+
+export { Platform, platformSelect, setPlatformFacts }
+export const PROTOCOL = "desktop/v1"

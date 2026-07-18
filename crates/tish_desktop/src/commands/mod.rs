@@ -1,7 +1,7 @@
 //! Broker dispatch: the webview calls `desktop_invoke(cmd, args)` which routes
 //! to a Tish-registered handler or one of the command modules below.
 
-mod chrome;
+pub(crate) mod chrome;
 mod clipboard;
 mod core;
 mod dialog_extra;
@@ -11,7 +11,9 @@ mod power_process;
 pub(crate) mod secrets_auth;
 mod shell_os;
 mod shortcut;
+pub(crate) mod state_shared;
 mod store_auto;
+mod webview_cap;
 mod window_extra;
 
 use serde_json::json;
@@ -39,9 +41,11 @@ pub fn desktop_invoke(
 type ExtraDispatch =
     fn(&AppHandle, &AppState, &str, &serde_json::Value) -> Option<Result<serde_json::Value, String>>;
 
-const EXTRA_MODULES: &[ExtraDispatch] = &[
+/// Legacy modules after CapProviders (migration period). `state.*` is handled earlier.
+const LEGACY_MODULES: &[ExtraDispatch] = &[
     core::try_dispatch,
     chrome::try_dispatch,
+    webview_cap::try_dispatch,
     window_extra::try_dispatch,
     dialog_extra::try_dispatch,
     clipboard::try_dispatch,
@@ -59,11 +63,20 @@ fn dispatch(
     cmd: &str,
     args: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
+    // Plan order: handlers → state.* → CapProvider → legacy try_dispatch → unknown
     if state.handlers.lock().contains_key(cmd) {
         return state.call_handler(cmd, args);
     }
 
-    for try_dispatch in EXTRA_MODULES {
+    if let Some(result) = state_shared::try_dispatch(app, state, cmd, &args) {
+        return result;
+    }
+
+    if let Some(result) = crate::caps::try_caps(app, state, cmd, &args) {
+        return result;
+    }
+
+    for try_dispatch in LEGACY_MODULES {
         if let Some(result) = try_dispatch(app, state, cmd, &args) {
             return result;
         }

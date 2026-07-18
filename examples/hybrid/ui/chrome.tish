@@ -1,0 +1,34 @@
+import { setPlatformFacts } from "@tish-desktop/shared"
+import { stateSet, useSharedState, invoke } from "@tish-desktop/app-api"
+
+setPlatformFacts("macos", "webview")
+
+fn mount() {
+  let root = document.getElementById("root")
+  root.innerHTML = "<h1>Chrome</h1><p class='muted'>Second webview — shares state.*</p>"
+  let list = document.createElement("div")
+  list.className = "col"
+  let docs = ["demo-1", "demo-2", "demo-3"]
+  let i = 0
+  while (i < docs.length) {
+    let id = docs[i]
+    let b = document.createElement("button")
+    b.textContent = id
+    b.onclick = () => {
+      invoke("app.openDoc", { id: id, wordCount: 10 + i * 5, edits: i }).then(() => {
+        stateSet("selection.docId", id)
+      })
+    }
+    list.appendChild(b)
+    i = i + 1
+  }
+  root.appendChild(list)
+  let sel = document.createElement("pre")
+  sel.textContent = "…"
+  root.appendChild(sel)
+  useSharedState("selection.docId", (value, path, rev) => {
+    sel.textContent = "selected " + JSON.stringify(value) + " rev=" + rev
+  })
+}
+
+mount()

@@ -1,0 +1,34 @@
+// Bare template — no lattish. Prefer cargo:tish_app.
+import { run, handle, createSurface } from "cargo:tish_app"
+
+fn greet(from: string): string {
+  return "hello from shell Tish, " + from
+}
+
+handle("app.hello", (args) => {
+  let name: string = "ui"
+  if (args !== null && args.from !== null) {
+    name = String(args.from)
+  }
+  return { ok: true, message: greet(name), args: args }
+})
+
+createSurface({
+  id: "main",
+  kind: "webview",
+  label: "main",
+  url: "http://localhost:__DEV_PORT__/",
+  title: "__APP_NAME__",
+  width: 900,
+  height: 600,
+  titleBarStyle: "transparent"
+})
+
+run({
+  plugins: {
+    dialog: true,
+    menu: true,
+    notification: true,
+    singleInstance: false
+  }
+})

@@ -1,0 +1,13 @@
+// Public alias — same surface as @tish-desktop/desktop-api.
+export {
+  getCurrentWindowLabel,
+  invoke,
+  listen,
+  emit,
+  stateGet,
+  stateSet,
+  statePatch,
+  useSharedState,
+  Platform,
+  PROTOCOL,
+} from "@tish-desktop/desktop-api"

@@ -1,11 +1,15 @@
-//! `cargo:tish_desktop` — Tauri 2 host for Tish-first desktop apps.
+//! `cargo:tish_desktop` / `cargo:tish_app` — cross-device app runtime host.
 //!
-//! Shell Tish configures handlers/windows then calls `run(config)`.
+//! Shell Tish configures handlers/surfaces then calls `run(config)`.
 //! UI talks over broker protocol `desktop/v1` via `desktop_invoke` / events.
+//! Shared microfrontend state is `state.*` (persisted KV remains `store.*`).
 
+mod broker;
+mod caps;
 mod commands;
 mod extensions;
 mod fs_sandbox;
+mod platform;
 mod state;
 mod value_util;
 mod windows;
@@ -71,22 +75,139 @@ pub fn register_rust_extension(args: &[Value]) -> Value {
     ok_json(serde_json::json!({ "ok": true }))
 }
 
-/// `createWindow(spec)` — only valid after run has started; prefer windows in run(config).
+/// `createWindow(spec)` — queue a webview window (prefer `createSurface` for kind).
 pub fn create_window(args: &[Value]) -> Value {
-    let Some(spec_json) = arg_object_json(args, 0) else {
+    let Some(mut spec_json) = arg_object_json(args, 0) else {
         return err_str("createWindow(spec) requires object");
     };
-    // Queued into pending config if not running yet
+    if spec_json.get("kind").is_none() {
+        if let Some(obj) = spec_json.as_object_mut() {
+            obj.insert("kind".into(), serde_json::json!("webview"));
+        }
+    }
+    queue_surface_spec(spec_json)
+}
+
+/// `createSurface({ id?, label, kind: "webview"|"native", url?, root?, … })`
+pub fn create_surface(args: &[Value]) -> Value {
+    let Some(spec_val) = args.first() else {
+        return err_str("createSurface(spec) requires object");
+    };
+    let Some(mut spec_json) = arg_object_json(args, 0) else {
+        return err_str("createSurface(spec) requires object");
+    };
+    let kind = spec_json
+        .get("kind")
+        .and_then(|v| v.as_str())
+        .unwrap_or("webview")
+        .to_string();
+
+    // Preserve Tish `root` fn (JSON round-trip drops functions).
+    let root_fn = match spec_val {
+        Value::Object(o) => o.borrow().strings.get("root").cloned(),
+        _ => None,
+    };
+    let has_root = root_fn.is_some();
+
+    if kind == "native" {
+        let host = platform::current_host();
+        let id = spec_json
+            .get("id")
+            .or_else(|| spec_json.get("label"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("native")
+            .to_string();
+        broker::GLOBAL_SURFACES.register(broker::SurfaceInfo {
+            id: id.clone(),
+            kind: broker::SurfaceKind::Native,
+            platform: Some(host.name().into()),
+            label: Some(id.clone()),
+        });
+        if let Some(root) = root_fn {
+            broker::PENDING_NATIVE_ROOTS
+                .lock()
+                .push((id.clone(), root));
+        }
+        if !host.supports_native_surface() {
+            return ok_json(broker::unsupported_on("createSurface.native", host.name()));
+        }
+        let attach = host
+            .attach_native(&Value::Null, &spec_json)
+            .unwrap_or_else(|e| serde_json::json!({ "ok": false, "error": e }));
+        return ok_json(serde_json::json!({
+            "ok": true,
+            "queued": true,
+            "kind": "native",
+            "host": host.name(),
+            "attach": attach,
+            "hasRoot": has_root,
+            "hint": "run({ platformAttach: { apple: { outerHost: true, autoRunEventLoop: false } } }); attach roots with macos.attach",
+        }));
+    }
+
+    if let Some(obj) = spec_json.as_object_mut() {
+        obj.remove("root"); // not part of WindowSpec JSON
+    }
+    queue_surface_spec(spec_json)
+}
+
+fn queue_surface_spec(spec_json: serde_json::Value) -> Value {
     let mut cfg = PENDING_CONFIG.lock();
     let mut c = cfg.clone().unwrap_or_default();
     match serde_json::from_value::<state::WindowSpec>(spec_json) {
         Ok(spec) => {
+            let id = spec.id.clone().unwrap_or_else(|| spec.label.clone());
+            let kind = match spec.kind.as_deref() {
+                Some("native") => broker::SurfaceKind::Native,
+                Some("web") => broker::SurfaceKind::Web,
+                _ => broker::SurfaceKind::Webview,
+            };
+            broker::GLOBAL_SURFACES.register(broker::SurfaceInfo {
+                id,
+                kind,
+                platform: None,
+                label: Some(spec.label.clone()),
+            });
             c.windows.push(spec);
             *cfg = Some(c);
             ok_json(serde_json::json!({ "ok": true, "queued": true }))
         }
         Err(e) => err_str(e.to_string()),
     }
+}
+
+/// Shell helper: `stateSet(path, value)` — broker shared state (plan `path` contract).
+pub fn state_set(args: &[Value]) -> Value {
+    let Some(path) = arg_str(args, 0) else {
+        return err_str("stateSet(path, value): path required");
+    };
+    let value = args
+        .get(1)
+        .and_then(|v| value_util::value_to_json(v))
+        .unwrap_or(serde_json::Value::Null);
+    let out = broker::GLOBAL_SHARED_STATE.set(path, value);
+    ok_json(out)
+}
+
+/// Shell helper: `stateGet(path)`.
+pub fn state_get(args: &[Value]) -> Value {
+    let Some(path) = arg_str(args, 0) else {
+        return err_str("stateGet(path): path required");
+    };
+    let (value, revision) = broker::GLOBAL_SHARED_STATE.get(&path);
+    ok_json(serde_json::json!({
+        "ok": true,
+        "path": path,
+        "value": value,
+        "revision": revision,
+    }))
+}
+
+/// `pendingNativeRoots()` — ids queued via `createSurface({ kind: "native", root })`.
+pub fn pending_native_roots(_args: &[Value]) -> Value {
+    let roots = broker::PENDING_NATIVE_ROOTS.lock();
+    let ids: Vec<String> = roots.iter().map(|(id, _)| id.clone()).collect();
+    ok_json(serde_json::json!({ "ok": true, "ids": ids, "count": ids.len() }))
 }
 
 pub fn list_windows(_args: &[Value]) -> Value {
@@ -148,6 +269,8 @@ pub fn run(args: &[Value]) -> Value {
     if config.windows.is_empty() {
         config.windows.push(state::WindowSpec {
             label: "main".into(),
+            kind: Some("webview".into()),
+            id: Some("main".into()),
             url: Some("http://localhost:5173/".into()),
             title: Some("Tish Desktop".into()),
             width: 960.0,
@@ -155,6 +278,7 @@ pub fn run(args: &[Value]) -> Value {
             title_bar_style: "transparent".into(),
             hidden_title: false,
             decorations: true,
+            layout: None,
         });
     }
 
@@ -162,6 +286,22 @@ pub fn run(args: &[Value]) -> Value {
     let tick_ms = config.tick_ms.unwrap_or(0);
     if tick_ms > 0 {
         eprintln!("tish_desktop: tick loop interval {tick_ms}ms");
+    }
+    if let Some(profile) = config.profile.as_deref() {
+        eprintln!("tish_desktop: run profile={profile}");
+    }
+    let apple_attach = config
+        .platform_attach
+        .as_ref()
+        .and_then(|p| p.apple.as_ref());
+    if let Some(a) = apple_attach {
+        let n = broker::PENDING_NATIVE_ROOTS.lock().len();
+        eprintln!(
+            "tish_desktop: platformAttach.apple outerHost={} autoRunEventLoop={} pendingNativeRoots={}",
+            a.outer_host, a.auto_run_event_loop, n
+        );
+        // Native roots are attached from shell via macos.attach (outerHost) before/around run.
+        // Desktop does not own NSApplication — see tish-apple attach API + docs/HYBRID.md.
     }
     let plugins = config.plugins.clone();
     let window_specs = config.windows.clone();

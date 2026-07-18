@@ -1,0 +1,11 @@
+// Universal fallback export shape — same API across platform files.
+export fn Button(props) {
+  let title = props.title === null ? "Button" : props.title
+  let el = document.createElement("button")
+  el.textContent = title
+  el.className = "btn"
+  if (props.onPress) {
+    el.onclick = () => props.onPress()
+  }
+  return el
+}

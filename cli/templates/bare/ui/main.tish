@@ -1,0 +1,20 @@
+import { invoke } from "@tish-desktop/app-api"
+
+fn mount() {
+  let root = document.getElementById("root")
+  root.innerHTML = "<h1>__APP_NAME__</h1><p class='muted'>Bare scaffold (no lattish).</p>"
+  let btn = document.createElement("button")
+  btn.textContent = "Hello"
+  let out = document.createElement("pre")
+  btn.onclick = () => {
+    invoke("app.hello", { from: "ui" }).then((r) => {
+      out.textContent = JSON.stringify(r, null, 2)
+    }, (e) => {
+      out.textContent = String(e)
+    })
+  }
+  root.appendChild(btn)
+  root.appendChild(out)
+}
+
+mount()

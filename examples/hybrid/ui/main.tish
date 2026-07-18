@@ -1,0 +1,5 @@
+import { setPlatformFacts } from "@tish-desktop/shared"
+import { mountApp } from "../app/App.tish"
+
+setPlatformFacts("macos", "webview")
+mountApp(document.getElementById("root"))

@@ -1,0 +1,25 @@
+[package]
+name = "tish_app"
+version = "0.1.0"
+edition = "2021"
+description = "cargo:tish_app — alias re-export of tish_desktop (cross-device app runtime)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tishlang/tish-desktop"
+homepage = "https://tishlang.com"
+readme = "README.md"
+keywords = ["tish", "desktop", "app"]
+categories = ["gui", "development-tools"]
+
+[lib]
+name = "tish_app"
+crate-type = ["rlib"]
+
+[features]
+default = ["webview-tauri"]
+webview-tauri = ["tish_desktop/webview-tauri"]
+platform-apple = ["tish_desktop/platform-apple"]
+platform-ms = ["tish_desktop/platform-ms"]
+platform-lin = ["tish_desktop/platform-lin"]
+
+[dependencies]
+tish_desktop = { path = "../tish_desktop" }
