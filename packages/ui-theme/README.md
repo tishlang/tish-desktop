@@ -1,4 +1,4 @@
-# `@tish-desktop/ui-theme`
+# `@tishlang/tish-desktop-ui-theme`
 
 Shared design tokens + small **lattish** primitives for Tish Desktop examples and apps.
 
@@ -15,12 +15,12 @@ Shared design tokens + small **lattish** primitives for Tish Desktop examples an
 ## Usage
 
 1. Depend on the package (`file:` or published).
-2. Alias `@tish-desktop/ui-theme` in Vite to `src/index.tish`.
+2. Alias `@tishlang/tish-desktop-ui-theme` in Vite to `src/index.tish`.
 3. In `build-css.tish`, concatenate `fonts.css` + `theme.css` + `theme-utilities.css` with the tish-tailwind emit, and include theme `src/ui/*.tish` in `sourceFiles` so scanned utilities are emitted.
 4. Import primitives in UI Tish:
 
 ```tish
-import { Button, Section } from "@tish-desktop/ui-theme"
+import { Button, Section } from "@tishlang/tish-desktop-ui-theme"
 ```
 
 `examples/basic` intentionally stays unthemed. Prefer this package for `file-browser`, `native-chrome`, and new apps.

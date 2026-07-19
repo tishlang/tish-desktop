@@ -1,11 +1,11 @@
 [package]
 name = "tish_app"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 description = "cargo:tish_app — alias re-export of tish_desktop (cross-device app runtime)"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/tishlang/tish-desktop"
-homepage = "https://tishlang.com"
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
 readme = "README.md"
 keywords = ["tish", "desktop", "app"]
 categories = ["gui", "development-tools"]

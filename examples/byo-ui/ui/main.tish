@@ -1,6 +1,6 @@
 // Plain DOM UI — no lattish / ui-theme.
-import { invoke, stateSet, stateGet, listen, Platform } from "@tish-desktop/app-api"
-import { EVT_STATE_CHANGED } from "@tish-desktop/shared"
+import { invoke, stateSet, stateGet, listen, Platform } from "@tishlang/tish-app-api"
+import { EVT_STATE_CHANGED } from "@tishlang/tish-desktop-shared"
 
 fn mount() {
   let root = document.getElementById("root")

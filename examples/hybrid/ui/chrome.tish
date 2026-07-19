@@ -1,9 +1,9 @@
 /** @jsxImportSource lattish */
 // Second Tauri webview (dev:multi) — same contract as DemoPane, thinner chrome.
 import { createRoot, useState, useEffect } from "lattish"
-import { Button, Badge } from "@tish-desktop/ui-theme"
-import { setPlatformFacts } from "@tish-desktop/shared"
-import { invoke, useSharedState, stateSet } from "@tish-desktop/app-api"
+import { Button, Badge } from "@tishlang/tish-desktop-ui-theme"
+import { setPlatformFacts } from "@tishlang/tish-desktop-shared"
+import { invoke, useSharedState, stateSet } from "@tishlang/tish-app-api"
 import { DEMO } from "../app/demo.tish"
 
 setPlatformFacts("macos", "webview")

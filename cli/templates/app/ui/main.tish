@@ -1,7 +1,7 @@
 /** @jsxImportSource lattish */
 import { createRoot, useState } from "lattish"
-import { invoke } from "@tish-desktop/desktop-api"
-import { Button, Card, CardBody, CardHeader, Section, Badge } from "@tish-desktop/ui-theme"
+import { invoke } from "@tishlang/tish-desktop-api"
+import { Button, Card, CardBody, CardHeader, Section, Badge } from "@tishlang/tish-desktop-ui-theme"
 
 fn App() {
   let [hello, setHello] = useState(null)
@@ -20,7 +20,7 @@ fn App() {
         <Badge tone="primary">desktop</Badge>
       </div>
       <p class="text-muted-foreground mb-8 text-sm">
-        Scaffolded by <code class="text-primary">tish-desktop init</code>.
+        Scaffolded by <code class="text-primary">mode init</code>.
       </p>
 
       <Section title="Shell bridge" hint="Invoke a handler registered in src/main.tish">

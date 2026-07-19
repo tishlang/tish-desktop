@@ -19,7 +19,7 @@ UI talks over the broker via `desktop_invoke` / events (see repo `packages/deskt
 
 ## CLI binary
 
-`cargo install tish_desktop` installs a thin `tish-desktop` launcher that prefers the Tish CLI on `PATH` (from `@tish-desktop/cli`). Set `TISH_DESKTOP_CLI` to override.
+`cargo install tish_desktop` installs a thin `mode` launcher that prefers the CLI on `PATH` (from `@tishlang/tish-desktop`). Set `TISH_MODE_CLI` or `TISH_DESKTOP_CLI` to override.
 
 ## Publish notes (crates.io)
 
@@ -27,20 +27,23 @@ UI talks over the broker via `desktop_invoke` / events (see repo `packages/deskt
 
 ```toml
 tishlang_core = { path = "../../../tish/crates/tish_core", features = ["send-values"] }
+tish_broker = { path = "../tish_broker" }
 ```
 
 so `tish build --native-backend rust` shares one physical `Value` type with the `tish` CLI. Mixing path `0.1.x` with crates.io `2.39.x` produces dual-`Value` link errors.
 
-**Automated publish:** promote a GitHub prerelease to a full release → [`.github/workflows/crates-release.yml`](../../.github/workflows/crates-release.yml) sets the crate version from the tag, rewrites the path dep to `tishlang_core = { version = "2.39", … }` (override via workflow input), then `cargo publish`. See [`docs/RELEASE.md`](../../docs/RELEASE.md).
+Optional sibling hosts (`platform-apple` / ms / lin / android) are **monorepo-only** path deps and are stripped for crates.io publish.
+
+**Automated publish:** promote a GitHub prerelease to a full release → [`.github/workflows/crates-release.yml`](../../.github/workflows/crates-release.yml) sets versions from the tag, rewrites path deps to crates.io (`tishlang_core` train **2.39.x**, plus `tish_broker` / `tish_app`), then publishes in order. See [`docs/RELEASE.md`](../../docs/RELEASE.md).
 
 **Manual / local publish:**
 
-1. Align with the published `tish` / `tishlang_core` train (ecosystem **2.39.x** today). Temporarily switch this dep to `tishlang_core = { version = "2.39", features = ["send-values"] }` **and** ensure the CLI you ship was built against the same crate.
+1. Align with the published `tish` / `tishlang_core` train (ecosystem **2.39.x** today). Temporarily switch deps to versioned lines **and** ensure the CLI you ship was built against the same crate.
 2. Confirm crate metadata (`repository`, `homepage`, `readme`, `keywords`, `categories`) is present.
-3. Run `cargo publish -p tish_desktop --dry-run`, then publish.
+3. Publish `tish_broker`, then `tish_desktop`, then `tish_app` (`cargo publish -p … --dry-run` first).
 4. Do **not** publish `tish_desktop_sample_ext` — `publish = false`.
 
-Consumers after publish: path or versioned `tish.rustDependencies.tish_desktop` in app `package.json`.
+Consumers after publish: versioned `tish.rustDependencies.tish_desktop` (or `tish_app`) in app `package.json` — no monorepo checkout required.
 
 ## Auth notes
 

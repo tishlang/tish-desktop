@@ -25,14 +25,14 @@
     "build:shell": "tish build --target native --native-backend rust --check warn src/main.tish -o dist/hybrid-shell",
     "build:shell:apple": "node ./scripts/build-shell-apple.mjs",
     "check:tree": "node ./scripts/check-tree.mjs",
-    "dev": "node ../../cli/bin/tish-desktop.js dev --example hybrid",
+    "dev": "node ../../cli/bin/mode.js dev --example hybrid",
     "start": "npm run build:ui && npm run build:shell && ./dist/hybrid-shell"
   },
   "dependencies": {
-    "@tish-desktop/app-api": "file:../../packages/app-api",
-    "@tish-desktop/desktop-api": "file:../../packages/desktop-api",
-    "@tish-desktop/shared": "file:../../packages/shared",
-    "@tish-desktop/ui-theme": "file:../../packages/ui-theme",
+    "@tishlang/tish-app-api": "file:../../packages/app-api",
+    "@tishlang/tish-desktop-api": "file:../../packages/desktop-api",
+    "@tishlang/tish-desktop-shared": "file:../../packages/shared",
+    "@tishlang/tish-desktop-ui-theme": "file:../../packages/ui-theme",
     "lattish": "file:../../../lattish",
     "tish-macos": "file:../../../tish-apple/crates/tish-macos",
     "tish-tailwind": "file:../../../tish-tailwind"

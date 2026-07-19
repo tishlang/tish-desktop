@@ -9,10 +9,12 @@ members = [
 
 [workspace.package]
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license-file = "LICENSE"
 repository = "https://github.com/tishlang/tish-desktop"
 homepage = "https://tishlang.com"
 
 # Note: tish_desktop uses a path dep on tishlang_core so `tish build` shares one
 # Value type with the CLI. When publishing, temporarily use a versioned crates.io
 # dep matching the CLI release train; do not mix path + crates.io Value types.
+# Sibling host path deps (tish-apple / tish-ms / …) are monorepo-only — stripped
+# for crates.io publish (see .github/workflows/crates-release.yml).

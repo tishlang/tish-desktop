@@ -18,7 +18,7 @@ BYO apps need only these. Optional later lattish sugar (`NativeSurface` / `WebSu
 |------|---------|----------|
 | **Multi-window (v1)** | `npm run dev:multi` · `build:shell` | Dual Tauri `createSurface({ kind: "webview" })` — chrome + main share `state.*` |
 | **Native ‖ webview (SC4)** | `npm run dev:hybrid` · `build:shell:apple` | AppKit + nested WK + **Tauri outerHost** (clipboard/dialog/os plugins) |
-| **Pure web** | `npm run dev:web` · `build:web` | Vite only — `installWebBridge` from `@tish-desktop/app-api/web`, `Button.web` / `Sidebar.web` |
+| **Pure web** | `npm run dev:web` · `build:web` | Vite only — `installWebBridge` from `@tishlang/tish-app-api/web`, `Button.web` / `Sidebar.web` |
 
 Dual-window does **not** satisfy SC4. SC4 is the apple shell path above — both surfaces visible in one window; both share BrokerCore `state.*`.
 
@@ -33,10 +33,10 @@ npm run dev:hybrid          # Vite + native chrome + webview (macOS)
 npm run build:web           # pure web profile
 ```
 
-Doctor (plan name `tish app doctor` ≡ `tish-desktop doctor`):
+Doctor (plan name `tish app doctor` ≡ `mode doctor`):
 
 ```bash
-node cli/bin/tish-desktop.js doctor --platform macos --surface webview --resolve ./Button
+node cli/bin/mode.js doctor --platform macos --surface webview --resolve ./Button
 ```
 
 ### Attach (tish-apple) — SC4
@@ -55,7 +55,7 @@ Enable Cargo feature `platform-apple` and path-depend tish-apple. CI builds `dis
 
 ## Web → webview → native
 
-1. `*.web.tish` + `npm run build:web` / `dev:web` (`--surface web`, `@tish-desktop/app-api/web`)
+1. `*.web.tish` + `npm run build:web` / `dev:web` (`--surface web`, `@tishlang/tish-app-api/web`)
 2. Shell + `createSurface({ kind: "webview" })`; UI with `--surface webview` — `.web.tish` still resolves
 3. `*.macos.tish` + `createSurface({ kind: "native", root })` + `platformAttach.apple` (`dev:hybrid`)
 

@@ -15,16 +15,16 @@
     "build:ui": "vite build",
     "dev:ui": "vite",
     "build:shell": "tish build --target native --native-backend rust --check warn src/main.tish -o __SHELL_OUT__",
-    "dev": "tish-desktop dev",
+    "dev": "mode dev",
     "start": "npm run build:ui && npm run build:shell && ./__SHELL_OUT__"
   },
   "dependencies": {
-    "@tish-desktop/app-api": "file:__ROOT__/packages/app-api",
-    "@tish-desktop/desktop-api": "file:__ROOT__/packages/desktop-api",
-    "@tish-desktop/shared": "file:__ROOT__/packages/shared"
+    "@tishlang/tish-app-api": "file:__ROOT__/packages/app-api",
+    "@tishlang/tish-desktop-api": "file:__ROOT__/packages/desktop-api",
+    "@tishlang/tish-desktop-shared": "file:__ROOT__/packages/shared"
   },
   "devDependencies": {
-    "@tish-desktop/cli": "file:__ROOT__/cli",
+    "@tishlang/tish-desktop": "file:__ROOT__/cli",
     "@tishlang/vite-plugin-tish": "file:__ROOT__/../tish/npm/vite-plugin-tish",
     "vite": "^6.0.0"
   }

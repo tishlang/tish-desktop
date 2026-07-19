@@ -1,6 +1,6 @@
 /** @jsxImportSource lattish */
 import { createRoot } from "lattish"
-import { setPlatformFacts } from "@tish-desktop/shared"
+import { setPlatformFacts } from "@tishlang/tish-desktop-shared"
 import { DemoPane } from "./DemoPane.tish"
 
 setPlatformFacts("macos", "webview")

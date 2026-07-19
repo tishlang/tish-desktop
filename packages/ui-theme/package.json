@@ -1,8 +1,8 @@
 {
-  "name": "@tish-desktop/ui-theme",
+  "name": "@tishlang/tish-desktop-ui-theme",
   "version": "0.1.0",
   "description": "Shared shadcn-like theme tokens and lattish UI primitives for Tish Desktop",
-  "license": "MIT OR Apache-2.0",
+  "license": "PIF",
   "type": "module",
   "repository": {
     "type": "git",
@@ -14,7 +14,8 @@
   },
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "tish": {
     "module": "./src/index.tish"

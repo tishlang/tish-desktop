@@ -1,9 +1,9 @@
 /** @jsxImportSource lattish */
 // Tauri webview companion — same plugin caps as nested WK DemoPane (desktop/v1).
 import { createRoot, useState } from "lattish"
-import { Button, Section, Badge } from "@tish-desktop/ui-theme"
-import { setPlatformFacts } from "@tish-desktop/shared"
-import { invoke } from "@tish-desktop/app-api"
+import { Button, Section, Badge } from "@tishlang/tish-desktop-ui-theme"
+import { setPlatformFacts } from "@tishlang/tish-desktop-shared"
+import { invoke } from "@tishlang/tish-app-api"
 import { DEMO_TITLE } from "../app/demo.tish"
 
 setPlatformFacts("macos", "webview")

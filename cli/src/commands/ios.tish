@@ -1,9 +1,9 @@
 // Launch iOS examples on the Simulator (no Xcode UI).
 // Examples live in tish-desktop; the UIKit host comes from a sibling tish-apple checkout.
 //
-//   tish-desktop ios --example hello-ios
-//   tish-desktop ios --example hello-ios --launch-only
-//   tish-desktop ios --example hello-ios --device "iPhone 16"
+//   mode ios --example hello-ios
+//   mode ios --example hello-ios --launch-only
+//   mode ios --example hello-ios --device "iPhone 16"
 import { exit, cwd, exec, env } from "tish:process"
 import {
   flagValue,
@@ -16,9 +16,9 @@ import {
 } from "../paths.tish"
 
 fn usage() {
-  console.log("tish-desktop ios — build + launch an iOS example on the Simulator")
+  console.log("mode ios — build + launch an iOS example on the Simulator")
   console.log("")
-  console.log("Usage: tish-desktop ios [options]")
+  console.log("Usage: mode ios [options]")
   console.log("")
   console.log("Options:")
   console.log("  --example <name>   hello-ios (default) — under examples/")

@@ -14,13 +14,13 @@
     "dev:ui": "TISH_PLATFORM=macos TISH_SURFACE=webview vite --port 5176",
     "build:shell": "tish build --target native --native-backend rust --check warn src/main.tish -o dist/byo-ui-shell",
     "build:web": "TISH_PLATFORM=web TISH_SURFACE=web vite build",
-    "dev": "node ../../cli/bin/tish-desktop.js dev --example byo-ui",
+    "dev": "node ../../cli/bin/mode.js dev --example byo-ui",
     "start": "npm run build:ui && npm run build:shell && ./dist/byo-ui-shell"
   },
   "dependencies": {
-    "@tish-desktop/app-api": "file:../../packages/app-api",
-    "@tish-desktop/desktop-api": "file:../../packages/desktop-api",
-    "@tish-desktop/shared": "file:../../packages/shared"
+    "@tishlang/tish-app-api": "file:../../packages/app-api",
+    "@tishlang/tish-desktop-api": "file:../../packages/desktop-api",
+    "@tishlang/tish-desktop-shared": "file:../../packages/shared"
   },
   "devDependencies": {
     "@tishlang/vite-plugin-tish": "file:../../../tish/npm/vite-plugin-tish",

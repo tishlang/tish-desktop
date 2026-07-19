@@ -1,5 +1,8 @@
-# Publish @tish-desktop/* packages to npm when a GitHub release is promoted from
+# Publish @tishlang/tish-desktop* packages to npm when a GitHub release is promoted from
 # prerelease to full release. Mirrors tish/.github/workflows/npm-release.yml.
+#
+# Packages are published sequentially (shared → desktop-api → app-api → …) so
+# intra-scope version deps resolve on first release.
 #
 # AUTH: npm OIDC trusted publishing (no long-lived NPM_TOKEN). One-time setup on
 # npmjs.com for EACH package below — Settings → Trusted Publisher → GitHub Actions:
@@ -23,28 +26,12 @@ on:
 
 jobs:
   publish:
-    name: Publish ${{ matrix.label }}
+    name: Publish @tishlang/tish-desktop*
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: "@tish-desktop/cli"
-            npm: "@tish-desktop/cli"
-            dir: cli
-          - label: "@tish-desktop/desktop-api"
-            npm: "@tish-desktop/desktop-api"
-            dir: packages/desktop-api
-          - label: "@tish-desktop/shared"
-            npm: "@tish-desktop/shared"
-            dir: packages/shared
-          - label: "@tish-desktop/ui-theme"
-            npm: "@tish-desktop/ui-theme"
-            dir: packages/ui-theme
     env:
       NPM_CONFIG_PROVENANCE: "false"
     steps:
@@ -62,39 +49,75 @@ jobs:
 
       - name: Upgrade npm for OIDC trusted publishing (needs >= 11.5.1)
         run: |
-          # Pin to npm 11.x — same rationale as tish npm-release.yml (npm 12.0.0
-          # publish path is broken without bundled sigstore).
+          # Pin to npm 11.x — same rationale as tish npm-release.yml.
           npm install -g "npm@^11"
           npm --version
 
-      - name: Determine version and whether it is already published
-        id: check
+      - name: Publish packages (dependency order)
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          TAG="${{ github.event.release.tag_name || inputs.tag }}"
           VERSION="${TAG#v}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if npm view "${{ matrix.npm }}@${VERSION}" version >/dev/null 2>&1; then
-            echo "already=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::${{ matrix.npm }}@${VERSION} is already published — skipping."
-          else
-            echo "already=false" >> "$GITHUB_OUTPUT"
-          fi
+          # shared first (no intra-scope deps), then dependents, then cli.
+          PACKAGES=(
+            "packages/shared:@tishlang/tish-desktop-shared"
+            "packages/desktop-api:@tishlang/tish-desktop-api"
+            "packages/app-api:@tishlang/tish-app-api"
+            "packages/ui-theme:@tishlang/tish-desktop-ui-theme"
+            "cli:@tishlang/tish-desktop"
+          )
 
-      - name: Publish (source dir)
-        if: steps.check.outputs.already == 'false'
-        run: |
-          cp -r "${{ matrix.dir }}" /tmp/publish-pkg
-          cd /tmp/publish-pkg
-          # Monorepo copies may still carry private:true — strip for publish.
-          node -e "
-            const fs = require('fs');
-            const p = require('./package.json');
-            delete p.private;
-            p.publishConfig = Object.assign({ access: 'public' }, p.publishConfig || {});
-            fs.writeFileSync('./package.json', JSON.stringify(p, null, 2) + '\n');
-          "
-          npm version "${{ steps.check.outputs.version }}" --no-git-tag-version --allow-same-version
-          npm publish --access public
+          publish_one() {
+            local dir="$1" npm_name="$2"
+            if npm view "${npm_name}@${VERSION}" version >/dev/null 2>&1; then
+              echo "::notice::${npm_name}@${VERSION} is already published — skipping."
+              return 0
+            fi
+            rm -rf /tmp/publish-pkg
+            cp -r "$dir" /tmp/publish-pkg
+            # Ship PIF license text with every tarball.
+            cp LICENSE /tmp/publish-pkg/LICENSE
+            (
+              cd /tmp/publish-pkg
+              VERSION="$VERSION" node -e "
+                const fs = require('fs');
+                const version = process.env.VERSION;
+                const p = require('./package.json');
+                delete p.private;
+                p.version = version;
+                p.publishConfig = Object.assign({ access: 'public' }, p.publishConfig || {});
+                const rewrite = (deps) => {
+                  if (!deps) return;
+                  for (const [k, v] of Object.entries(deps)) {
+                    if (typeof v === 'string' && (v.startsWith('file:') || v.startsWith('workspace:'))) {
+                      const ours = new Set([
+                        '@tishlang/tish-desktop',
+                        '@tishlang/tish-desktop-api',
+                        '@tishlang/tish-app-api',
+                        '@tishlang/tish-desktop-shared',
+                        '@tishlang/tish-desktop-ui-theme',
+                      ]);
+                      if (ours.has(k)) deps[k] = version;
+                    }
+                  }
+                };
+                rewrite(p.dependencies);
+                rewrite(p.devDependencies);
+                rewrite(p.peerDependencies);
+                if (!Array.isArray(p.files)) p.files = [];
+                if (!p.files.includes('LICENSE')) p.files.push('LICENSE');
+                fs.writeFileSync('./package.json', JSON.stringify(p, null, 2) + '\n');
+              "
+              npm publish --access public
+            )
+          }
+
+          for entry in "${PACKAGES[@]}"; do
+            dir="${entry%%:*}"
+            name="${entry#*:}"
+            echo "=== Publishing $name from $dir ==="
+            publish_one "$dir" "$name"
+          done
 
   update-release:
     name: Update release description
@@ -110,10 +133,11 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name }}"
           VERSION="${TAG#v}"
-          CLI_URL="https://www.npmjs.com/package/@tish-desktop/cli/v/${VERSION}"
-          API_URL="https://www.npmjs.com/package/@tish-desktop/desktop-api/v/${VERSION}"
-          SHARED_URL="https://www.npmjs.com/package/@tish-desktop/shared/v/${VERSION}"
-          THEME_URL="https://www.npmjs.com/package/@tish-desktop/ui-theme/v/${VERSION}"
+          CLI_URL="https://www.npmjs.com/package/@tishlang/tish-desktop/v/${VERSION}"
+          API_URL="https://www.npmjs.com/package/@tishlang/tish-desktop-api/v/${VERSION}"
+          APP_API_URL="https://www.npmjs.com/package/@tishlang/tish-app-api/v/${VERSION}"
+          SHARED_URL="https://www.npmjs.com/package/@tishlang/tish-desktop-shared/v/${VERSION}"
+          THEME_URL="https://www.npmjs.com/package/@tishlang/tish-desktop-ui-theme/v/${VERSION}"
           CRATES_URL="https://crates.io/crates/tish_desktop/${VERSION}"
           RELEASE_ID="${{ github.event.release.id }}"
           REPO="${{ github.repository }}"
@@ -128,6 +152,7 @@ jobs:
           ---
           Published to npm: ${CLI_URL}
           desktop-api: ${API_URL}
+          app-api: ${APP_API_URL}
           shared: ${SHARED_URL}
           ui-theme: ${THEME_URL}
           crates.io: ${CRATES_URL}"

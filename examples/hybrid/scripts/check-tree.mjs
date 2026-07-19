@@ -28,8 +28,8 @@ for (const rel of required) {
   }
 }
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
-if (!pkg.dependencies?.lattish || !pkg.dependencies?.["@tish-desktop/ui-theme"]) {
-  console.error("package.json must depend on lattish + @tish-desktop/ui-theme")
+if (!pkg.dependencies?.lattish || !pkg.dependencies?.["@tishlang/tish-desktop-ui-theme"]) {
+  console.error("package.json must depend on lattish + @tishlang/tish-desktop-ui-theme")
   failed = true
 }
 const hybrid = pkg.scripts?.["dev:hybrid"] ?? ""
@@ -67,7 +67,7 @@ for (const needle of ["Increment", "toggler", "textinput", "demo.tish"]) {
   }
 }
 const demoUi = readFileSync(join(root, "ui/DemoPane.tish"), "utf8")
-for (const needle of ["lattish", "@tish-desktop/ui-theme", "Increment", "DEMO"]) {
+for (const needle of ["lattish", "@tishlang/tish-desktop-ui-theme", "Increment", "DEMO"]) {
   if (!demoUi.includes(needle)) {
     console.error("DemoPane.tish must include", needle)
     failed = true

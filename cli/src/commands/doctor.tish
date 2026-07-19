@@ -36,7 +36,7 @@ fn capture(cmd) {
 
 export fn runDoctor(args) {
   // `--desk-platform` / `--desk-surface` are rewritten from `--platform` /
-  // `--surface` by cli/bin/tish-desktop.js so `tish run` is not disrupted.
+  // `--surface` by cli/bin/mode.js so `tish run` is not disrupted.
   let platform = flagValue(args, "--desk-platform")
   if (platform === null) platform = flagValue(args, "--platform")
   if (platform === null) platform = "macos"
@@ -46,7 +46,7 @@ export fn runDoctor(args) {
   if (surface === null) surface = "webview"
 
   let tish = resolveTish()
-  console.log("tish-desktop doctor")
+  console.log("mode doctor")
   console.log("  (alias of plan name: tish app doctor)")
   console.log("  platform: " + platform)
   console.log("  surface:  " + surface)

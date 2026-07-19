@@ -1,11 +1,11 @@
 [package]
 name = "tish_desktop"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 description = "cargo:tish_desktop / cargo:tish_app — cross-device Tish app runtime (Tauri desktop + platform adapters)"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/tishlang/tish-desktop"
-homepage = "https://tishlang.com"
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
 readme = "README.md"
 keywords = ["tish", "tauri", "desktop", "webview"]
 categories = ["gui", "development-tools"]
@@ -15,7 +15,7 @@ name = "tish_desktop"
 crate-type = ["rlib"]
 
 [[bin]]
-name = "tish-desktop"
+name = "mode"
 path = "src/bin/tish_desktop.rs"
 
 [features]

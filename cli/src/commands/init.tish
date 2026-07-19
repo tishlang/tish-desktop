@@ -2,9 +2,11 @@ import { exit, cwd } from "tish:process"
 import { mkdir, readFile, writeFile, readDir, isDir } from "tish:fs"
 import {
   basename,
+  cliPackageVersion,
   cliRoot,
   firstPositional,
   flagValue,
+  inMonorepoCheckout,
   joinPath,
   pathExists,
   q,
@@ -55,22 +57,23 @@ fn replaceAll(text, from, to) {
   return String(text).split(from).join(to)
 }
 
-fn applyReplacements(text, appName, relRoot, shellOut, port) {
+fn applyReplacements(text, appName, relRoot, shellOut, port, pkgVersion) {
   let out = String(text)
   out = replaceAll(out, "__APP_NAME__", appName)
   out = replaceAll(out, "__ROOT__", relRoot)
   out = replaceAll(out, "__SHELL_OUT__", shellOut)
   out = replaceAll(out, "__DEV_PORT__", port)
+  out = replaceAll(out, "__PKG_VERSION__", pkgVersion)
   return out
 }
 
-fn copyTemplateFile(src, dest, appName, relRoot, shellOut, port) {
+fn copyTemplateFile(src, dest, appName, relRoot, shellOut, port, pkgVersion) {
   let text = readFile(src)
   if (text === null || String(text).startsWith("Error:")) {
     console.error("init: failed to read template " + src)
     exit(1)
   }
-  let out = applyReplacements(text, appName, relRoot, shellOut, port)
+  let out = applyReplacements(text, appName, relRoot, shellOut, port, pkgVersion)
   let slash = dest.lastIndexOf("/")
   if (slash > 0) {
     let parent = dest.slice(0, slash)
@@ -82,7 +85,7 @@ fn copyTemplateFile(src, dest, appName, relRoot, shellOut, port) {
   console.log("  wrote " + dest)
 }
 
-fn walkCopy(srcDir, destDir, appName, relRoot, shellOut, port) {
+fn walkCopy(srcDir, destDir, appName, relRoot, shellOut, port, pkgVersion, skipRegistryExtras) {
   if (!pathExists(srcDir)) {
     console.error("init: template missing: " + srcDir)
     exit(1)
@@ -100,15 +103,31 @@ fn walkCopy(srcDir, destDir, appName, relRoot, shellOut, port) {
       i = i + 1
       continue
     }
+    // Registry-only stubs are applied separately; skip in the tree walk.
+    if (skipRegistryExtras && (name === "package.registry.json" || name === "vite.registry.config.mjs")) {
+      i = i + 1
+      continue
+    }
     let src = joinPath(srcDir, name)
     let dest = joinPath(destDir, name)
     if (isDir(src)) {
-      walkCopy(src, dest, appName, relRoot, shellOut, port)
+      walkCopy(src, dest, appName, relRoot, shellOut, port, pkgVersion, skipRegistryExtras)
     } else {
-      copyTemplateFile(src, dest, appName, relRoot, shellOut, port)
+      copyTemplateFile(src, dest, appName, relRoot, shellOut, port, pkgVersion)
     }
     i = i + 1
   }
+}
+
+fn applyRegistryOverlay(templates, target, appName, shellOut, port, pkgVersion) {
+  let pkgSrc = joinPath(templates, "package.registry.json")
+  let viteSrc = joinPath(templates, "vite.registry.config.mjs")
+  if (!pathExists(pkgSrc) || !pathExists(viteSrc)) {
+    console.error("init: registry templates missing under " + templates)
+    exit(1)
+  }
+  copyTemplateFile(pkgSrc, joinPath(target, "package.json"), appName, ".", shellOut, port, pkgVersion)
+  copyTemplateFile(viteSrc, joinPath(target, "vite.config.mjs"), appName, ".", shellOut, port, pkgVersion)
 }
 
 export fn runInit(args) {
@@ -128,6 +147,8 @@ export fn runInit(args) {
   }
 
   let root = repoRoot()
+  let monorepo = inMonorepoCheckout()
+  let pkgVersion = cliPackageVersion()
   // Plan packages-dx: `init --ui none` == BYO bare (no lattish). Alias of `--template bare`.
   let templateName = flagValue(args, "--template")
   let uiName = flagValue(args, "--ui")
@@ -152,19 +173,26 @@ export fn runInit(args) {
   let appName = basename(target)
   if (appName === "" || appName === "." || appName === "/") appName = "my-desktop-app"
 
-  let relRoot = relPath(target, root)
+  let relRoot = monorepo ? relPath(target, root) : "."
   let shellOut = "dist/" + appName + "-shell"
   let port = "5173"
 
   console.log("[init] scaffolding " + target + " (template=" + templateName + ")")
-  console.log("[init] repo root → " + relRoot)
+  if (monorepo) {
+    console.log("[init] monorepo mode — path deps → " + relRoot)
+  } else {
+    console.log("[init] registry mode — @tishlang/tish-desktop*@" + pkgVersion + " (outside tish-mode checkout)")
+  }
   mkdir(target, true)
-  walkCopy(templates, target, appName, relRoot, shellOut, port)
+  walkCopy(templates, target, appName, relRoot, shellOut, port, pkgVersion, true)
+  if (!monorepo) {
+    applyRegistryOverlay(templates, target, appName, shellOut, port, pkgVersion)
+  }
 
   console.log("")
   console.log("Next:")
   console.log("  cd " + q(target))
   console.log("  npm install")
-  console.log("  npx tish-desktop dev")
+  console.log("  npx mode dev")
   console.log("  # or: npm run dev")
 }

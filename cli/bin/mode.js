@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// npx entrypoint for tish-desktop.
-// Prefers the prebuilt native binary (`npm run build` → dist/tish-desktop);
+// npx entrypoint for `mode` (@tishlang/tish-desktop).
+// Prefers the prebuilt native binary (`npm run build` → dist/mode);
 // otherwise runs src/main.tish through `tish` with process+fs features.
 //
 // Rewrite `--platform` / `--surface` → `--desk-platform` / `--desk-surface` and
@@ -18,7 +18,7 @@ const root = path.join(__dirname, "..")
 const nativeBin = path.join(
   root,
   "dist",
-  process.platform === "win32" ? "tish-desktop.exe" : "tish-desktop"
+  process.platform === "win32" ? "mode.exe" : "mode"
 )
 const FEATURES = "process,fs"
 
@@ -65,7 +65,7 @@ if (existsSync(nativeBin)) {
   )
   if (result.error && result.error.code === "ENOENT") {
     process.stderr.write(
-      "tish-desktop: no prebuilt binary and `tish` is not installed. Run `npm run build` in cli/ first.\n"
+      "mode: no prebuilt binary and `tish` is not installed. Run `npm run build` in cli/ first.\n"
     )
     process.exit(127)
   }

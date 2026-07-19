@@ -2,20 +2,33 @@
 
 Cross-device **Tish app runtime** (umbrella): shell Tish + BrokerCore (`state.*` / `desktop/v1`) + Tauri desktop webviews. **Lattish is optional** — use BYO UI or `init --template bare`. Apple native stays on **tish-apple**. Public shell entry: `cargo:tish_app` (alias of `cargo:tish_desktop`).
 
+This GitHub repo is the **tish-mode** monorepo. Outside the monorepo, install the published **tish-desktop** packages — you do not need sibling checkouts.
+
 See [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md), [docs/HYBRID.md](./docs/HYBRID.md) (native / hybrid / webview surfaces), [docs/PARITY.md](./docs/PARITY.md) (web · desktop · mobile matrix), [STRATEGY.md](./STRATEGY.md), [docs/UPSTREAM.md](./docs/UPSTREAM.md).
 
-## Quick start
+## Quick start (standalone)
 
 ```bash
-# From this repo
+# Requires: Rust, Node 20+, and the `tish` CLI (npm i -g @tishlang/tish)
+npx @tishlang/tish-desktop init my-app
+# or BYO UI (no lattish):
+npx @tishlang/tish-desktop init my-app --ui none
+cd my-app
+npm install
+npx mode dev
+npx mode build
+```
+
+## Quick start (tish-mode monorepo)
+
+```bash
+# From this repo (path deps on sibling tish / lattish / …)
 cargo check -p tish_desktop
 
-# Create / run apps via the Tish CLI (preferred)
-node cli/bin/tish-desktop.js help
-node cli/bin/tish-desktop.js init my-app
-node cli/bin/tish-desktop.js init my-app --ui none         # BYO, no lattish (`--template bare`)
-node cli/bin/tish-desktop.js doctor --platform macos --surface webview
-node cli/bin/tish-desktop.js dev --example byo-ui
+node cli/bin/mode.js help
+node cli/bin/mode.js init my-app
+node cli/bin/mode.js doctor --platform macos --surface webview
+node cli/bin/mode.js dev --example byo-ui
 
 # Or use npm wrappers (examples call the CLI under the hood)
 npm run example:basic
@@ -26,7 +39,7 @@ npm run example:hybrid
 # Hybrid modes (from examples/hybrid):
 #   npm run dev:multi    — dual Tauri webviews + state.*
 #   npm run dev:hybrid   — SC4 Native/Webview switcher (macOS, hello-ios parity)
-#   npm run dev:web      — pure web + @tish-desktop/app-api/web
+#   npm run dev:web      — pure web + @tishlang/tish-app-api/web
 
 # Force-rebuild the native shell after Rust changes
 npm run example:native-chrome:rebuild
@@ -36,18 +49,7 @@ npm run example:native-chrome:rebuild
 
 Legacy Node orchestrator (fallback): `npm run example:basic --` with `dev:legacy` in each example.
 
-## Create an app
-
-```bash
-# Scaffold (shell + UI + Vite aliases + package.json)
-npx tish-desktop init my-app   # or: node cli/bin/tish-desktop.js init my-app
-cd my-app
-npm install
-npx tish-desktop dev
-npx tish-desktop build
-```
-
-Install the CLI via npm (`npx @tish-desktop/cli` / `npm i -g @tish-desktop/cli`) or use the Rust `tish-desktop` launcher binary (PATH / `TISH_DESKTOP_CLI` / `npx` fallback). Package release steps: [docs/RELEASE.md](./docs/RELEASE.md).
+Install the CLI via npm (`npx @tishlang/tish-desktop` / `npm i -g @tishlang/tish-desktop`, bin: **`mode`**) or use the Rust `mode` launcher (`TISH_MODE_CLI` / `TISH_DESKTOP_CLI` / `npx` fallback). Package release steps: [docs/RELEASE.md](./docs/RELEASE.md).
 
 ## Layout
 
@@ -55,8 +57,9 @@ Install the CLI via npm (`npx @tish-desktop/cli` / `npm i -g @tish-desktop/cli`)
 |------|------|
 | `crates/tish_desktop` | `cargo:tish_desktop` host + BrokerCore + caps |
 | `crates/tish_app` | `cargo:tish_app` alias re-export |
+| `crates/tish_broker` | Standalone BrokerCore (published) |
 | `crates/tish_desktop_sample_ext` | Private sample Rust extension (not published) |
-| `cli/` | `@tish-desktop/cli` — `init\|dev\|build\|info\|icon\|distribute` |
+| `cli/` | `@tishlang/tish-desktop` — `init\|dev\|build\|info\|icon\|distribute` |
 | `packages/shared` | Protocol, events, `Platform` helpers (no UI kit) |
 | `packages/desktop-api` / `app-api` | invoke / listen / `state.*` + bridge / web-bridge |
 | `packages/ui-theme` | Optional design tokens + lattish primitives |
@@ -102,7 +105,7 @@ Draft GitHub Actions under `.github/workflows/release-*.yml` document required s
 
 ### Production protocol
 
-For release builds: set `frontendDist` to the real UI `dist/`, leave Vite localhost out of CSP/remote ACL for shipping configs, enable `bundle.active`, and fill updater `pubkey` + `endpoints`. Deep link / OAuth scheme `tish-desktop` is registered via `Info.plist` + `plugins.deep-link`.
+For release builds: set `frontendDist` to the real UI `dist/`, leave Vite localhost out of CSP/remote ACL for shipping configs, enable `bundle.active`, and fill updater `pubkey` + `endpoints`. Deep link / OAuth scheme `mode` is registered via `Info.plist` + `plugins.deep-link`.
 
 ## Tooling
 
@@ -116,6 +119,6 @@ npm run lint:rust       # cargo fmt --check + clippy -D warnings
 ## Requirements
 
 - Rust toolchain
-- `tish` CLI (`tish build --target native --native-backend rust`)
+- `tish` CLI (`tish build --target native --native-backend rust`) — install via `@tishlang/tish`
 - Node 20+ for Vite examples / CLI shim
-- Sibling checkouts of `tish`, `lattish`, `tish-tailwind` for local path aliases (examples)
+- **Monorepo only:** sibling checkouts of `tish`, `lattish`, `tish-tailwind` for local path aliases (examples)

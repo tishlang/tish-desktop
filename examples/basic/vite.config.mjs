@@ -13,9 +13,9 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@tish-desktop/desktop-api/bridge": path.resolve(__dirname, "../../packages/desktop-api/src/bridge.js"),
-      "@tish-desktop/desktop-api": path.resolve(__dirname, "../../packages/desktop-api/src/desktopHost.tish"),
-      "@tish-desktop/shared": path.resolve(__dirname, "../../packages/shared/src/index.tish"),
+      "@tishlang/tish-desktop-api/bridge": path.resolve(__dirname, "../../packages/desktop-api/src/bridge.js"),
+      "@tishlang/tish-desktop-api": path.resolve(__dirname, "../../packages/desktop-api/src/desktopHost.tish"),
+      "@tishlang/tish-desktop-shared": path.resolve(__dirname, "../../packages/shared/src/index.tish"),
       lattish: path.resolve(__dirname, "../../../lattish/src/Lattish.tish"),
       "lattish/jsx-runtime": path.resolve(__dirname, "../../../lattish/src/jsx-runtime.tish"),
       "tish-tailwind/tw": path.resolve(__dirname, "../../../tish-tailwind/src/tw.tish"),

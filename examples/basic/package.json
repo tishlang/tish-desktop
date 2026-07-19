@@ -19,8 +19,8 @@
     "start": "npm run build:ui && npm run build:shell && ./dist/basic-shell"
   },
   "dependencies": {
-    "@tish-desktop/desktop-api": "file:../../packages/desktop-api",
-    "@tish-desktop/shared": "file:../../packages/shared",
+    "@tishlang/tish-desktop-api": "file:../../packages/desktop-api",
+    "@tishlang/tish-desktop-shared": "file:../../packages/shared",
     "lattish": "file:../../../lattish",
     "tish-tailwind": "file:../../../tish-tailwind"
   },

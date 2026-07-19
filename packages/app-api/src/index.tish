@@ -1,4 +1,4 @@
-// Public alias — same surface as @tish-desktop/desktop-api.
+// Public alias — same surface as @tishlang/tish-desktop-api.
 export {
   getCurrentWindowLabel,
   invoke,
@@ -10,4 +10,4 @@ export {
   useSharedState,
   Platform,
   PROTOCOL,
-} from "@tish-desktop/desktop-api"
+} from "@tishlang/tish-desktop-api"

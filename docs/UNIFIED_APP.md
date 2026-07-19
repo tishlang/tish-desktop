@@ -6,9 +6,9 @@ Umbrella repo: **tish-desktop**. Public shell entry: `cargo:tish_app` (alias of 
 
 | Layer | What | UI kit? |
 |-------|------|---------|
-| Optional packs | lattish, `@tish-desktop/ui-theme`, scaffold templates | Yes |
+| Optional packs | lattish, `@tishlang/tish-desktop-ui-theme`, scaffold templates | Yes |
 | App / BYO UI | Your components | Your choice |
-| Core API | `@tish-desktop/app-api`, bridge / web-bridge, `@tish-desktop/shared` | **No** |
+| Core API | `@tishlang/tish-app-api`, bridge / web-bridge, `@tishlang/tish-desktop-shared` | **No** |
 | Core Rust | BrokerCore, `state.*`, caps, `createSurface`, platform adapters | **No** |
 
 ## Surfaces
@@ -17,7 +17,7 @@ Umbrella repo: **tish-desktop**. Public shell entry: `cargo:tish_app` (alias of 
 |---------|------|-------|
 | `native` | tish-apple (macOS/iOS), tish-ms, tish-lin, tish-android | `--surface native` |
 | `webview` | Tauri (desktop) or WKWebView + bridge | `--surface webview` |
-| `web` | Vite only | `--surface web` + `@tish-desktop/app-api/web` |
+| `web` | Vite only | `--surface web` + `@tishlang/tish-app-api/web` |
 
 **Authoring layers** (canonical BYO — no required JSX Surface components):
 
@@ -59,8 +59,8 @@ App code calls `invoke("notification.show", …)`. Desktop CapProviders wrap `no
 ## Pure web entry
 
 ```tish
-import { installWebBridge } from "@tish-desktop/app-api/web"
-// compat: @tish-desktop/app-api/web-bridge
+import { installWebBridge } from "@tishlang/tish-app-api/web"
+// compat: @tishlang/tish-app-api/web-bridge
 installWebBridge()
 mount(document.getElementById("root"), App)
 ```
@@ -79,7 +79,7 @@ Owned by **tish** (`--platform` / `--surface`, `tish resolve-id`). Vite plugin a
 | `dev:hybrid` / `build:shell:apple` | SC4 Native ‖ Webview panes share `demo.*` / `selection.docId` |
 | `dev:web` / `build:web` | Pure web + `app-api/web` |
 
-Scaffold BYO: `tish-desktop init --ui none` → `app/App.tish` + `Button.{tish,web,webview}.tish` + typed shell.
+Scaffold BYO: `mode init --ui none` → `app/App.tish` + `Button.{tish,web,webview}.tish` + typed shell.
 
 See [HYBRID.md](./HYBRID.md).
 
@@ -89,7 +89,7 @@ Prefer typed params/returns in shell / native modules; build with `tish build --
 
 ## Doctor
 
-`tish-desktop doctor` (plan alias: `tish app doctor`) prints platform/surface, resolve probe, and a Cap matrix sample (`Full` | `Unsupported`).
+`mode doctor` (plan alias: `tish app doctor`) prints platform/surface, resolve probe, and a Cap matrix sample (`Full` | `Unsupported`).
 
 ## Success criteria checklist (2026-07)
 

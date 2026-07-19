@@ -18,7 +18,7 @@ Owners: [UPSTREAM.md](./UPSTREAM.md) · open gaps: [UPSTREAM_OPEN.md](./UPSTREAM
 
 | Target | Repo / crate | Entry | Maturity |
 |--------|--------------|-------|----------|
-| Web (browser) | `tish-desktop` `@tish-desktop/desktop-api` `web-bridge.js` | Vite + `--surface web` | **full** (subset caps) |
+| Web (browser) | `mode` `@tishlang/tish-desktop-api` `web-bridge.js` | Vite + `--surface web` | **full** (subset caps) |
 | Desktop webview | `tish_desktop` / `tish_app` + Tauri | `cargo:tish_app` `run()` | **full** |
 | macOS native | `tish-apple` `tish-macos` | `macos.run` / `macos.attach` | **full** |
 | iOS native | `tish-apple` `tish-ios` | `ios.run` + staticlib | **partial** (vs AppKit) |
@@ -34,10 +34,10 @@ Desktop Tauri covers macOS / Windows / Linux **webview** shells. Native attach o
 
 | Package | Layer | web | desktop webview | macos native | win/lin native | ios | android |
 |---------|-------|-----|-----------------|--------------|----------------|-----|---------|
-| `@tish-desktop/shared` | Protocol, `Platform`, events | full | full | full | full | full | stub facts |
-| `@tish-desktop/app-api` | `invoke` / `listen` / `state.*` | full | full | via shell | via shell | via `tish:ios` | planned |
-| `@tish-desktop/desktop-api` | `bridge.js` + `web-bridge.js` | full | full | — | — | WK `__TISH_APP__` | planned |
-| `@tish-desktop/ui-theme` | Optional DOM UI | full | full | n/a | n/a | n/a | n/a |
+| `@tishlang/tish-desktop-shared` | Protocol, `Platform`, events | full | full | full | full | full | stub facts |
+| `@tishlang/tish-app-api` | `invoke` / `listen` / `state.*` | full | full | via shell | via shell | via `tish:ios` | planned |
+| `@tishlang/tish-desktop-api` | `bridge.js` + `web-bridge.js` | full | full | — | — | WK `__TISH_APP__` | planned |
+| `@tishlang/tish-desktop-ui-theme` | Optional DOM UI | full | full | n/a | n/a | n/a | n/a |
 | `@tishlang/lattish` | Optional React-like UI | full | full | optional | — | optional | planned |
 | `@tishlang/lattish/adapters/rn` | RN-ish tags → DOM | full | full | **not** native | — | **not** native | missing |
 | `cargo:tish_app` / `tish_desktop` | Shell + BrokerCore | — | full | attach | attach stub | — | attach stub |

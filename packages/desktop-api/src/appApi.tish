@@ -1,7 +1,7 @@
 // Core app API — invoke / listen / state.* / Platform. No lattish dependency.
 
-import { Platform, platformSelect, setPlatformFacts } from "@tish-desktop/shared"
-import { EVT_STATE_CHANGED } from "@tish-desktop/shared"
+import { Platform, platformSelect, setPlatformFacts } from "@tishlang/tish-desktop-shared"
+import { EVT_STATE_CHANGED } from "@tishlang/tish-desktop-shared"
 
 fn bridge() {
   let g = globalThis

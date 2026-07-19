@@ -1,8 +1,8 @@
 {
-  "name": "@tish-desktop/shared",
+  "name": "@tishlang/tish-desktop-shared",
   "version": "0.1.0",
   "description": "Shared Tish helpers and desktop event name constants",
-  "license": "MIT OR Apache-2.0",
+  "license": "PIF",
   "type": "module",
   "repository": {
     "type": "git",
@@ -13,7 +13,8 @@
     "access": "public"
   },
   "files": [
-    "src"
+    "src",
+    "LICENSE"
   ],
   "tish": {
     "module": "./src/index.tish"

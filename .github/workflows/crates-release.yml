@@ -1,9 +1,9 @@
-# Publish tish_desktop to crates.io when a GitHub release is promoted from
-# prerelease to full release. Mirrors tish/.github/workflows/crates-release.yml.
+# Publish tish_broker → tish_desktop → tish_app to crates.io when a GitHub
+# release is promoted from prerelease to full release. Mirrors
+# tish/.github/workflows/crates-release.yml.
 #
-# Local/monorepo builds keep a path dep on tishlang_core (Value ABI). This
-# workflow rewrites that dep to a versioned crates.io line before publish —
-# see crates/tish_desktop/README.md.
+# Local/monorepo builds keep path deps on tishlang_core + sibling hosts.
+# This workflow rewrites those for publish — see crates/tish_desktop/README.md.
 #
 # Secret: CARGO_REGISTRY_TOKEN (crates.io API token) on this repo.
 
@@ -47,40 +47,100 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Set version and crates.io tishlang_core dep
+      - name: Set versions and registry deps
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           VERSION="${TAG#v}"
           CORE="${TISHLANG_CORE_VERSION}"
-          sed -i.bak "s/^version = .*/version = \"$VERSION\"/" crates/tish_desktop/Cargo.toml
+
+          for crate in tish_broker tish_desktop tish_app; do
+            sed -i.bak "s/^version = .*/version = \"$VERSION\"/" "crates/$crate/Cargo.toml"
+            rm -f "crates/$crate/Cargo.toml.bak"
+          done
+
           # Path dep → versioned crates.io (cargo publish rejects path deps).
           perl -i -0pe "s/tishlang_core = \\{ path = \"[^\"]+\", features = \\[\"send-values\"\\] \\}/tishlang_core = { version = \"$CORE\", features = [\"send-values\"] }/s" \
             crates/tish_desktop/Cargo.toml
-          rm -f crates/tish_desktop/Cargo.toml.bak
-          grep -E '^(version|name) =|tishlang_core' crates/tish_desktop/Cargo.toml
 
-      - name: Publish tish_desktop
+          # Workspace path → versioned (publish order: broker → desktop → app).
+          perl -i -0pe "s/tish_broker = \\{ path = \"[^\"]+\" \\}/tish_broker = { version = \"$VERSION\" }/s" \
+            crates/tish_desktop/Cargo.toml
+          perl -i -0pe "s/tish_desktop = \\{ path = \"[^\"]+\" \\}/tish_desktop = { version = \"$VERSION\" }/s" \
+            crates/tish_app/Cargo.toml
+
+          # Sibling host path deps are monorepo-only (not on crates.io). Strip them
+          # and their feature gates so the default webview crate publishes cleanly.
+          # Consumers who need platform-apple etc. develop against this checkout.
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("crates/tish_desktop/Cargo.toml")
+          text = p.read_text()
+          # Drop optional sibling host dependency lines.
+          text = re.sub(
+              r'^tish-(macos|ms|lin|android)\s*=\s*\{[^\}]*\}\s*\n',
+              "",
+              text,
+              flags=re.M,
+          )
+          # Drop feature lines that only enabled those deps.
+          text = re.sub(
+              r'^platform-(apple|ms|lin|android)\s*=\s*\[[^\]]*\]\s*\n',
+              "",
+              text,
+              flags=re.M,
+          )
+          # Drop feature = ["dep:…"] leftovers if any remain empty.
+          p.write_text(text)
+          print("--- crates/tish_desktop/Cargo.toml (publish) ---")
+          print(p.read_text())
+          PY
+
+          # Mirror feature strip on tish_app alias crate.
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("crates/tish_app/Cargo.toml")
+          text = p.read_text()
+          text = re.sub(
+              r'^platform-(apple|ms|lin|android)\s*=\s*\[[^\]]*\]\s*\n',
+              "",
+              text,
+              flags=re.M,
+          )
+          p.write_text(text)
+          PY
+
+          grep -E '^(version|name) =|tishlang_core|tish_broker|tish_desktop' \
+            crates/tish_broker/Cargo.toml \
+            crates/tish_desktop/Cargo.toml \
+            crates/tish_app/Cargo.toml
+
+      - name: Publish crates (dependency order)
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           VERSION="${TAG#v}"
-          CRATE=tish_desktop
+          CRATES=(tish_broker tish_desktop tish_app)
           UA="tish-desktop-release/1.0 (https://github.com/tishlang/tish-desktop)"
 
-          if curl -sSf -o /dev/null -A "$UA" "https://crates.io/api/v1/crates/${CRATE}/${VERSION}"; then
-            echo "Skipping $CRATE v${VERSION} (already published)"
-            exit 0
-          fi
+          # Drift guard: every publishable workspace crate MUST be listed above.
+          missing=0
+          while IFS= read -r c; do
+            printf '%s\n' "${CRATES[@]}" | grep -qx "$c" \
+              || { echo "::error::publishable crate '$c' is missing from the CRATES list in crates-release.yml"; missing=1; }
+          done < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.publish == null or (.publish | length > 0)) | .name')
+          [ "$missing" -eq 0 ] || { echo "Add the crate(s) above to CRATES in dependency order, then re-run."; exit 1; }
 
           publish_with_retry() {
-            local max="${PUBLISH_MAX_ATTEMPTS:-6}" attempt log after tgt now wait
+            local crate="$1" max="${PUBLISH_MAX_ATTEMPTS:-6}" attempt log after tgt now wait
             log=$(mktemp)
             for attempt in $(seq 1 "$max"); do
-              if cargo publish -p "$CRATE" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty >"$log" 2>&1; then
+              if cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty >"$log" 2>&1; then
                 cat "$log"; rm -f "$log"; return 0
               fi
               cat "$log"
               if ! grep -qiE '429|too many|rate.?limit|try again (later|after)' "$log"; then
-                echo "::error::cargo publish $CRATE failed (not a rate limit) — see log above"
+                echo "::error::cargo publish $crate failed (not a rate limit) — see log above"
                 rm -f "$log"; return 1
               fi
               after=$(grep -oiE 'try again after [^.]*(GMT|UTC)' "$log" | head -1 | sed -E 's/.*try again after //I' || true)
@@ -92,15 +152,21 @@ jobs:
               fi
               if [ -z "$wait" ] || [ "$wait" -lt 1 ]; then wait=60; fi
               if [ "$wait" -gt 180 ]; then wait=180; fi
-              echo "::warning::$CRATE hit a crates.io rate limit (attempt ${attempt}/${max}); waiting ${wait}s then retrying"
+              echo "::warning::$crate hit a crates.io rate limit (attempt ${attempt}/${max}); waiting ${wait}s then retrying"
               sleep "$wait"
             done
-            echo "::error::$CRATE still rate-limited after ${max} attempts. Re-dispatch (Actions → Crates.io release → Run workflow, tag=${TAG})."
+            echo "::error::$crate still rate-limited after ${max} attempts. Re-dispatch (Actions → Crates.io release → Run workflow, tag=${TAG})."
             rm -f "$log"; return 1
           }
 
-          echo "Publishing $CRATE v${VERSION} (tishlang_core ${TISHLANG_CORE_VERSION})..."
-          publish_with_retry
+          for crate in "${CRATES[@]}"; do
+            if curl -sSf -o /dev/null -A "$UA" "https://crates.io/api/v1/crates/${crate}/${VERSION}"; then
+              echo "Skipping $crate v${VERSION} (already published)"
+            else
+              echo "Publishing $crate v${VERSION} (tishlang_core ${TISHLANG_CORE_VERSION})..."
+              publish_with_retry "$crate"
+            fi
+          done
 
       - name: Update release description with crates.io URL
         if: github.event_name == 'release'
@@ -120,7 +186,7 @@ jobs:
             NEW_BODY="${CURRENT_BODY}
 
           ---
-          Published to crates.io: ${CRATES_URL}"
+          Published to crates.io: ${CRATES_URL} (also tish_broker, tish_app)"
             curl -s -X PATCH \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \

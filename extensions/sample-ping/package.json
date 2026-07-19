@@ -1,5 +1,5 @@
 {
-  "name": "@tish-desktop/ext-sample-ping",
+  "name": "@tishlang/tish-desktop-ext-sample-ping",
   "version": "0.1.0",
   "private": true,
   "tish": {

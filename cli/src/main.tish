@@ -1,8 +1,8 @@
-// tish-desktop CLI entry — Tauri-like subcommands, Tish-first (scii-style).
+// mode CLI entry — Tauri-like subcommands, Tish-first (scii-style).
 //
 //   tish run src/main.tish --feature process,fs -- <cmd> [args]
-//   ./dist/tish-desktop <cmd> [args]
-//   npx tish-desktop <cmd> [args]
+//   ./dist/mode <cmd> [args]
+//   npx mode <cmd> [args]
 import { exit } from "tish:process"
 import { userArgs } from "./paths.tish"
 import { runInit } from "./commands/init.tish"
@@ -15,9 +15,9 @@ import { runDoctor } from "./commands/doctor.tish"
 import { runIos } from "./commands/ios.tish"
 
 fn usage() {
-  console.log("tish-desktop — Tish Desktop CLI")
+  console.log("mode — Tish Mode / Desktop CLI (@tishlang/tish-desktop)")
   console.log("")
-  console.log("Usage: tish-desktop <command> [options]")
+  console.log("Usage: mode <command> [options]")
   console.log("")
   console.log("Commands:")
   console.log("  init [dir]              Scaffold a desktop app")
@@ -38,7 +38,7 @@ fn usage() {
   console.log("  --platform <name>       macos|ios|windows|linux|web (or TISH_PLATFORM)")
   console.log("  --surface <name>        native|webview|web (or TISH_SURFACE)")
   console.log("  --resolve <spec>        relative import to probe (default ./Button)")
-  console.log("  Note: plan docs say `tish app doctor` — use `tish-desktop doctor`.")
+  console.log("  Note: plan docs say `tish app doctor` — use `mode doctor`.")
   console.log("")
   console.log("Dev options:")
   console.log("  --example <name>        basic|file-browser|native-chrome|byo-ui|hybrid")

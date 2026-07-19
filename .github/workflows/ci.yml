@@ -80,7 +80,7 @@ jobs:
         working-directory: examples/hybrid
         run: |
           IMPORTER="$(pwd)/app/App.tish"
-          node ../../cli/bin/tish-desktop.js doctor \
+          node ../../cli/bin/mode.js doctor \
             --platform macos --surface webview \
             --resolve ./Button --importer "$IMPORTER"
       - name: Prove attach_app wiring references

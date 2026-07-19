@@ -1,8 +1,8 @@
 {
-  "name": "@tish-desktop/app-api",
+  "name": "@tishlang/tish-app-api",
   "version": "0.1.0",
-  "description": "Alias of @tish-desktop/desktop-api — invoke, listen, state.*, Platform",
-  "license": "MIT OR Apache-2.0",
+  "description": "Alias of @tishlang/tish-desktop-api — invoke, listen, state.*, Platform",
+  "license": "PIF",
   "type": "module",
   "repository": {
     "type": "git",
@@ -13,20 +13,29 @@
     "access": "public"
   },
   "files": [
-    "src"
+    "src",
+    "LICENSE"
   ],
   "tish": {
     "module": "./src/index.tish"
   },
   "exports": {
-    ".": { "tish": "./src/index.tish" },
-    "./bridge": { "import": "../desktop-api/src/bridge.js" },
-    "./web": { "import": "../desktop-api/src/web-bridge.js" },
-    "./web-bridge": { "import": "../desktop-api/src/web-bridge.js" }
+    ".": {
+      "tish": "./src/index.tish"
+    },
+    "./bridge": {
+      "import": "./src/bridge.js"
+    },
+    "./web": {
+      "import": "./src/web-bridge.js"
+    },
+    "./web-bridge": {
+      "import": "./src/web-bridge.js"
+    }
   },
   "dependencies": {
-    "@tish-desktop/desktop-api": "file:../desktop-api",
-    "@tish-desktop/shared": "file:../shared"
+    "@tishlang/tish-desktop-api": "file:../desktop-api",
+    "@tishlang/tish-desktop-shared": "file:../shared"
   },
   "keywords": [
     "tish",

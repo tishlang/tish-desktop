@@ -1,6 +1,6 @@
 // Shared App entry — BYO DOM mount (no lattish).
 import { Button } from "./Button"
-import { invoke } from "@tish-desktop/app-api"
+import { invoke } from "@tishlang/tish-app-api"
 
 export fn mountApp(rootEl) {
   rootEl.innerHTML = ""

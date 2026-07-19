@@ -1,4 +1,4 @@
-import { installBridge } from "@tish-desktop/desktop-api/bridge"
+import { installBridge } from "@tishlang/tish-desktop-api/bridge"
 
 installBridge()
 if (import.meta.hot) {

@@ -1,8 +1,8 @@
 {
-  "name": "@tish-desktop/cli",
+  "name": "@tishlang/tish-desktop",
   "version": "0.1.0",
   "description": "Tish Desktop CLI — init, dev, build, info, icon, distribute",
-  "license": "MIT OR Apache-2.0",
+  "license": "PIF",
   "type": "module",
   "repository": {
     "type": "git",
@@ -13,21 +13,25 @@
     "access": "public"
   },
   "bin": {
-    "tish-desktop": "bin/tish-desktop.js"
+    "mode": "bin/mode.js"
   },
   "files": [
     "bin",
     "src",
-    "templates"
+    "templates",
+    "LICENSE"
   ],
   "tish": {
     "source": "./src/main.tish",
-    "features": ["process", "fs"]
+    "features": [
+      "process",
+      "fs"
+    ]
   },
   "scripts": {
     "dev": "tish run --feature process,fs src/main.tish",
-    "build": "tish build --feature process,fs --target native --native-backend rust src/main.tish -o dist/tish-desktop",
-    "start": "node bin/tish-desktop.js"
+    "build": "tish build --feature process,fs --target native --native-backend rust src/main.tish -o dist/mode",
+    "start": "node bin/mode.js"
   },
   "engines": {
     "node": ">=20"

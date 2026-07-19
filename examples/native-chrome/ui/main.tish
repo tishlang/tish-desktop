@@ -1,7 +1,7 @@
 /** @jsxImportSource lattish */
 import { createRoot, useState, useEffect } from "lattish"
-import { invoke, listen } from "@tish-desktop/desktop-api"
-import { Button, Section, Badge } from "@tish-desktop/ui-theme"
+import { invoke, listen } from "@tishlang/tish-desktop-api"
+import { Button, Section, Badge } from "@tishlang/tish-desktop-ui-theme"
 
 fn App() {
   let [log, setLog] = useState([])

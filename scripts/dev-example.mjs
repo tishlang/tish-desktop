@@ -2,7 +2,7 @@
 /* eslint-env node */
 /**
  * Legacy entry — forwards to the Tish CLI.
- * Prefer: node cli/bin/tish-desktop.js dev --example <name>
+ * Prefer: node cli/bin/mode.js dev --example <name>
  *         npm run example:<name>
  */
 import { spawnSync } from "node:child_process"
@@ -14,7 +14,7 @@ const root = path.resolve(__dirname, "..")
 const args = process.argv.slice(2)
 const name = args.find((a) => !a.startsWith("--")) || "basic"
 const rebuild = args.includes("--rebuild")
-const cli = path.join(root, "cli/bin/tish-desktop.js")
+const cli = path.join(root, "cli/bin/mode.js")
 
 const forwarded = ["dev", "--example", name]
 if (rebuild) forwarded.push("--rebuild")

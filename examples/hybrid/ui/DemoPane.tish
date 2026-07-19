@@ -1,9 +1,9 @@
 /** @jsxImportSource lattish */
 // Webview / web demo pane — lattish + ui-theme (same stack as native-chrome).
 import { useState, useEffect } from "lattish"
-import { Button, Input, Section, Badge } from "@tish-desktop/ui-theme"
-import { invoke, useSharedState, stateSet } from "@tish-desktop/app-api"
-import { Platform } from "@tish-desktop/shared"
+import { Button, Input, Section, Badge } from "@tishlang/tish-desktop-ui-theme"
+import { invoke, useSharedState, stateSet } from "@tishlang/tish-app-api"
+import { Platform } from "@tishlang/tish-desktop-shared"
 import { DEMO, DEMO_TITLE, DEMO_HINT } from "../app/demo.tish"
 
 export fn DemoPane() {

@@ -1,4 +1,4 @@
-import { installWebBridge } from "@tish-desktop/app-api/web"
+import { installWebBridge } from "@tishlang/tish-app-api/web"
 
 installWebBridge()
 if (import.meta.hot) {

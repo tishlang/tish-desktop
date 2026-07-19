@@ -19,7 +19,7 @@ See [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md), [docs/UPSTREAM.md](./docs/UPST
 - **Shell:** `tish build --target native --native-backend rust` — may import `cargo:tish_desktop`
 - **UI:** Vite + `@tishlang/vite-plugin-tish` — pure Tish + lattish; talks via `window.__TISH_DESKTOP__`
 - **Shared:** `packages/shared` — no native imports
-- **CLI:** `@tish-desktop/cli` (`tish-desktop init|dev|build|info|icon|distribute`) — product DX, not example app code
+- **CLI:** `@tishlang/tish-desktop` (`mode init|dev|build|info|icon|distribute`) — product DX, not example app code
 
 ## Broker / state (microfrontend)
 
@@ -129,8 +129,8 @@ Wired when flags are true: `dialog`, `tray-icon`, `menu`, `deep-link`, `opener`,
 ## Public crate + CLI
 
 - **`tish_desktop`** — publishable library (`repository` / `readme` metadata). Locally depends on **path** `tishlang_core` so `tish build` shares one `Value` type with the CLI. Crates.io publish rewrites to a versioned dep in [`.github/workflows/crates-release.yml`](./.github/workflows/crates-release.yml) — see [`docs/RELEASE.md`](./docs/RELEASE.md). Sample ext stays `publish = false`.
-- **`tish-desktop` bin** — thin launcher → PATH / `TISH_DESKTOP_CLI` / `npx @tish-desktop/cli`
-- **`@tish-desktop/cli`** (+ `desktop-api` / `shared` / `ui-theme`) — npm OIDC publish via [`.github/workflows/npm-release.yml`](./.github/workflows/npm-release.yml)
+- **`mode` bin** — thin launcher → PATH / `TISH_DESKTOP_CLI` / `npx @tishlang/tish-desktop`
+- **`@tishlang/tish-desktop`** (+ `desktop-api` / `shared` / `ui-theme`) — npm OIDC publish via [`.github/workflows/npm-release.yml`](./.github/workflows/npm-release.yml)
 
 ## UI theme
 

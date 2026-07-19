@@ -87,11 +87,36 @@ fn looksLikeCliRoot(dir) {
   if (!pathExists(pkg)) return false
   let text = readFile(pkg)
   if (text === null || String(text).startsWith("Error:")) return false
-  return String(text).indexOf("@tish-desktop/cli") >= 0
+  return String(text).indexOf("@tishlang/tish-desktop") >= 0
 }
 
 fn looksLikeRepoRoot(dir) {
   return pathExists(joinPath(dir, "crates/tish_desktop")) && pathExists(joinPath(dir, "examples"))
+}
+
+/** True when running inside a tish-mode / tish-desktop checkout (path deps available). */
+export fn inMonorepoCheckout() {
+  return looksLikeRepoRoot(repoRoot())
+}
+
+/** CLI package version (for registry scaffolds outside the monorepo). */
+export fn cliPackageVersion() {
+  let pkg = joinPath(cliRoot(), "package.json")
+  let text = readFile(pkg)
+  if (text === null || String(text).startsWith("Error:")) return "0.1.0"
+  let s = String(text)
+  let key = "\"version\""
+  let i = s.indexOf(key)
+  if (i < 0) return "0.1.0"
+  let colon = s.indexOf(":", i + key.length)
+  if (colon < 0) return "0.1.0"
+  let q1 = s.indexOf("\"", colon + 1)
+  if (q1 < 0) return "0.1.0"
+  let q2 = s.indexOf("\"", q1 + 1)
+  if (q2 < 0) return "0.1.0"
+  let ver = s.slice(q1 + 1, q2)
+  if (ver === "") return "0.1.0"
+  return ver
 }
 
 /** Resolve the cli/ package directory (absolute when possible). */
@@ -107,7 +132,7 @@ export fn cliRoot() {
   }
   if (candidate === null && argv.length >= 1 && argv[0] !== null) {
     let exe = String(argv[0])
-    if (exe.indexOf("tish-desktop") >= 0) {
+    if (exe.indexOf("mode") >= 0 || exe.indexOf("tish-desktop") >= 0) {
       let dist = dirname(exe)
       let root = dirname(dist)
       if (looksLikeCliRoot(root)) candidate = root

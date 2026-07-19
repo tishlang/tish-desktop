@@ -14,14 +14,14 @@
     "build:ui": "npm run build:css && vite build",
     "dev:ui": "npm run build:css && vite",
     "build:shell": "tish build --target native --native-backend rust src/main.tish -o dist/file-browser-shell",
-    "dev": "node ../../cli/bin/tish-desktop.js dev --example file-browser",
+    "dev": "node ../../cli/bin/mode.js dev --example file-browser",
     "dev:legacy": "node ../../scripts/dev-example.mjs file-browser",
     "start": "npm run build:ui && npm run build:shell && ./dist/file-browser-shell"
   },
   "dependencies": {
-    "@tish-desktop/desktop-api": "file:../../packages/desktop-api",
-    "@tish-desktop/shared": "file:../../packages/shared",
-    "@tish-desktop/ui-theme": "file:../../packages/ui-theme",
+    "@tishlang/tish-desktop-api": "file:../../packages/desktop-api",
+    "@tishlang/tish-desktop-shared": "file:../../packages/shared",
+    "@tishlang/tish-desktop-ui-theme": "file:../../packages/ui-theme",
     "lattish": "file:../../../lattish",
     "tish-tailwind": "file:../../../tish-tailwind"
   },

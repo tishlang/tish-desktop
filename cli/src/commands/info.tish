@@ -29,7 +29,7 @@ fn versionLine(label, cmd) {
 export fn runInfo(_args) {
   let root = repoRoot()
   let tishBin = resolveTish()
-  console.log("tish-desktop info")
+  console.log("mode info")
   console.log("repo: " + root)
   console.log("cli:  " + cliRoot())
   console.log("cwd:  " + cwd())
