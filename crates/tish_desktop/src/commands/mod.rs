@@ -17,7 +17,7 @@ pub(crate) mod webview_cap;
 mod window_extra;
 
 use serde_json::json;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::AppState;
 
@@ -27,14 +27,30 @@ pub fn desktop_protocol() -> serde_json::Value {
 }
 
 #[tauri::command]
-pub fn desktop_invoke(
+pub async fn desktop_invoke(
     app: AppHandle,
-    state: State<'_, AppState>,
     cmd: String,
     args: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
     let args = args.unwrap_or(json!({}));
-    dispatch(&app, &state, &cmd, args)
+    // A Tish `handle()` command is app logic (fs / process / http / index) that can block for a
+    // long time; run it OFF the main thread so the webview never beachballs. The rest — state.*,
+    // CapProviders, and the window/menu/dialog glue — is fast and (on macOS) main-thread-only, so
+    // it stays inline. NativeFn + AppState are Send + Sync, so the handler moves safely. State is
+    // fetched from the AppHandle (not taken as a command param) so no non-Send borrow crosses the
+    // await and the command future stays Send.
+    let is_handler = app.state::<AppState>().handlers.lock().contains_key(&cmd);
+    if is_handler {
+        let app = app.clone();
+        return tauri::async_runtime::spawn_blocking(move || {
+            let state = app.state::<AppState>();
+            dispatch(&app, state.inner(), &cmd, args)
+        })
+        .await
+        .map_err(|e| format!("desktop_invoke worker failed: {e}"))?;
+    }
+    let state = app.state::<AppState>();
+    dispatch(&app, state.inner(), &cmd, args)
 }
 
 /// Extra command modules, tried in order. Each returns `None` if it doesn't own `cmd`.

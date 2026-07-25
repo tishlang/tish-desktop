@@ -37,6 +37,48 @@ pub fn handle(args: &[Value]) -> Value {
     ok_json(serde_json::json!({ "ok": true }))
 }
 
+/// `emit(event, payload?, opts?)` — emit a Tauri event to the webview(s). `opts.window` targets a
+/// single window by label; otherwise it broadcasts to all. This is how shell Tish (and, via
+/// `emit_event`, Rust extension crates) push streaming output — pty/lsp/dap chunks, watcher
+/// notifications, chat deltas — that the request/response `desktop_invoke` path cannot carry.
+/// Returns `{ ok: bool }` (false when no AppHandle is live yet, e.g. before `run()`).
+pub fn emit(args: &[Value]) -> Value {
+    let Some(event) = arg_str(args, 0) else {
+        return err_str("emit(event, payload?, opts?): event required");
+    };
+    let payload = args
+        .get(1)
+        .and_then(value_util::value_to_json)
+        .unwrap_or(serde_json::Value::Null);
+    let window = match args.get(2) {
+        Some(Value::Object(m)) => match m.borrow().strings.get("window") {
+            Some(Value::String(s)) => Some(s.to_string()),
+            _ => None,
+        },
+        _ => None,
+    };
+    ok_json(serde_json::json!({ "ok": emit_event_to(&event, payload, window.as_deref()) }))
+}
+
+/// Emit a Tauri event from Rust extension code (broadcasts to all webviews). The Value-ABI
+/// `emit()` above is the Tish-facing entry; this is the direct Rust one for `cargo:` extensions.
+pub fn emit_event(event: &str, payload: serde_json::Value) -> bool {
+    emit_event_to(event, payload, None)
+}
+
+fn emit_event_to(event: &str, payload: serde_json::Value, window: Option<&str>) -> bool {
+    let Some(app) = local_invoke::APP_HANDLE.lock().clone() else {
+        return false;
+    };
+    match window {
+        Some(label) => match app.get_webview_window(label) {
+            Some(w) => w.emit(event, payload).is_ok(),
+            None => false,
+        },
+        None => app.emit(event, payload).is_ok(),
+    }
+}
+
 /// `useExtensions(["id", ...])` — record enabled extension ids for the next run.
 pub fn use_extensions(args: &[Value]) -> Value {
     let ids: Vec<String> = match args.first() {
@@ -528,6 +570,7 @@ pub fn tish_desktop_object() -> Value {
     let mut m = ObjectMap::default();
     m.insert(Arc::from("run"), Value::native(run));
     m.insert(Arc::from("handle"), Value::native(handle));
+    m.insert(Arc::from("emit"), Value::native(emit));
     m.insert(Arc::from("useExtensions"), Value::native(use_extensions));
     m.insert(
         Arc::from("registerRustExtension"),
