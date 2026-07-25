@@ -14,6 +14,11 @@ mod platform;
 mod state;
 mod value_util;
 mod windows;
+// macOS window-chrome (traffic-light inset + tint), ported from dune-ide. objc2, so apple+macos only.
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod traffic_lights;
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod traffic_light_tint;
 
 use std::sync::Arc;
 
@@ -483,6 +488,13 @@ fn build_and_run(
         .setup(move |app| {
             let handle = app.handle().clone();
             local_invoke::set_app_handle(handle.clone());
+
+            // macOS traffic-light chrome: install the relayout observers (idempotent, no-op elsewhere).
+            #[cfg(all(feature = "platform-apple", target_os = "macos"))]
+            {
+                traffic_lights::init(&handle);
+                traffic_light_tint::init(&handle);
+            }
 
             if plugins.deep_link {
                 use tauri_plugin_deep_link::DeepLinkExt;

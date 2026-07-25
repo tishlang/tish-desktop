@@ -22,8 +22,9 @@ path = "src/bin/tish_desktop.rs"
 default = ["webview-tauri"]
 # Classic desktop webview host (Tauri). Always on by default.
 webview-tauri = []
-# Path-depend tish-apple for native macOS attach under an outer host.
-platform-apple = ["dep:tish-macos"]
+# Path-depend tish-apple for native macOS attach under an outer host. Also pulls objc2 for the
+# in-host macOS window chrome (traffic-light inset + tint), ported from dune-ide.
+platform-apple = ["dep:tish-macos", "dep:objc2", "dep:objc2-foundation", "dep:objc2-app-kit"]
 # Path-depend sibling native hosts (real attach + notify — not forever-unsupported).
 platform-ms = ["dep:tish-ms"]
 platform-lin = ["dep:tish-lin"]
@@ -44,6 +45,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon", "devtools"] }
 tish-macos = { path = "../../../tish-apple/crates/tish-macos", optional = true }
+# macOS window-chrome (traffic-light inset + tint), gated on platform-apple. Versions match dune-ide.
+objc2 = { version = "0.6", optional = true }
+objc2-foundation = { version = "0.3", optional = true, features = ["NSString", "NSObject", "NSGeometry", "NSNotification", "NSKeyValueObserving", "NSDictionary", "NSArray"] }
+objc2-app-kit = { version = "0.3", optional = true, features = ["NSApplication", "NSMenu", "NSMenuItem", "NSControl", "NSWindow", "NSButton", "NSView", "NSResponder", "NSColor", "NSBezierPath", "NSGraphics", "objc2-core-foundation"] }
 tish-ms = { path = "../../../tish-ms/crates/tish-ms", optional = true }
 tish-lin = { path = "../../../tish-lin/crates/tish-lin", optional = true }
 tish-android = { path = "../../../tish-android/crates/tish-android", optional = true }

@@ -39,9 +39,66 @@ pub fn try_dispatch(
         "notification.requestPermission" => notification_request_permission(app, state),
         "notification.show" => notification_show(app, state, args),
         "opener.open" => opener_open(app, state, args),
+        // macOS traffic-light chrome (theme-driven inset + color tint); no-op off apple/macos.
+        "window.trafficLightInset" => traffic_light_inset(app, args),
+        "window.reapplyTrafficLightInset" => reapply_traffic_light_inset(app),
+        "window.trafficLightTint" => traffic_light_tint_cmd(app, args),
+        "window.reapplyTrafficLightTint" => reapply_traffic_light_tint_cmd(app),
         _ => return None,
     };
     Some(result)
+}
+
+// ---- traffic-light chrome (apple/macos does the work; everything else is a successful no-op) ----
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn traffic_light_inset(app: &AppHandle, args: &Value) -> Result<Value, String> {
+    crate::traffic_lights::set_inset(
+        app,
+        args.get("padX").and_then(|v| v.as_f64()),
+        args.get("padY").and_then(|v| v.as_f64()),
+        args.get("spacing").and_then(|v| v.as_f64()),
+    );
+    Ok(json!({ "ok": true }))
+}
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn reapply_traffic_light_inset(app: &AppHandle) -> Result<Value, String> {
+    crate::traffic_lights::reapply(app);
+    Ok(json!({ "ok": true }))
+}
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn traffic_light_tint_cmd(app: &AppHandle, args: &Value) -> Result<Value, String> {
+    let s = |k: &str| args.get(k).and_then(|v| v.as_str()).map(|x| x.to_string());
+    crate::traffic_light_tint::set_tint(
+        app,
+        s("close"),
+        s("minimize"),
+        s("zoom"),
+        args.get("diameter").and_then(|v| v.as_f64()),
+        args.get("opacity").and_then(|v| v.as_f64()),
+    );
+    Ok(json!({ "ok": true }))
+}
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn reapply_traffic_light_tint_cmd(app: &AppHandle) -> Result<Value, String> {
+    crate::traffic_light_tint::reapply(app);
+    Ok(json!({ "ok": true }))
+}
+
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn traffic_light_inset(_app: &AppHandle, _args: &Value) -> Result<Value, String> {
+    Ok(json!({ "ok": true }))
+}
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn reapply_traffic_light_inset(_app: &AppHandle) -> Result<Value, String> {
+    Ok(json!({ "ok": true }))
+}
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn traffic_light_tint_cmd(_app: &AppHandle, _args: &Value) -> Result<Value, String> {
+    Ok(json!({ "ok": true }))
+}
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn reapply_traffic_light_tint_cmd(_app: &AppHandle) -> Result<Value, String> {
+    Ok(json!({ "ok": true }))
 }
 
 fn dialog_message(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, String> {
