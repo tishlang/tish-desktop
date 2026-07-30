@@ -33,7 +33,7 @@ impl PlatformHost for ApplePlatformHost {
             }));
         }
         let opts = json_options_to_tish(options);
-        let handle = tish_macos::attach_app(root.clone(), Some(opts));
+        let handle = tishlang_macos::attach_app(root.clone(), Some(opts));
         Ok(json!({
             "ok": true,
             "host": "apple",

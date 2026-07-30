@@ -24,7 +24,7 @@ default = ["webview-tauri"]
 webview-tauri = []
 # Path-depend tish-apple for native macOS attach under an outer host. Also pulls objc2 for the
 # in-host macOS window chrome (traffic-light inset + tint), ported from dune-ide.
-platform-apple = ["dep:tish-macos", "dep:objc2", "dep:objc2-foundation", "dep:objc2-app-kit"]
+platform-apple = ["dep:tishlang_macos", "dep:objc2", "dep:objc2-foundation", "dep:objc2-app-kit"]
 # Path-depend sibling native hosts (real attach + notify — not forever-unsupported).
 platform-ms = ["dep:tish-ms"]
 platform-lin = ["dep:tish-lin"]
@@ -45,7 +45,7 @@ tish_broker = { path = "../tish_broker" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon", "devtools", "image-png"] }
-tish-macos = { path = "../../../tish-apple/crates/tish-macos", optional = true }
+tishlang_macos = { path = "../../../tish-apple/crates/tish-macos", optional = true }
 # macOS window-chrome (traffic-light inset + tint), gated on platform-apple. Versions match dune-ide.
 objc2 = { version = "0.6", optional = true }
 objc2-foundation = { version = "0.3", optional = true, features = ["NSString", "NSObject", "NSGeometry", "NSNotification", "NSKeyValueObserving", "NSDictionary", "NSArray"] }

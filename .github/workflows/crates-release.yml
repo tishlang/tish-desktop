@@ -4,7 +4,7 @@
 #
 # Local/monorepo builds keep path deps on tishlang_core + sibling hosts.
 # This workflow rewrites those for publish — see crates/tish_desktop/README.md.
-# tish-macos (platform-apple) is published from tishlang/tish-apple, so it is
+# tishlang_macos (platform-apple) is published from tishlang/tish-apple, so it is
 # rewritten to a versioned crates.io dep here (NOT stripped); the not-yet-published
 # ms/lin/android siblings are still stripped until those repos exist.
 #
@@ -28,7 +28,7 @@ on:
         default: "3.0"
         type: string
       tish_apple_version:
-        description: "crates.io tish-macos (tish-apple) version (semver req)"
+        description: "crates.io tishlang_macos (tish-apple) version (semver req)"
         required: false
         default: "3.0"
         type: string
@@ -45,7 +45,7 @@ jobs:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       # Pin must match the published tish CLI / ecosystem train.
       TISHLANG_CORE_VERSION: ${{ inputs.tishlang_core_version || '3.0' }}
-      # tish-macos (platform-apple) published version from tishlang/tish-apple.
+      # tishlang_macos (platform-apple) published version from tishlang/tish-apple.
       TISH_APPLE_VERSION: ${{ inputs.tish_apple_version || '3.0' }}
     steps:
       - name: Checkout
@@ -79,9 +79,10 @@ jobs:
           perl -i -0pe "s/tish_desktop = \\{ path = \"[^\"]+\" \\}/tish_desktop = { version = \"$VERSION\" }/s" \
             crates/tish_app/Cargo.toml
 
-          # macOS host (platform-apple): keep the feature + dep, but point tish-macos at the
-          # PUBLISHED crate (tishlang/tish-apple) instead of the monorepo path.
-          perl -i -0pe "s/tish-macos = \\{ path = \"[^\"]+\", optional = true \\}/tish-macos = { version = \"$APPLE\", optional = true }/s" \
+          # macOS host (platform-apple): keep the feature + dep, but point tishlang_macos at the
+          # PUBLISHED crate (tishlang/tish-apple) instead of the monorepo path. The crate NAME is
+          # underscore (tishlang_macos); its directory under tish-apple stays hyphenated.
+          perl -i -0pe "s/tishlang_macos = \\{ path = \"[^\"]+\", optional = true \\}/tishlang_macos = { version = \"$APPLE\", optional = true }/s" \
             crates/tish_desktop/Cargo.toml
 
           # The remaining sibling host path deps (ms/lin/android) are monorepo-only — those repos

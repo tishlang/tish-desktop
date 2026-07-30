@@ -38,7 +38,7 @@ fn webview_list(app: &AppHandle) -> Result<Value, String> {
     let mut labels: Vec<String> = app.webview_windows().keys().cloned().collect();
     #[cfg(all(feature = "platform-apple", target_os = "macos"))]
     {
-        if let Some(Ok(v)) = tish_macos::webview_broker_try_invoke("webview.list", &json!({})) {
+        if let Some(Ok(v)) = tishlang_macos::webview_broker_try_invoke("webview.list", &json!({})) {
             if let Some(arr) = v.get("labels").and_then(|x| x.as_array()) {
                 for item in arr {
                     if let Some(s) = item.as_str() {
@@ -115,7 +115,7 @@ fn webview_eval(app: &AppHandle, args: &Value) -> Result<Value, String> {
 
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
 fn wk_try(args: &Value, cmd: &str) -> Option<Result<Value, String>> {
-    match tish_macos::webview_broker_try_invoke(cmd, args) {
+    match tishlang_macos::webview_broker_try_invoke(cmd, args) {
         Some(Ok(v)) => Some(Ok(v)),
         Some(Err(e)) if e.contains("no bridged webview") => None,
         Some(Err(e)) => Some(Err(e)),

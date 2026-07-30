@@ -164,7 +164,7 @@ fn dispatch_state(cmd: &str, args: &Json) -> Option<Result<Json, String>> {
 fn platform_webview(cmd: &str, args: &Json) -> Result<Json, String> {
     #[cfg(all(feature = "platform-apple", target_os = "macos"))]
     {
-        if let Some(r) = tish_macos::webview_broker_try_invoke(cmd, args) {
+        if let Some(r) = tishlang_macos::webview_broker_try_invoke(cmd, args) {
             return r;
         }
     }
@@ -222,10 +222,10 @@ fn platform_notification(cmd: &str, args: &Json) -> Result<Json, String> {
 fn apple_notification(cmd: &str, args: &Json) -> Result<Json, String> {
     match cmd {
         "notification.permissionState" => Ok(json!({
-            "state": tish_macos::notification_permission_state(),
+            "state": tishlang_macos::notification_permission_state(),
         })),
         "notification.requestPermission" => Ok(json!({
-            "state": tish_macos::notification_request_permission(),
+            "state": tishlang_macos::notification_request_permission(),
         })),
         "notification.show" => {
             let title = args
@@ -233,7 +233,7 @@ fn apple_notification(cmd: &str, args: &Json) -> Result<Json, String> {
                 .and_then(|v| v.as_str())
                 .unwrap_or("Tish Desktop");
             let body = args.get("body").and_then(|v| v.as_str()).unwrap_or("");
-            tish_macos::notification_show(title, body)?;
+            tishlang_macos::notification_show(title, body)?;
             Ok(json!({ "ok": true, "title": title, "body": body }))
         }
         _ => Ok(broker::unsupported("notification")),
@@ -302,6 +302,6 @@ fn emit_state_multi(path: &str, value: &Json, revision: u64, source: &str) {
         o.insert(Arc::from("value"), json_to_value(value));
         o.insert(Arc::from("revision"), Value::Number(revision as f64));
         o.insert(Arc::from("source"), Value::String(source.into()));
-        tish_macos::broadcast_event("state:changed", &Value::object(o));
+        tishlang_macos::broadcast_event("state:changed", &Value::object(o));
     }
 }
