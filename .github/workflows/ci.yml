@@ -41,6 +41,19 @@ jobs:
         run: git clone --depth 1 https://github.com/tishlang/tish.git ../tish
       - name: Checkout tish-apple (platform-apple path dep)
         run: git clone --depth 1 https://github.com/tishlang/tish-apple.git ../tish-apple
+      - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
+        # These optional platform-host crates have no public repo yet, but Cargo must
+        # read every path-dep manifest to resolve the workspace. Write empty stub crates
+        # so resolution succeeds; their features stay OFF here, so the stubs never compile.
+        run: |
+          for c in tish-ms tish-lin tish-android; do
+            d="../$c/crates/$c"
+            if [ ! -f "$d/Cargo.toml" ]; then
+              mkdir -p "$d/src"
+              printf '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2021"\n' "$c" > "$d/Cargo.toml"
+              : > "$d/src/lib.rs"
+            fi
+          done
       - name: Install local tish CLI
         run: cargo install --path ../tish/crates/tish --force --bin tish
       - name: Check (default features)
@@ -49,17 +62,9 @@ jobs:
         # Full link of tish-macos needs macOS; ensure the feature resolves on Linux.
         run: cargo check -p tish_desktop --features platform-apple
         continue-on-error: true
-      - name: Checkout tish-android (optional stub host)
-        continue-on-error: true
-        run: git clone --depth 1 https://github.com/tishlang/tish-android.git ../tish-android
-      - name: Check platform-android stub
-        continue-on-error: true
-        run: |
-          if [ -f ../tish-android/crates/tish-android/Cargo.toml ]; then
-            cargo check -p tish_desktop --features platform-android
-          else
-            echo "tish-android not available; skip"
-          fi
+      # platform-ms / platform-lin / platform-android are not compile-tested here: their
+      # host crates have no public repo, only the resolution stubs above. The default and
+      # platform-apple checks already exercise the real, buildable configurations.
       - name: Typed shell --check warn (byo-ui + hybrid + basic)
         run: |
           npm --prefix examples/byo-ui install
@@ -92,6 +97,18 @@ jobs:
         run: git clone --depth 1 https://github.com/tishlang/tish.git ../tish
       - name: Checkout tish-apple
         run: git clone --depth 1 https://github.com/tishlang/tish-apple.git ../tish-apple
+      - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
+        # Same as the linux job: Cargo reads every path-dep manifest to resolve the
+        # workspace, so stub the optional platform crates that have no public repo.
+        run: |
+          for c in tish-ms tish-lin tish-android; do
+            d="../$c/crates/$c"
+            if [ ! -f "$d/Cargo.toml" ]; then
+              mkdir -p "$d/src"
+              printf '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2021"\n' "$c" > "$d/Cargo.toml"
+              : > "$d/src/lib.rs"
+            fi
+          done
       - name: Check with platform-apple
         run: cargo check -p tish_desktop --features platform-apple -p tish_app
       - name: Install tish CLI + hybrid apple shell build (SC4)
