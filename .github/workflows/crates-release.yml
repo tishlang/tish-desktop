@@ -4,6 +4,9 @@
 #
 # Local/monorepo builds keep path deps on tishlang_core + sibling hosts.
 # This workflow rewrites those for publish — see crates/tish_desktop/README.md.
+# tish-macos (platform-apple) is published from tishlang/tish-apple, so it is
+# rewritten to a versioned crates.io dep here (NOT stripped); the not-yet-published
+# ms/lin/android siblings are still stripped until those repos exist.
 #
 # Secret: CARGO_REGISTRY_TOKEN (crates.io API token) on this repo.
 
@@ -22,7 +25,12 @@ on:
       tishlang_core_version:
         description: "crates.io tishlang_core version (semver req)"
         required: false
-        default: "2.39"
+        default: "3.0"
+        type: string
+      tish_apple_version:
+        description: "crates.io tish-macos (tish-apple) version (semver req)"
+        required: false
+        default: "3.0"
         type: string
 
 permissions:
@@ -36,7 +44,9 @@ jobs:
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       # Pin must match the published tish CLI / ecosystem train.
-      TISHLANG_CORE_VERSION: ${{ inputs.tishlang_core_version || '2.39' }}
+      TISHLANG_CORE_VERSION: ${{ inputs.tishlang_core_version || '3.0' }}
+      # tish-macos (platform-apple) published version from tishlang/tish-apple.
+      TISH_APPLE_VERSION: ${{ inputs.tish_apple_version || '3.0' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,6 +62,7 @@ jobs:
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           VERSION="${TAG#v}"
           CORE="${TISHLANG_CORE_VERSION}"
+          APPLE="${TISH_APPLE_VERSION}"
 
           for crate in tish_broker tish_desktop tish_app; do
             sed -i.bak "s/^version = .*/version = \"$VERSION\"/" "crates/$crate/Cargo.toml"
@@ -68,24 +79,29 @@ jobs:
           perl -i -0pe "s/tish_desktop = \\{ path = \"[^\"]+\" \\}/tish_desktop = { version = \"$VERSION\" }/s" \
             crates/tish_app/Cargo.toml
 
-          # Sibling host path deps are monorepo-only (not on crates.io). Strip them
-          # and their feature gates so the default webview crate publishes cleanly.
-          # Consumers who need platform-apple etc. develop against this checkout.
+          # macOS host (platform-apple): keep the feature + dep, but point tish-macos at the
+          # PUBLISHED crate (tishlang/tish-apple) instead of the monorepo path.
+          perl -i -0pe "s/tish-macos = \\{ path = \"[^\"]+\", optional = true \\}/tish-macos = { version = \"$APPLE\", optional = true }/s" \
+            crates/tish_desktop/Cargo.toml
+
+          # The remaining sibling host path deps (ms/lin/android) are monorepo-only — those repos
+          # aren't published yet. Strip them and their feature gates so the crate publishes cleanly;
+          # apple is kept (versioned above). Re-add a sibling here once its repo is on crates.io.
           python3 <<'PY'
           from pathlib import Path
           import re
           p = Path("crates/tish_desktop/Cargo.toml")
           text = p.read_text()
-          # Drop optional sibling host dependency lines.
+          # Drop optional sibling host dependency lines (apple kept — versioned above).
           text = re.sub(
-              r'^tish-(macos|ms|lin|android)\s*=\s*\{[^\}]*\}\s*\n',
+              r'^tish-(ms|lin|android)\s*=\s*\{[^\}]*\}\s*\n',
               "",
               text,
               flags=re.M,
           )
-          # Drop feature lines that only enabled those deps.
+          # Drop feature lines that only enabled those deps (platform-apple kept).
           text = re.sub(
-              r'^platform-(apple|ms|lin|android)\s*=\s*\[[^\]]*\]\s*\n',
+              r'^platform-(ms|lin|android)\s*=\s*\[[^\]]*\]\s*\n',
               "",
               text,
               flags=re.M,
@@ -96,14 +112,15 @@ jobs:
           print(p.read_text())
           PY
 
-          # Mirror feature strip on tish_app alias crate.
+          # Mirror feature strip on tish_app alias crate (platform-apple kept — forwards to
+          # tish_desktop/platform-apple, which is now published).
           python3 <<'PY'
           from pathlib import Path
           import re
           p = Path("crates/tish_app/Cargo.toml")
           text = p.read_text()
           text = re.sub(
-              r'^platform-(apple|ms|lin|android)\s*=\s*\[[^\]]*\]\s*\n',
+              r'^platform-(ms|lin|android)\s*=\s*\[[^\]]*\]\s*\n',
               "",
               text,
               flags=re.M,
