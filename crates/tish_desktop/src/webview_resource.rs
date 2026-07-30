@@ -1,35 +1,27 @@
-//! `dune-webview://localhost/<url-encoded-abs-path>` resource protocol.
+//! Generic `<scheme>://localhost/<url-encoded-abs-path>` resource protocol.
 //!
-//! Serves an extension's local webview files (css/js/images/fonts) to its sandboxed iframe. The
-//! extension host's `webview.asWebviewUri()` mints these URLs and `webview.cspSource` is
-//! `dune-webview://localhost`, so the extension's own CSP allows them. Path-restricted to
-//! dune-managed extension dirs (`…/.dune/extensions/…`); any `..` is rejected.
-//!
-//! Ported verbatim (behaviour-for-behaviour) from dune-ide's `src-tauri` — `serve_webview_resource`
-//! + `ext_paths::webview_resource_allowed` + `webview_resource_content_type`. Registering the scheme
-//! is what lets extension webview panels (custom editors, view containers) load their assets; without
-//! it the iframe requests fail (`Load failed`) and the panel renders blank. This is a host primitive
-//! (a URI-scheme hook), so it lives in the runtime rather than in shell tish.
+//! Lets a hosting app serve its OWN local files (css/js/images/fonts) to a sandboxed webview iframe
+//! that needs to load them via a custom scheme (e.g. an extension host's `asWebviewUri()`). Nothing
+//! app-specific lives here: the caller supplies the scheme and a single trusted absolute-path
+//! substring (`allowed_segment`) via `RunConfig.resource_protocols`; only files whose decoded path
+//! contains that substring — and have no `..` traversal — are served. This is a host primitive (a
+//! URI-scheme hook must be registered on the Tauri builder), so it lives in the runtime; the policy
+//! (which scheme, which trusted segment) comes entirely from the host's config.
 
 use tauri::http::Response;
 
-/// The only trusted path segment: dune installs every extension under a `.dune/extensions` root.
-/// Mirrors `DUNE_EXTENSIONS_PATH_SEGMENT` in the shared `extPaths` module.
-const DUNE_EXTENSIONS_SEGMENT: &str = "/.dune/extensions/";
-
-/// Only dune-managed extension installs are trusted; reject any `..` traversal. Root-independent by
-/// design (matches `ext_paths::webview_resource_allowed`) — the segment check is the whole guard.
-fn resource_allowed(path: &str) -> bool {
+/// Trusted iff the path has no `..` traversal AND contains the host-supplied `allowed_segment`
+/// (e.g. "/.dune/extensions/"). Root-independent by design — the segment check is the whole guard.
+fn resource_allowed(path: &str, allowed_segment: &str) -> bool {
     let norm = path.replace('\\', "/");
     if norm.contains("..") {
         return false;
     }
-    norm.contains(DUNE_EXTENSIONS_SEGMENT)
+    norm.contains(allowed_segment)
 }
 
-/// Content-type for the file, matching `webview_resource_content_type`: text/binary types the webview
-/// needs (with the charset params these responses require), falling back to the common image/font
-/// table and then `application/octet-stream`.
+/// Content-type for the file: text/binary types a webview needs (with the charset params these
+/// responses require), falling back to the common image/font table and then octet-stream.
 fn content_type(path: &str) -> &'static str {
     let p = path.to_lowercase();
     if p.ends_with(".css") {
@@ -67,8 +59,7 @@ fn content_type(path: &str) -> &'static str {
     }
 }
 
-/// Percent-decode a URL path (`%20` → space, etc.). Malformed escapes are left as-is, mirroring the
-/// lossy `urlencoding::decode(...).unwrap_or(raw)` the Rust backend used.
+/// Percent-decode a URL path (`%20` → space, etc.). Malformed escapes are left as-is.
 fn percent_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
@@ -97,12 +88,13 @@ fn err(code: u16, msg: &str) -> Response<Vec<u8>> {
         .unwrap()
 }
 
-/// Serve one `dune-webview://localhost/<path>` request. `raw_path` is the URI path component
-/// (still percent-encoded). Registered via `register_uri_scheme_protocol("dune-webview", …)`.
-pub fn serve(raw_path: &str) -> Response<Vec<u8>> {
+/// Serve one `<scheme>://localhost/<path>` request. `raw_path` is the URI path component (still
+/// percent-encoded); `allowed_segment` is the host-configured trusted substring. Registered per
+/// `RunConfig.resource_protocols` entry via `register_uri_scheme_protocol(scheme, …)`.
+pub fn serve(raw_path: &str, allowed_segment: &str) -> Response<Vec<u8>> {
     let decoded = percent_decode(raw_path);
-    if !resource_allowed(&decoded) {
-        eprintln!("[dune-webview] forbidden: {decoded}");
+    if !resource_allowed(&decoded, allowed_segment) {
+        eprintln!("[resource-protocol] forbidden: {decoded}");
         return err(403, "forbidden");
     }
     match std::fs::read(&decoded) {
@@ -114,7 +106,7 @@ pub fn serve(raw_path: &str) -> Response<Vec<u8>> {
             .body(bytes)
             .unwrap(),
         Err(e) => {
-            eprintln!("[dune-webview] not found: {decoded} ({e})");
+            eprintln!("[resource-protocol] not found: {decoded} ({e})");
             err(404, "not found")
         }
     }
@@ -123,18 +115,20 @@ pub fn serve(raw_path: &str) -> Response<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const SEG: &str = "/.dune/extensions/";
 
     #[test]
-    fn rejects_traversal_and_non_extension_paths() {
-        assert!(!resource_allowed("/Users/x/.dune/extensions/../secret"));
-        assert!(!resource_allowed("/etc/passwd"));
-        assert!(!resource_allowed("/Users/x/project/src/main.rs"));
+    fn rejects_traversal_and_out_of_segment_paths() {
+        assert!(!resource_allowed("/Users/x/.dune/extensions/../secret", SEG));
+        assert!(!resource_allowed("/etc/passwd", SEG));
+        assert!(!resource_allowed("/Users/x/project/src/main.rs", SEG));
     }
 
     #[test]
-    fn allows_dune_managed_extension_files() {
+    fn allows_files_under_the_trusted_segment() {
         assert!(resource_allowed(
-            "/Users/x/.dune/extensions/pub.ext-1.0.0/media/main.css"
+            "/Users/x/.dune/extensions/pub.ext-1.0.0/media/main.css",
+            SEG
         ));
     }
 

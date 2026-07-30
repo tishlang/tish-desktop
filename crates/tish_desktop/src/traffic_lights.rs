@@ -7,11 +7,10 @@
 //! CONTAINER view (the close button's grandparent) so its title-bar subview autoresizes taller, then
 //! center each button in that taller bar and inset it from the left.
 //!
-//! The inset is DRIVEN BY THE ACTIVE THEME (not hard-coded): the frontend reads
-//! `dune.titleBar.controlsPadX/PadY/Spacing` from the theme's colors and pushes them here via the
-//! `set_traffic_light_inset` command. A theme that sets them (e.g. the Dune themes) gets the custom
-//! inset; a theme that doesn't (every imported VS Code / Cursor theme) leaves it `None`, which
-//! restores the untouched macOS default so the chrome matches VS Code / Cursor exactly.
+//! The inset is DRIVEN BY THE HOST (not hard-coded): the webview pushes pad-x/pad-y/spacing via the
+//! generic `window.trafficLightInset` command whenever it wants a custom layout. `None` (the host
+//! sends nothing) restores the untouched macOS default. What the host derives those values from
+//! (e.g. theme tokens) is entirely the host's concern — this module only applies them.
 //!
 //! macOS re-runs its title-bar layout (resetting the button frames to default) on all sorts of
 //! events — show, focus, move, resize, AND webview relayouts like selecting a file — far more than
@@ -219,7 +218,7 @@ thread_local! {
 
 define_class!(
     #[unsafe(super(NSObject))]
-    #[name = "DuneTrafficLightObserver"]
+    #[name = "TishTrafficLightObserver"]
     #[thread_kind = MainThreadOnly]
     #[ivars = ()]
     struct TrafficLightObserver;

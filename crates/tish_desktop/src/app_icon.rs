@@ -1,5 +1,5 @@
 //! macOS dock-icon override. Tauri sets the app (dock) icon from the bundled `tauri.conf.json`
-//! icons at build time; a hosted app that wants its OWN dock icon (Dune IDE, not the tish-desktop
+//! icons at build time; a hosting app that wants its OWN dock icon (not the tish-desktop
 //! default) sets it at runtime here via `NSApplication.setApplicationIconImage:`. The tray icon is
 //! handled separately through Tauri's `TrayIconBuilder::icon` — this is only the dock. objc2, so
 //! apple + macos only.

@@ -41,8 +41,8 @@ pub async fn desktop_invoke(
     // await and the command future stays Send.
     let is_handler = app.state::<AppState>().handlers.lock().contains_key(&cmd);
     // Diagnostic trace: a command that logs `→` but never `←` is the one hanging the boot (a `←`
-    // with a large ms is merely slow). Gated on DUNE_TRACE_INVOKE=1 so it's silent by default.
-    let trace = std::env::var("DUNE_TRACE_INVOKE").as_deref() == Ok("1");
+    // with a large ms is merely slow). Gated on TISH_DESKTOP_TRACE_INVOKE=1 so it's silent by default.
+    let trace = std::env::var("TISH_DESKTOP_TRACE_INVOKE").as_deref() == Ok("1");
     if trace {
         eprintln!("[desktop_invoke] → {cmd} (handler={is_handler})");
     }

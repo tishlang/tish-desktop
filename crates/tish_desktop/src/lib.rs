@@ -16,7 +16,7 @@ mod state;
 mod value_util;
 mod webview_resource;
 mod windows;
-// macOS window-chrome (traffic-light inset + tint), ported from dune-ide. objc2, so apple+macos only.
+// macOS window-chrome (traffic-light inset + tint), ported from the reference IDE. objc2, so apple+macos only.
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
 mod app_icon;
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
@@ -432,8 +432,18 @@ fn build_and_run(
     let mut builder = tauri::Builder::default();
 
     if plugins.single_instance {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             let _ = windows::focus(app, "main");
+            // A second launch (`<binary> <path>` / Finder "Open With" on a packaged build) delivers
+            // its args here — forward file/folder paths to the running instance (open-paths event).
+            // Skip argv[0] (the binary) and any -flags; app_open tags each path with isDir.
+            let paths: Vec<String> = argv
+                .iter()
+                .skip(1)
+                .filter(|a| !a.starts_with('-'))
+                .cloned()
+                .collect();
+            app_open::emit_open_paths(app, &paths);
         }));
     }
     if plugins.dialog {
@@ -473,33 +483,55 @@ fn build_and_run(
         builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     }
 
+    // Host-defined resource protocols (RunConfig.resource_protocols): register each `<scheme>://`
+    // generically — the scheme + trusted path substring come from config, nothing app-specific here.
+    // A hosting app uses this to serve its own local files (e.g. extension assets) to sandboxed
+    // webview iframes; without it those iframe requests fail ("Load failed").
+    let resource_protocols = state.config.lock().resource_protocols.clone();
+    for rp in resource_protocols {
+        let path_contains = rp.path_contains;
+        builder = builder.register_uri_scheme_protocol(rp.scheme, move |_app, request| {
+            webview_resource::serve(request.uri().path(), &path_contains)
+        });
+    }
+
     builder
-        // Extension webview asset protocol: `dune-webview://localhost/<abs-path>` serves an
-        // extension's local files (path-restricted to `…/.dune/extensions/…`) to its sandboxed
-        // iframe. Without it, extension webview panels can't load their css/js/images.
-        .register_uri_scheme_protocol("dune-webview", |_app, request| {
-            webview_resource::serve(request.uri().path())
-        })
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::desktop_protocol,
             commands::desktop_invoke,
             commands::desktop_emit_tick,
         ])
-        .on_window_event(|window, event| {
-            if let WindowEvent::ThemeChanged(theme) = event {
+        .on_window_event(|window, event| match event {
+            WindowEvent::ThemeChanged(theme) => {
                 let theme = format!("{theme:?}").to_lowercase();
                 let _ = window.app_handle().emit(
                     "theme:changed",
                     serde_json::json!({ "theme": theme }),
                 );
             }
+            // Per-window lifecycle → let the app tear down that window's resources (ptys, sessions).
+            WindowEvent::CloseRequested { .. } => {
+                let _ = window.app_handle().emit(
+                    "window-close",
+                    serde_json::json!({ "label": window.label() }),
+                );
+            }
+            WindowEvent::Destroyed => {
+                let _ = window.app_handle().emit(
+                    "window-destroyed",
+                    serde_json::json!({ "label": window.label() }),
+                );
+            }
+            _ => {}
         })
         .setup(move |app| {
             let handle = app.handle().clone();
             local_invoke::set_app_handle(handle.clone());
             // Optional app-branding icon (RunConfig.icon) for the tray + macOS dock.
             let icon_path = app.state::<AppState>().config.lock().icon.clone();
+            // Optional custom deep-link scheme (RunConfig.deep_link_scheme), registered below.
+            let deep_link_scheme = app.state::<AppState>().config.lock().deep_link_scheme.clone();
 
             // macOS traffic-light chrome: install the relayout observers (idempotent, no-op elsewhere).
             #[cfg(all(feature = "platform-apple", target_os = "macos"))]
@@ -513,6 +545,12 @@ fn build_and_run(
 
             if plugins.deep_link {
                 use tauri_plugin_deep_link::DeepLinkExt;
+                // Register the app's custom scheme at runtime so the RUNNING instance handles
+                // `<scheme>://…` (dev + already-running). Packaged default-handler status still comes
+                // from the bundle Info.plist. Best-effort — a failure just means no deep links in dev.
+                if let Some(ref scheme) = deep_link_scheme {
+                    let _ = app.deep_link().register(scheme.as_str());
+                }
                 let dl = handle.clone();
                 app.deep_link().on_open_url(move |event| {
                     for url in event.urls() {
@@ -560,21 +598,13 @@ fn build_and_run(
                 let tray = tray_builder
                     .on_menu_event(move |app, event| {
                         let id = event.id().0.clone();
-                        if id == "tray:quit" || id == "quit" {
-                            app.exit(0);
-                            return;
-                        }
-                        // Map the item id to a { action, agentId } event for a hosted app's dynamic
-                        // menu: "action" → {action}, "action:arg" → {action, agentId:arg} (e.g.
-                        // "focus-agent:<id>"). Also keep the generic { id } event.
-                        let (action, agent) = match id.split_once(':') {
-                            Some((a, b)) => (a.to_string(), Some(b.to_string())),
-                            None => (id.clone(), None),
-                        };
-                        let _ = app
-                            .emit("tray-action", serde_json::json!({ "action": action, "agentId": agent }));
+                        // Generic: emit `tray:action` { id } and let the hosting app map ids to its
+                        // own actions (a dynamic menu set via tray.setMenu). Two conventional ids get
+                        // built-in behavior so the default tray works with no host wiring.
                         let _ = app.emit("tray:action", serde_json::json!({ "id": id }));
-                        if id == "tray:show" || action == "open" || action == "show" {
+                        if id == "tray:quit" {
+                            app.exit(0);
+                        } else if id == "tray:show" {
                             let _ = windows::focus(app, "main");
                         }
                     })
@@ -607,7 +637,7 @@ fn build_and_run(
         .map_err(|e| e.to_string())?
         .run(|app_handle, event| {
             // macOS: files/folders dropped on the running dock icon (or Finder "Open With") arrive
-            // as RunEvent::Opened — forward them to the webview as a `cli-open` invocation.
+            // as RunEvent::Opened — forward them to the webview as an `open-paths` event.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = &event {
                 let paths: Vec<String> = urls

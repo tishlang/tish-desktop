@@ -12,9 +12,10 @@
 //! composites over the button entirely. The cost is that the overlay no longer auto-follows the
 //! button's frame, so this module keeps each overlay aligned + on top via its own relayout observer.
 //!
-//! DRIVEN BY THE ACTIVE THEME: the frontend pushes `dune.titleBar.controlsColor{Close,Minimize,Zoom}`
-//! (+ optional `controlsDiameter` / `controlsOpacity`) via `set_traffic_light_tint`. A theme that
-//! sets none leaves the native buttons untouched. No-op off macOS.
+//! DRIVEN BY THE HOST: the webview pushes per-button close/minimize/zoom colors (+ optional
+//! diameter / opacity) via the generic `window.trafficLightTint` command. Sending none leaves the
+//! native buttons untouched. Where the host gets those colors (e.g. theme tokens) is its concern.
+//! No-op off macOS.
 //!
 //! SEPARATION CONTRACT: this file owns its own app handle, config, overlay class, per-button overlay
 //! map, and relayout observer. It shares NOTHING mutable with `traffic_lights.rs` (which owns button
@@ -63,7 +64,7 @@ struct TintIvars {
 
 define_class!(
     #[unsafe(super(NSView))]
-    #[name = "DuneTrafficTintView"]
+    #[name = "TishTrafficTintView"]
     #[thread_kind = MainThreadOnly]
     #[ivars = TintIvars]
     struct TintView;
@@ -237,7 +238,7 @@ thread_local! {
 
 define_class!(
     #[unsafe(super(NSObject))]
-    #[name = "DuneTrafficTintObserver"]
+    #[name = "TishTrafficTintObserver"]
     #[thread_kind = MainThreadOnly]
     #[ivars = ()]
     struct TintObserver;

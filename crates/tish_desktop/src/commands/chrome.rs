@@ -25,6 +25,7 @@ pub fn try_dispatch(
         "dialog.message" => dialog_message(app, state, args),
         "dock.badge" => dock_badge(app, args),
         "dock.badgeLabel" => dock_badge_label(app, args),
+        "dock.setIcon" => dock_set_icon(app, args),
         "window.title" => window_title(app, args),
         "window.titleBarStyle" => window_title_bar_style(app, args),
         "window.decorations" => window_decorations(app, args),
@@ -151,6 +152,29 @@ fn dock_badge_label(app: &AppHandle, args: &Value) -> Result<Value, String> {
     Ok(json!({ "ok": true, "label": next }))
 }
 
+/// `dock.setIcon({ path })` — change the macOS dock icon at runtime from a PNG (or any
+/// NSImage-readable) file. Dispatches to the main thread (AppKit requires it; broker handlers run
+/// off-main). A successful no-op on non-macOS. Generic: any app on tish-desktop can rebrand its dock
+/// icon on the fly (state/notification variants), complementing the startup `RunConfig.icon`.
+#[allow(unused_variables)]
+fn dock_set_icon(app: &AppHandle, args: &Value) -> Result<Value, String> {
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or("path required")?
+        .to_string();
+    #[cfg(all(feature = "platform-apple", target_os = "macos"))]
+    {
+        let handle = app.clone();
+        handle
+            .run_on_main_thread(move || crate::app_icon::set_dock_icon(&path))
+            .map_err(|e| e.to_string())?;
+        return Ok(json!({ "ok": true }));
+    }
+    #[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+    Ok(json!({ "ok": true, "unsupported": true }))
+}
+
 fn window_title(app: &AppHandle, args: &Value) -> Result<Value, String> {
     let win = window_for(app, args)?;
     let title = args
@@ -251,10 +275,10 @@ fn window_attention(app: &AppHandle, args: &Value) -> Result<Value, String> {
     Ok(json!({ "ok": true, "kind": kind }))
 }
 
-/// Rebuild the tray's context menu from a shell-supplied item list. Each item is
-/// `{ id, label, enabled? }` or `{ separator: true }`. Lets a hosted app own a dynamic tray (e.g.
-/// Dune IDE's Recent Agents menu) instead of the runtime's default. Item clicks fire through the
-/// tray's on_menu_event (set at build time), which emits `tray-action` { action, agentId }.
+/// Rebuild the tray's context menu from a host-supplied item list. Each item is
+/// `{ id, label, enabled? }` or `{ separator: true }`. Lets a hosted app own a dynamic tray menu
+/// instead of the runtime's default. Item clicks fire through the tray's on_menu_event (set at
+/// build time), which emits a generic `tray:action` { id } for the host to interpret.
 fn tray_set_menu(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, String> {
     if !state.has_permission("tray") {
         return Err("tray permission denied".into());

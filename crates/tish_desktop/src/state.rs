@@ -167,6 +167,17 @@ pub struct PlatformAttachConfig {
     pub apple: Option<AppleAttachConfig>,
 }
 
+/// One host-defined `<scheme>://localhost/<abs-path>` resource protocol (see `RunConfig::resource_protocols`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceProtocol {
+    /// URI scheme name, e.g. "app-assets" — served as `<scheme>://localhost/<abs-path>`.
+    pub scheme: String,
+    /// Trusted absolute-path substring (e.g. "/my-app/assets/"); only files whose decoded path
+    /// contains it (and have no `..`) are served. This is the entire allowlist for the scheme.
+    pub path_contains: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct RunConfig {
@@ -182,10 +193,21 @@ pub struct RunConfig {
     #[serde(default)]
     pub fs_root: Option<String>,
     /// Path to a PNG the app should use for its tray icon and (macOS) dock icon, overriding the
-    /// tish-desktop default. Lets a hosted app (e.g. Dune IDE) brand itself without rebuilding the
+    /// tish-desktop default. Lets a hosting app brand itself without rebuilding the
     /// runtime's bundled icons.
     #[serde(default)]
     pub icon: Option<String>,
+    /// A custom URI scheme the hosting app handles as a deep link, registered at runtime so
+    /// `<scheme>://…` opens route to `on_open_url` → the `deep-link` event. Packaged builds also
+    /// need the scheme in their OWN bundle Info.plist; this covers dev + the running-instance case.
+    #[serde(default)]
+    pub deep_link_scheme: Option<String>,
+    /// Custom `<scheme>://localhost/<abs-path>` resource protocols the hosting app registers to serve
+    /// its own local files to sandboxed webview iframes (e.g. an extension's assets). Each is
+    /// path-restricted to files whose absolute path contains `path_contains` (plus a `..` traversal
+    /// guard). Nothing app-specific lives in the runtime — the scheme + trusted segment come from here.
+    #[serde(default)]
+    pub resource_protocols: Vec<ResourceProtocol>,
     #[serde(default)]
     pub extensions: Vec<String>,
     #[serde(default, deserialize_with = "deserialize_opt_u64_from_number")]
