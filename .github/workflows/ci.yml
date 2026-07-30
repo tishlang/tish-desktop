@@ -34,16 +34,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      # The Cargo path-deps (../../../tish, ../../../tish-apple) resolve to SIBLINGS of
+      # $GITHUB_WORKSPACE. actions/checkout refuses any path outside the workspace, so
+      # clone the (public) sources directly to those sibling paths instead.
       - name: Checkout tish core (path dep)
-        uses: actions/checkout@v4
-        with:
-          repository: tishlang/tish
-          path: ../tish
+        run: git clone --depth 1 https://github.com/tishlang/tish.git ../tish
       - name: Checkout tish-apple (platform-apple path dep)
-        uses: actions/checkout@v4
-        with:
-          repository: tishlang/tish-apple
-          path: ../tish-apple
+        run: git clone --depth 1 https://github.com/tishlang/tish-apple.git ../tish-apple
       - name: Install local tish CLI
         run: cargo install --path ../tish/crates/tish --force --bin tish
       - name: Check (default features)
@@ -54,10 +51,7 @@ jobs:
         continue-on-error: true
       - name: Checkout tish-android (optional stub host)
         continue-on-error: true
-        uses: actions/checkout@v4
-        with:
-          repository: tishlang/tish-android
-          path: ../tish-android
+        run: git clone --depth 1 https://github.com/tishlang/tish-android.git ../tish-android
       - name: Check platform-android stub
         continue-on-error: true
         run: |
@@ -92,16 +86,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # Siblings of $GITHUB_WORKSPACE (see the rust job) — clone directly since
+      # actions/checkout can't write outside the workspace.
       - name: Checkout tish core
-        uses: actions/checkout@v4
-        with:
-          repository: tishlang/tish
-          path: ../tish
+        run: git clone --depth 1 https://github.com/tishlang/tish.git ../tish
       - name: Checkout tish-apple
-        uses: actions/checkout@v4
-        with:
-          repository: tishlang/tish-apple
-          path: ../tish-apple
+        run: git clone --depth 1 https://github.com/tishlang/tish-apple.git ../tish-apple
       - name: Check with platform-apple
         run: cargo check -p tish_desktop --features platform-apple -p tish_app
       - name: Install tish CLI + hybrid apple shell build (SC4)
