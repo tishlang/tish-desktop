@@ -40,17 +40,36 @@ pub async fn desktop_invoke(
     // fetched from the AppHandle (not taken as a command param) so no non-Send borrow crosses the
     // await and the command future stays Send.
     let is_handler = app.state::<AppState>().handlers.lock().contains_key(&cmd);
-    if is_handler {
-        let app = app.clone();
-        return tauri::async_runtime::spawn_blocking(move || {
-            let state = app.state::<AppState>();
-            dispatch(&app, state.inner(), &cmd, args)
+    // Diagnostic trace: a command that logs `→` but never `←` is the one hanging the boot (a `←`
+    // with a large ms is merely slow). Gated on DUNE_TRACE_INVOKE=1 so it's silent by default.
+    let trace = std::env::var("DUNE_TRACE_INVOKE").as_deref() == Ok("1");
+    if trace {
+        eprintln!("[desktop_invoke] → {cmd} (handler={is_handler})");
+    }
+    let started = std::time::Instant::now();
+    let out = if is_handler {
+        let app2 = app.clone();
+        let cmd2 = cmd.clone();
+        match tauri::async_runtime::spawn_blocking(move || {
+            let state = app2.state::<AppState>();
+            dispatch(&app2, state.inner(), &cmd2, args)
         })
         .await
-        .map_err(|e| format!("desktop_invoke worker failed: {e}"))?;
+        {
+            Ok(r) => r,
+            Err(e) => Err(format!("desktop_invoke worker failed: {e}")),
+        }
+    } else {
+        let state = app.state::<AppState>();
+        dispatch(&app, state.inner(), &cmd, args)
+    };
+    if trace {
+        eprintln!(
+            "[desktop_invoke] ← {cmd} ({}ms)",
+            started.elapsed().as_millis()
+        );
     }
-    let state = app.state::<AppState>();
-    dispatch(&app, state.inner(), &cmd, args)
+    out
 }
 
 /// Extra command modules, tried in order. Each returns `None` if it doesn't own `cmd`.

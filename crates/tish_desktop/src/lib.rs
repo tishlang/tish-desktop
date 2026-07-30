@@ -4,6 +4,7 @@
 //! UI talks over broker protocol `desktop/v1` via `desktop_invoke` / events.
 //! Shared microfrontend state is `state.*` (persisted KV remains `store.*`).
 
+mod app_open;
 mod broker;
 mod local_invoke;
 mod caps;
@@ -13,8 +14,11 @@ mod fs_sandbox;
 mod platform;
 mod state;
 mod value_util;
+mod webview_resource;
 mod windows;
 // macOS window-chrome (traffic-light inset + tint), ported from dune-ide. objc2, so apple+macos only.
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod app_icon;
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
 mod traffic_lights;
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
@@ -470,6 +474,12 @@ fn build_and_run(
     }
 
     builder
+        // Extension webview asset protocol: `dune-webview://localhost/<abs-path>` serves an
+        // extension's local files (path-restricted to `…/.dune/extensions/…`) to its sandboxed
+        // iframe. Without it, extension webview panels can't load their css/js/images.
+        .register_uri_scheme_protocol("dune-webview", |_app, request| {
+            webview_resource::serve(request.uri().path())
+        })
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::desktop_protocol,
@@ -488,12 +498,17 @@ fn build_and_run(
         .setup(move |app| {
             let handle = app.handle().clone();
             local_invoke::set_app_handle(handle.clone());
+            // Optional app-branding icon (RunConfig.icon) for the tray + macOS dock.
+            let icon_path = app.state::<AppState>().config.lock().icon.clone();
 
             // macOS traffic-light chrome: install the relayout observers (idempotent, no-op elsewhere).
             #[cfg(all(feature = "platform-apple", target_os = "macos"))]
             {
                 traffic_lights::init(&handle);
                 traffic_light_tint::init(&handle);
+                if let Some(ref p) = icon_path {
+                    app_icon::set_dock_icon_scheduled(&handle, p.clone());
+                }
             }
 
             if plugins.deep_link {
@@ -535,15 +550,31 @@ fn build_and_run(
                 let show_i = MenuItem::with_id(app, "tray:show", "Show", true, None::<&str>)?;
                 let quit_i = MenuItem::with_id(app, "tray:quit", "Quit", true, None::<&str>)?;
                 let tray_menu = Menu::with_items(app, &[&show_i, &quit_i])?;
-                let tray = TrayIconBuilder::new()
-                    .menu(&tray_menu)
-                    .tooltip("Tish Desktop")
+                let mut tray_builder = TrayIconBuilder::new().menu(&tray_menu).tooltip("Tish Desktop");
+                // Brand the menu-bar icon from RunConfig.icon (else the tray shows blank/default).
+                if let Some(ref p) = icon_path {
+                    if let Ok(img) = tauri::image::Image::from_path(p) {
+                        tray_builder = tray_builder.icon(img);
+                    }
+                }
+                let tray = tray_builder
                     .on_menu_event(move |app, event| {
                         let id = event.id().0.clone();
-                        let _ = app.emit("tray:action", serde_json::json!({ "id": id }));
-                        if id == "tray:quit" {
+                        if id == "tray:quit" || id == "quit" {
                             app.exit(0);
-                        } else if id == "tray:show" {
+                            return;
+                        }
+                        // Map the item id to a { action, agentId } event for a hosted app's dynamic
+                        // menu: "action" → {action}, "action:arg" → {action, agentId:arg} (e.g.
+                        // "focus-agent:<id>"). Also keep the generic { id } event.
+                        let (action, agent) = match id.split_once(':') {
+                            Some((a, b)) => (a.to_string(), Some(b.to_string())),
+                            None => (id.clone(), None),
+                        };
+                        let _ = app
+                            .emit("tray-action", serde_json::json!({ "action": action, "agentId": agent }));
+                        let _ = app.emit("tray:action", serde_json::json!({ "id": id }));
+                        if id == "tray:show" || action == "open" || action == "show" {
                             let _ = windows::focus(app, "main");
                         }
                     })
@@ -572,8 +603,26 @@ fn build_and_run(
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .map_err(|e| e.to_string())
+        .build(tauri::generate_context!())
+        .map_err(|e| e.to_string())?
+        .run(|app_handle, event| {
+            // macOS: files/folders dropped on the running dock icon (or Finder "Open With") arrive
+            // as RunEvent::Opened — forward them to the webview as a `cli-open` invocation.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                let paths: Vec<String> = urls
+                    .iter()
+                    .filter_map(|u| u.to_file_path().ok())
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .collect();
+                app_open::emit_open_paths(app_handle, &paths);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (app_handle, event);
+            }
+        });
+    Ok(())
 }
 
 /// Export module object for `tish:` npm-style packages (optional).

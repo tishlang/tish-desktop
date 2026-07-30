@@ -181,6 +181,11 @@ pub struct RunConfig {
     pub plugins: PluginFlags,
     #[serde(default)]
     pub fs_root: Option<String>,
+    /// Path to a PNG the app should use for its tray icon and (macOS) dock icon, overriding the
+    /// tish-desktop default. Lets a hosted app (e.g. Dune IDE) brand itself without rebuilding the
+    /// runtime's bundled icons.
+    #[serde(default)]
+    pub icon: Option<String>,
     #[serde(default)]
     pub extensions: Vec<String>,
     #[serde(default, deserialize_with = "deserialize_opt_u64_from_number")]
@@ -379,12 +384,21 @@ impl AppState {
         name: &str,
         args_json: serde_json::Value,
     ) -> Result<serde_json::Value, String> {
-        let handlers = self.handlers.lock();
-        let Some(f) = handlers.get(name) else {
-            return Err(format!("unknown command: {name}"));
+        // Clone the handler Arc OUT of the map and release the lock BEFORE running it. Handlers
+        // legitimately call brokerInvoke re-entrantly (e.g. appChrome's set_traffic_light_inset →
+        // window.trafficLightInset), which re-enters dispatch → handlers.lock(). Holding the lock
+        // across value_call would deadlock — parking_lot::Mutex is NOT re-entrant — and, because the
+        // wedged thread never releases it, every later desktop_invoke blocks at its is_handler check,
+        // freezing the whole backend (no themes / palette / extensions on boot).
+        let f = {
+            let handlers = self.handlers.lock();
+            match handlers.get(name) {
+                Some(f) => Arc::clone(f),
+                None => return Err(format!("unknown command: {name}")),
+            }
         };
         let arg = crate::value_util::json_to_value(&args_json);
-        let result = value_call(&Value::Function(Arc::clone(f)), &[arg]);
+        let result = value_call(&Value::Function(f), &[arg]);
         crate::value_util::value_to_json(&result)
             .ok_or_else(|| "handler returned non-JSON value".into())
     }
