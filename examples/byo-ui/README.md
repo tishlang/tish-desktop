@@ -3,7 +3,7 @@
 Classic desktop surface **without lattish**: shell + Tauri webview + plain DOM Tish UI.
 
 - Shared state: `stateSet` / `stateGet` / `state:changed`
-- Public imports: `cargo:tish_app`, `@tishlang/tish-app-api`
+- Public imports: `cargo:tishlang_app`, `@tishlang/tish-app-api`
 - See also [docs/HYBRID.md](../../docs/HYBRID.md) and [docs/LATTISH.md](../../docs/LATTISH.md)
 
 ```bash

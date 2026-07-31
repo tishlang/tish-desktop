@@ -1,7 +1,7 @@
 // Hybrid desktop — multi-window mode (v1): dual createSurface(webview).
 // SC4 native+webview: `src/main.apple.tish` via `npm run build:shell:apple` / `dev:hybrid`.
 // Canonical BYO API: imperative createSurface + run() — no NativeSurface/WebSurface JSX required.
-import { run, handle, createSurface, stateSet } from "cargo:tish_app"
+import { run, handle, createSurface, stateSet } from "cargo:tishlang_app"
 
 fn scoreDoc(wordCount: number, edits: number): number {
   return wordCount * 1.5 + edits * 0.25

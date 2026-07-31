@@ -8,7 +8,7 @@ This repo is the **tish-mode** monorepo. Published artifacts stay under the **ti
 |---------|---------|
 | npm CLI | `@tishlang/tish-desktop` (`npx mode`) |
 | npm libs | `@tishlang/tish-desktop-shared`, `@tishlang/tish-desktop-api`, `@tishlang/tish-app-api`, `@tishlang/tish-desktop-ui-theme` |
-| crates.io | `tish_broker`, `tish_desktop`, `tish_app` |
+| crates.io | `tishlang_broker`, `tishlang_desktop`, `tishlang_app` |
 
 ---
 
@@ -18,7 +18,7 @@ This repo is the **tish-mode** monorepo. Published artifacts stay under the **ti
 
 | Secret | Purpose |
 |--------|---------|
-| `CARGO_REGISTRY_TOKEN` | crates.io API token for `tish_broker` / `tish_desktop` / `tish_app` |
+| `CARGO_REGISTRY_TOKEN` | crates.io API token for `tishlang_broker` / `tishlang_desktop` / `tishlang_app` |
 
 npm uses **OIDC trusted publishing** (no `NPM_TOKEN`).
 
@@ -29,7 +29,7 @@ For each package, on npmjs.com → package → Settings → **Trusted Publisher*
 | Field | Value |
 |-------|-------|
 | Organization or user | `tishlang` |
-| Repository | `mode` |
+| Repository | `tish-desktop` |
 | Workflow filename | `npm-release.yml` |
 | Environment | *(blank)* |
 
@@ -41,7 +41,16 @@ Packages:
 - `@tishlang/tish-desktop-shared`
 - `@tishlang/tish-desktop-ui-theme`
 
-Create the packages on npm (empty publish or “Create package”) before the first OIDC publish if npm requires them to exist.
+#### First release: manual npm bootstrap
+
+A Trusted Publisher can only be configured for a package that **already exists** on npm, so the
+first publish of each package above is manual from a logged-in machine (`npm login`). Stage each
+package the same way `npm-release.yml` does — copy the directory, drop `private`, set `version` to
+the release version, rewrite intra-scope `file:` deps to that version, add `LICENSE` — then
+`npm publish --access public` in dependency order (shared → desktop-api → app-api → ui-theme → cli).
+
+Once the packages exist, configure the Trusted Publisher for each and every later release goes out
+through OIDC. The workflow skips versions already on npm, so it coexists with a manual bootstrap.
 
 ---
 
@@ -99,8 +108,8 @@ This runs the NPM and Crates.io release workflows. They run automatically; no fu
 ```bash
 npm view @tishlang/tish-desktop version
 npm view @tishlang/tish-desktop-api version
-cargo search tish_desktop
-# or: https://crates.io/crates/tish_desktop
+cargo search tishlang_desktop
+# or: https://crates.io/crates/tishlang_desktop
 ```
 
 Standalone smoke (no monorepo):
@@ -115,7 +124,7 @@ cd /tmp/td-smoke && npm install && npx mode doctor --platform macos --surface we
 ## Notes
 
 - **Monorepo vs registry:** local `cargo check` / `tish build` keep path deps on `tishlang_core` and sibling hosts. Release workflows rewrite to crates.io / npm versions. See [`crates/tish_desktop/README.md`](../crates/tish_desktop/README.md).
-- **`platform-apple` / ms / lin / android:** monorepo-only (sibling path deps). Published `tish_desktop` is the default Tauri webview host.
-- **Do not publish** `tish_desktop_sample_ext` (`publish = false`).
+- **`platform-apple` / ms / lin / android:** monorepo-only (sibling path deps). Published `tishlang_desktop` is the default Tauri webview host.
+- **Do not publish** `tishlang_desktop_sample_ext` (`publish = false`).
 - Root package name is **`tish-mode`** (`private: true`) — it is never published. Consumers use `@tishlang/tish-desktop*` packages.
 - App signing / store / updater workflows under `.github/workflows/release-*` are separate from crate/npm package publish.

@@ -6,7 +6,7 @@
   "tish": {
     "source": "./src/main.tish",
     "rustDependencies": {
-      "tish_desktop": "__PKG_VERSION__"
+      "tishlang_desktop": "__PKG_VERSION__"
     }
   },
   "scripts": {

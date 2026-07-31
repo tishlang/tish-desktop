@@ -4,7 +4,7 @@ Example and app code stay **Tish end-to-end**. Native/OS work lives in `crates/t
 
 | Layer | Allowed | Not allowed |
 |-------|---------|-------------|
-| Shell | `src/**/*.tish` + `cargo:tish_desktop` | Per-example `.rs`, inline Rust |
+| Shell | `src/**/*.tish` + `cargo:tishlang_desktop` | Per-example `.rs`, inline Rust |
 | UI | `ui/**/*.tish` + lattish + `@tishlang/tish-desktop*` | React/Vue/feature JS |
 | Styles | `build-css.tish` + tish-tailwind / ui-theme | Large hand-rolled CSS frameworks outside theme |
 | Host | `crates/tish_desktop` only | Copy-pasted Rust in `examples/*` |

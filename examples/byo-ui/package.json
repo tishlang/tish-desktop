@@ -6,7 +6,7 @@
   "tish": {
     "source": "./src/main.tish",
     "rustDependencies": {
-      "tish_app": { "path": "../../crates/tish_app" }
+      "tishlang_app": { "path": "../../crates/tish_app" }
     }
   },
   "scripts": {

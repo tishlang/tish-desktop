@@ -1,5 +1,5 @@
 // BYO UI example — no lattish. Typed shell helper + createSurface + state.*.
-import { run, handle, createSurface, stateSet } from "cargo:tish_app"
+import { run, handle, createSurface, stateSet } from "cargo:tishlang_app"
 
 fn greet(from: string): string {
   return "hello from typed shell, " + from

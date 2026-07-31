@@ -1,5 +1,5 @@
 use serde_json::json;
-use tish_broker::{invoke, GLOBAL_SHARED_STATE};
+use tishlang_broker::{invoke, GLOBAL_SHARED_STATE};
 
 #[test]
 fn state_set_get_roundtrip() {

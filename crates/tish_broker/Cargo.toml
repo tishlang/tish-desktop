@@ -1,5 +1,5 @@
 [package]
-name = "tish_broker"
+name = "tishlang_broker"
 version = "0.1.0"
 edition.workspace = true
 description = "Tauri-free BrokerCore — SharedState, surfaces, invoke dispatch (app hosts; not the Tish language)"

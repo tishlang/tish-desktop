@@ -1,4 +1,4 @@
-//! Sample Rust extension: `cargo:tish_desktop_sample_ext`
+//! Sample Rust extension: `cargo:tishlang_desktop_sample_ext`
 use std::sync::Arc;
 use tishlang_core::{ObjectMap, Value};
 

@@ -145,7 +145,7 @@ pub fn spawn_tick_loop(app: AppHandle, tick_ms: u64) {
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(0);
             if let Err(e) = desktop_emit_tick(app.clone(), ts) {
-                eprintln!("tish_desktop: tick emit failed: {e}");
+                eprintln!("tishlang_desktop: tick emit failed: {e}");
             }
         }
     });

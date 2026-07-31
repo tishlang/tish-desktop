@@ -72,7 +72,7 @@ Platform resolve: `import { Button } from "./Button"` → `Button.webview.tish` 
 Invoke routes through **`brokerInvoke`**; webview `state.set` hydrates the native pane.
 
 ```tish
-import { brokerInvoke } from "cargo:tish_app"
+import { brokerInvoke } from "cargo:tishlang_app"
 
 <webview
   id="wk-main"

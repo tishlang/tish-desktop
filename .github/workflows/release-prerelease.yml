@@ -77,7 +77,7 @@ jobs:
           **Promote to a full release** (Releases → Edit → uncheck pre-release) to publish:
 
           - npm: \`@tishlang/tish-desktop\`, \`tish-desktop-api\`, \`tish-app-api\`, \`tish-desktop-shared\`, \`tish-desktop-ui-theme\`
-          - crates.io: \`tish_broker\`, \`tish_desktop\`, \`tish_app\`
+          - crates.io: \`tishlang_broker\`, \`tishlang_desktop\`, \`tishlang_app\`
 
           See [docs/RELEASE.md](https://github.com/tishlang/tish-desktop/blob/main/docs/RELEASE.md).
           EOF

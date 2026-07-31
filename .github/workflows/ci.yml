@@ -69,7 +69,7 @@ jobs:
       - name: Install local tish CLI
         run: cargo install --path ../tish/crates/tish --force --bin tish
       - name: Check (default features)
-        run: cargo check -p tish_desktop -p tish_app
+        run: cargo check -p tishlang_desktop -p tishlang_app
       # platform-apple is NOT checked here. It pulls objc2, which is a hard
       # `compile_error!` off Apple targets, so the step could only ever be red-and-ignored.
       # The rust-macos job compile-checks that feature for real.
@@ -151,7 +151,7 @@ jobs:
             fi
           done
       - name: Check with platform-apple
-        run: cargo check -p tish_desktop --features platform-apple -p tish_app
+        run: cargo check -p tishlang_desktop --features platform-apple -p tishlang_app
       - name: Install tish CLI + hybrid apple shell build (SC4)
         run: |
           cargo install --path ../tish/crates/tish --force --bin tish

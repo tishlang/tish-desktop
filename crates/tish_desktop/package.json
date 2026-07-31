@@ -2,10 +2,10 @@
   "name": "tish-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Tauri 2 host module for Tish (tish:desktop / cargo:tish_desktop)",
+  "description": "Tauri 2 host module for Tish (tish:desktop / cargo:tishlang_desktop)",
   "tish": {
     "module": true,
-    "crate": "tish_desktop",
-    "export": "tish_desktop_object"
+    "crate": "tishlang_desktop",
+    "export": "tishlang_desktop_object"
   }
 }

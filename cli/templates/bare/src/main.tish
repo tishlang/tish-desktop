@@ -1,5 +1,5 @@
-// Bare template — no lattish. Prefer cargo:tish_app.
-import { run, handle, createSurface } from "cargo:tish_app"
+// Bare template — no lattish. Prefer cargo:tishlang_app.
+import { run, handle, createSurface } from "cargo:tishlang_app"
 
 fn greet(from: string): string {
   return "hello from shell Tish, " + from

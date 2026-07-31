@@ -1,6 +1,6 @@
 // SC4 hybrid: Native ‖ Webview + Tauri as outer host (desktop plugins).
 // Nested WK uses brokerInvoke → same CapProvider surface as Tauri webviews.
-import { run, handle, createSurface, stateSet } from "cargo:tish_app"
+import { run, handle, createSurface, stateSet } from "cargo:tishlang_app"
 import { Shell } from "../app/Shell"
 import { DEMO } from "../app/demo.tish"
 

@@ -1,8 +1,8 @@
 [package]
-name = "tish_app"
+name = "tishlang_app"
 version = "0.1.0"
 edition.workspace = true
-description = "cargo:tish_app — alias re-export of tish_desktop (cross-device app runtime)"
+description = "cargo:tishlang_app — alias re-export of tishlang_desktop (cross-device app runtime)"
 license-file.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -11,15 +11,15 @@ keywords = ["tish", "desktop", "app"]
 categories = ["gui", "development-tools"]
 
 [lib]
-name = "tish_app"
+name = "tishlang_app"
 crate-type = ["rlib"]
 
 [features]
 default = ["webview-tauri"]
-webview-tauri = ["tish_desktop/webview-tauri"]
-platform-apple = ["tish_desktop/platform-apple"]
-platform-ms = ["tish_desktop/platform-ms"]
-platform-lin = ["tish_desktop/platform-lin"]
+webview-tauri = ["tishlang_desktop/webview-tauri"]
+platform-apple = ["tishlang_desktop/platform-apple"]
+platform-ms = ["tishlang_desktop/platform-ms"]
+platform-lin = ["tishlang_desktop/platform-lin"]
 
 [dependencies]
-tish_desktop = { path = "../tish_desktop" }
+tishlang_desktop = { path = "../tish_desktop" }

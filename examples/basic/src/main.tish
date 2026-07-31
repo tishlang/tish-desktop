@@ -1,8 +1,8 @@
-// Basic example shell — Tish owns app logic; Tauri runs inside cargo:tish_desktop.
-import { run, handle, useExtensions, registerRustExtension, createWindow } from "cargo:tish_desktop"
-import { samplePing } from "cargo:tish_desktop_sample_ext"
+// Basic example shell — Tish owns app logic; Tauri runs inside cargo:tishlang_desktop.
+import { run, handle, useExtensions, registerRustExtension, createWindow } from "cargo:tishlang_desktop"
+import { samplePing } from "cargo:tishlang_desktop_sample_ext"
 
-registerRustExtension("tish_desktop_sample_ext")
+registerRustExtension("tishlang_desktop_sample_ext")
 useExtensions(["tish.ext.sample-ping"])
 
 handle("app.hello", (args) => {

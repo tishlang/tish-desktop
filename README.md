@@ -1,6 +1,6 @@
 # tish-desktop
 
-Cross-device **Tish app runtime** (umbrella): shell Tish + BrokerCore (`state.*` / `desktop/v1`) + Tauri desktop webviews. **Lattish is optional** — use BYO UI or `init --template bare`. Apple native stays on **tish-apple**. Public shell entry: `cargo:tish_app` (alias of `cargo:tish_desktop`).
+Cross-device **Tish app runtime** (umbrella): shell Tish + BrokerCore (`state.*` / `desktop/v1`) + Tauri desktop webviews. **Lattish is optional** — use BYO UI or `init --template bare`. Apple native stays on **tish-apple**. Public shell entry: `cargo:tishlang_app` (alias of `cargo:tishlang_desktop`).
 
 This GitHub repo is the **tish-mode** monorepo. Outside the monorepo, install the published **tish-desktop** packages — you do not need sibling checkouts.
 
@@ -23,7 +23,7 @@ npx mode build
 
 ```bash
 # From this repo (path deps on sibling tish / lattish / …)
-cargo check -p tish_desktop
+cargo check -p tishlang_desktop
 
 node cli/bin/mode.js help
 node cli/bin/mode.js init my-app
@@ -55,8 +55,8 @@ Install the CLI via npm (`npx @tishlang/tish-desktop` / `npm i -g @tishlang/tish
 
 | Path | Role |
 |------|------|
-| `crates/tish_desktop` | `cargo:tish_desktop` host + BrokerCore + caps |
-| `crates/tish_app` | `cargo:tish_app` alias re-export |
+| `crates/tish_desktop` | `cargo:tishlang_desktop` host + BrokerCore + caps |
+| `crates/tish_app` | `cargo:tishlang_app` alias re-export |
 | `crates/tish_broker` | Standalone BrokerCore (published) |
 | `crates/tish_desktop_sample_ext` | Private sample Rust extension (not published) |
 | `cli/` | `@tishlang/tish-desktop` — `init\|dev\|build\|info\|icon\|distribute` |

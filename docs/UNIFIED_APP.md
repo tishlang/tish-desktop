@@ -1,6 +1,6 @@
 # Cross-device Tish app runtime
 
-Umbrella repo: **tish-desktop**. Public shell entry: `cargo:tish_app` (alias of `cargo:tish_desktop`).
+Umbrella repo: **tish-desktop**. Public shell entry: `cargo:tishlang_app` (alias of `cargo:tishlang_desktop`).
 
 ## Layers
 
@@ -54,7 +54,7 @@ App code calls `invoke("notification.show", …)`. Desktop CapProviders wrap `no
 { "ok": false, "code": "unsupported", "capability": "tray", "platform": "web", "message": "…" }
 ```
 
-**iOS profile:** BrokerCore is linked via `tish-ios` — no Tauri. Hosts may path-depend on the `tish_broker` crate only, not on `tish_desktop`.
+**iOS profile:** BrokerCore is linked via `tish-ios` — no Tauri. Hosts may path-depend on the `tishlang_broker` crate only, not on `tishlang_desktop`.
 
 ## Pure web entry
 

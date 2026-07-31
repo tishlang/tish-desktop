@@ -13,7 +13,7 @@ Most resolve / attach / WK / broker items from the unified host plan are **lande
 | Apple UNUserNotificationCenter | tish-apple | Landed | `macos.notification*` + desktop `local_invoke` |
 | SC4 hybrid native+webview | tish-desktop | Landed | `examples/hybrid` `dev:hybrid` / `build:shell:apple` |
 | Tauri-free BrokerCore | tish-desktop `crates/tish_broker` | Landed | Hosts path-dep the crate only |
-| iOS broker profile | tish_broker + tish-apple | Landed | demo in `examples/hello-ios` |
+| iOS broker profile | tishlang_broker + tish-apple | Landed | demo in `examples/hello-ios` |
 | iOS CLI sim launch | tish-desktop | Landed | `mode ios` |
 | Broker `webview.*` ↔ WK | tish-desktop + tish-apple | Landed | load/postMessage/list/eval |
 | ms/lin / android attach stubs | sibling hosts | Landed | stubs; not full product hosts |
