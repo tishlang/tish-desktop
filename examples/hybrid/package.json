@@ -8,7 +8,7 @@
     "platform": "macos",
     "surface": "webview",
     "rustDependencies": {
-      "tish_app": { "path": "../../crates/tish_app" }
+      "tishlang_app": { "path": "../../crates/tish_app" }
     }
   },
   "scripts": {

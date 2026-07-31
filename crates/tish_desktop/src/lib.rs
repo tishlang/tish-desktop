@@ -1,4 +1,4 @@
-//! `cargo:tish_desktop` / `cargo:tish_app` — cross-device app runtime host.
+//! `cargo:tishlang_desktop` / `cargo:tishlang_app` — cross-device app runtime host.
 //!
 //! Shell Tish configures handlers/surfaces then calls `run(config)`.
 //! UI talks over broker protocol `desktop/v1` via `desktop_invoke` / events.
@@ -287,7 +287,7 @@ pub fn run(args: &[Value]) -> Value {
         Some(v) => match serde_json::from_value::<RunConfig>(v.clone()) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("tish_desktop: run config parse failed ({e}); using defaults + fallbacks");
+                eprintln!("tishlang_desktop: run config parse failed ({e}); using defaults + fallbacks");
                 RunConfig::default()
             }
         },
@@ -361,10 +361,10 @@ pub fn run(args: &[Value]) -> Value {
     let handlers = PENDING_HANDLERS.lock().clone();
     let tick_ms = config.tick_ms.unwrap_or(0);
     if tick_ms > 0 {
-        eprintln!("tish_desktop: tick loop interval {tick_ms}ms");
+        eprintln!("tishlang_desktop: tick loop interval {tick_ms}ms");
     }
     if let Some(profile) = config.profile.as_deref() {
-        eprintln!("tish_desktop: run profile={profile}");
+        eprintln!("tishlang_desktop: run profile={profile}");
     }
     let plugins = config.plugins.clone();
     let window_specs = config.windows.clone();
@@ -382,7 +382,7 @@ pub fn run(args: &[Value]) -> Value {
             a.auto_run_event_loop
         };
         eprintln!(
-            "tish_desktop: platformAttach.apple outerHost={} autoRunEventLoop={} pureNative={} attachingNativeRoots={}",
+            "tishlang_desktop: platformAttach.apple outerHost={} autoRunEventLoop={} pureNative={} attachingNativeRoots={}",
             outer_host,
             auto_run,
             pure_native_apple,
@@ -397,13 +397,13 @@ pub fn run(args: &[Value]) -> Value {
         });
         for (id, root) in roots {
             match host.attach_native(&root, &opts) {
-                Ok(v) => eprintln!("tish_desktop: attached native surface id={id} → {v}"),
-                Err(e) => eprintln!("tish_desktop: attach native id={id} failed: {e}"),
+                Ok(v) => eprintln!("tishlang_desktop: attached native surface id={id} → {v}"),
+                Err(e) => eprintln!("tishlang_desktop: attach native id={id} failed: {e}"),
             }
         }
         if pure_native_apple {
             // attach_native blocked in NSApplication.run when autoRunEventLoop=true.
-            eprintln!("tish_desktop: pure native AppKit event loop exited");
+            eprintln!("tishlang_desktop: pure native AppKit event loop exited");
             return Value::Null;
         }
     }
@@ -417,7 +417,7 @@ pub fn run(args: &[Value]) -> Value {
     match result {
         Ok(()) => Value::Null,
         Err(e) => {
-            eprintln!("tish_desktop run error: {e}");
+            eprintln!("tishlang_desktop run error: {e}");
             err_str(e)
         }
     }
@@ -656,7 +656,7 @@ fn build_and_run(
 }
 
 /// Export module object for `tish:` npm-style packages (optional).
-pub fn tish_desktop_object() -> Value {
+pub fn tishlang_desktop_object() -> Value {
     use tishlang_core::ObjectMap;
     let mut m = ObjectMap::default();
     m.insert(Arc::from("run"), Value::native(run));

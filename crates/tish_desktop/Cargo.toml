@@ -1,8 +1,8 @@
 [package]
-name = "tish_desktop"
+name = "tishlang_desktop"
 version = "0.1.0"
 edition.workspace = true
-description = "cargo:tish_desktop / cargo:tish_app — cross-device Tish app runtime (Tauri desktop + platform adapters)"
+description = "cargo:tishlang_desktop / cargo:tishlang_app — cross-device Tish app runtime (Tauri desktop + platform adapters)"
 license-file.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -11,7 +11,7 @@ keywords = ["tish", "tauri", "desktop", "webview"]
 categories = ["gui", "development-tools"]
 
 [lib]
-name = "tish_desktop"
+name = "tishlang_desktop"
 crate-type = ["rlib"]
 
 [[bin]]
@@ -41,7 +41,7 @@ tauri-build = { version = "2", features = [] }
 # published tishlang_core the CLI was built against (ecosystem 3.0.x today —
 # crates-release.yml rewrites this automatically).
 tishlang_core = { path = "../../../tish/crates/tish_core", features = ["send-values"] }
-tish_broker = { path = "../tish_broker" }
+tishlang_broker = { path = "../tish_broker" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon", "devtools", "image-png"] }

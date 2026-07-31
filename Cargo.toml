@@ -13,7 +13,7 @@ license-file = "LICENSE"
 repository = "https://github.com/tishlang/tish-desktop"
 homepage = "https://tishlang.com"
 
-# Note: tish_desktop uses a path dep on tishlang_core so `tish build` shares one
+# Note: tishlang_desktop uses a path dep on tishlang_core so `tish build` shares one
 # Value type with the CLI. When publishing, temporarily use a versioned crates.io
 # dep matching the CLI release train; do not mix path + crates.io Value types.
 # Sibling host path deps (tish-apple / tish-ms / …) are monorepo-only — stripped

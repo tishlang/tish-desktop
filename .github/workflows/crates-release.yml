@@ -1,4 +1,4 @@
-# Publish tish_broker → tish_desktop → tish_app to crates.io when a GitHub
+# Publish tishlang_broker → tishlang_desktop → tishlang_app to crates.io when a GitHub
 # release is promoted from prerelease to full release. Mirrors
 # tish/.github/workflows/crates-release.yml.
 #
@@ -30,7 +30,7 @@ on:
       tish_apple_version:
         description: "crates.io tishlang_macos (tish-apple) version (semver req)"
         required: false
-        default: "3.0"
+        default: "1.0"
         type: string
 
 permissions:
@@ -46,7 +46,8 @@ jobs:
       # Pin must match the published tish CLI / ecosystem train.
       TISHLANG_CORE_VERSION: ${{ inputs.tishlang_core_version || '3.0' }}
       # tishlang_macos (platform-apple) published version from tishlang/tish-apple.
-      TISH_APPLE_VERSION: ${{ inputs.tish_apple_version || '3.0' }}
+      # tish-apple versions on its OWN line (1.x) — it does not track the core tish train.
+      TISH_APPLE_VERSION: ${{ inputs.tish_apple_version || '1.0' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,9 +65,12 @@ jobs:
           CORE="${TISHLANG_CORE_VERSION}"
           APPLE="${TISH_APPLE_VERSION}"
 
-          for crate in tish_broker tish_desktop tish_app; do
-            sed -i.bak "s/^version = .*/version = \"$VERSION\"/" "crates/$crate/Cargo.toml"
-            rm -f "crates/$crate/Cargo.toml.bak"
+          # NOTE: crate names are tishlang_*, but the directories under crates/ keep their
+          # original tish_* spelling (same split as tish-apple: tishlang_macos in crates/tish-macos).
+          # Iterate DIRECTORIES here, not crate names.
+          for dir in tish_broker tish_desktop tish_app; do
+            sed -i.bak "s/^version = .*/version = \"$VERSION\"/" "crates/$dir/Cargo.toml"
+            rm -f "crates/$dir/Cargo.toml.bak"
           done
 
           # Path dep → versioned crates.io (cargo publish rejects path deps).
@@ -74,9 +78,9 @@ jobs:
             crates/tish_desktop/Cargo.toml
 
           # Workspace path → versioned (publish order: broker → desktop → app).
-          perl -i -0pe "s/tish_broker = \\{ path = \"[^\"]+\" \\}/tish_broker = { version = \"$VERSION\" }/s" \
+          perl -i -0pe "s/tishlang_broker = \\{ path = \"[^\"]+\" \\}/tishlang_broker = { version = \"$VERSION\" }/s" \
             crates/tish_desktop/Cargo.toml
-          perl -i -0pe "s/tish_desktop = \\{ path = \"[^\"]+\" \\}/tish_desktop = { version = \"$VERSION\" }/s" \
+          perl -i -0pe "s/tishlang_desktop = \\{ path = \"[^\"]+\" \\}/tishlang_desktop = { version = \"$VERSION\" }/s" \
             crates/tish_app/Cargo.toml
 
           # macOS host (platform-apple): keep the feature + dep, but point tishlang_macos at the
@@ -113,8 +117,8 @@ jobs:
           print(p.read_text())
           PY
 
-          # Mirror feature strip on tish_app alias crate (platform-apple kept — forwards to
-          # tish_desktop/platform-apple, which is now published).
+          # Mirror feature strip on tishlang_app alias crate (platform-apple kept — forwards to
+          # tishlang_desktop/platform-apple, which is now published).
           python3 <<'PY'
           from pathlib import Path
           import re
@@ -129,7 +133,7 @@ jobs:
           p.write_text(text)
           PY
 
-          grep -E '^(version|name) =|tishlang_core|tish_broker|tish_desktop' \
+          grep -E '^(version|name) =|tishlang_core|tishlang_broker|tishlang_desktop' \
             crates/tish_broker/Cargo.toml \
             crates/tish_desktop/Cargo.toml \
             crates/tish_app/Cargo.toml
@@ -138,7 +142,7 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           VERSION="${TAG#v}"
-          CRATES=(tish_broker tish_desktop tish_app)
+          CRATES=(tishlang_broker tishlang_desktop tishlang_app)
           UA="tish-desktop-release/1.0 (https://github.com/tishlang/tish-desktop)"
 
           # Drift guard: every publishable workspace crate MUST be listed above.
@@ -193,18 +197,18 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           VERSION="${TAG#v}"
-          CRATES_URL="https://crates.io/crates/tish_desktop/${VERSION}"
+          CRATES_URL="https://crates.io/crates/tishlang_desktop/${VERSION}"
           RELEASE_ID="${{ github.event.release.id }}"
           REPO="${{ github.repository }}"
           CURRENT_BODY=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
             "https://api.github.com/repos/${REPO}/releases/${RELEASE_ID}" | jq -r '.body // ""')
-          if printf '%s' "$CURRENT_BODY" | grep -q "crates.io/crates/tish_desktop"; then
+          if printf '%s' "$CURRENT_BODY" | grep -q "crates.io/crates/tishlang_desktop"; then
             echo "Release body already has crates.io link"
           else
             NEW_BODY="${CURRENT_BODY}
 
           ---
-          Published to crates.io: ${CRATES_URL} (also tish_broker, tish_app)"
+          Published to crates.io: ${CRATES_URL} (also tishlang_broker, tishlang_app)"
             curl -s -X PATCH \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \

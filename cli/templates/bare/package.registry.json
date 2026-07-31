@@ -8,7 +8,7 @@
     "platform": "macos",
     "surface": "webview",
     "rustDependencies": {
-      "tish_app": "__PKG_VERSION__"
+      "tishlang_app": "__PKG_VERSION__"
     }
   },
   "scripts": {

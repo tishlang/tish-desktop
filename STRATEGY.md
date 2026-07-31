@@ -1,6 +1,6 @@
 # Tish Desktop Strategy
 
-Cross-device **Tish app runtime** (repo name stays tish-desktop). Shell Tish owns application logic; **Tauri 2** owns the desktop webview event loop inside `cargo:tish_app` / `cargo:tish_desktop`. **Lattish is optional** — core is UI-kit agnostic. Surfaces (native / webview / web) sync via BrokerCore (`state.*` + `desktop/v1`). Apple native + iOS stay on **tish-apple**.
+Cross-device **Tish app runtime** (repo name stays tish-desktop). Shell Tish owns application logic; **Tauri 2** owns the desktop webview event loop inside `cargo:tishlang_app` / `cargo:tishlang_desktop`. **Lattish is optional** — core is UI-kit agnostic. Surfaces (native / webview / web) sync via BrokerCore (`state.*` + `desktop/v1`). Apple native + iOS stay on **tish-apple**.
 
 See [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md), [docs/UPSTREAM.md](./docs/UPSTREAM.md), [docs/TISH_FIRST_DX.md](./docs/TISH_FIRST_DX.md).
 
@@ -16,7 +16,7 @@ See [docs/UNIFIED_APP.md](./docs/UNIFIED_APP.md), [docs/UPSTREAM.md](./docs/UPST
 
 ## Dual entrypoints
 
-- **Shell:** `tish build --target native --native-backend rust` — may import `cargo:tish_desktop`
+- **Shell:** `tish build --target native --native-backend rust` — may import `cargo:tishlang_desktop`
 - **UI:** Vite + `@tishlang/vite-plugin-tish` — pure Tish + lattish; talks via `window.__TISH_DESKTOP__`
 - **Shared:** `packages/shared` — no native imports
 - **CLI:** `@tishlang/tish-desktop` (`mode init|dev|build|info|icon|distribute`) — product DX, not example app code
@@ -128,7 +128,7 @@ Wired when flags are true: `dialog`, `tray-icon`, `menu`, `deep-link`, `opener`,
 
 ## Public crate + CLI
 
-- **`tish_desktop`** — publishable library (`repository` / `readme` metadata). Locally depends on **path** `tishlang_core` so `tish build` shares one `Value` type with the CLI. Crates.io publish rewrites to a versioned dep in [`.github/workflows/crates-release.yml`](./.github/workflows/crates-release.yml) — see [`docs/RELEASE.md`](./docs/RELEASE.md). Sample ext stays `publish = false`.
+- **`tishlang_desktop`** — publishable library (`repository` / `readme` metadata). Locally depends on **path** `tishlang_core` so `tish build` shares one `Value` type with the CLI. Crates.io publish rewrites to a versioned dep in [`.github/workflows/crates-release.yml`](./.github/workflows/crates-release.yml) — see [`docs/RELEASE.md`](./docs/RELEASE.md). Sample ext stays `publish = false`.
 - **`mode` bin** — thin launcher → PATH / `TISH_DESKTOP_CLI` / `npx @tishlang/tish-desktop`
 - **`@tishlang/tish-desktop`** (+ `desktop-api` / `shared` / `ui-theme`) — npm OIDC publish via [`.github/workflows/npm-release.yml`](./.github/workflows/npm-release.yml)
 
@@ -145,7 +145,7 @@ Wired when flags are true: `dialog`, `tray-icon`, `menu`, `deep-link`, `opener`,
 ## Extensions
 
 - **Tish:** `package.json` → `tish.desktop` manifest
-- **Rust:** Tauri plugins and/or `cargo:` Value-ABI (`tish_desktop_sample_ext` private)
+- **Rust:** Tauri plugins and/or `cargo:` Value-ABI (`tishlang_desktop_sample_ext` private)
 - Registry: `useExtensions` / `registerRustExtension`; namespaced commands; permission gate
 
 ## Security (MVP)

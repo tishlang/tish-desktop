@@ -19,7 +19,7 @@ Owners: [UPSTREAM.md](./UPSTREAM.md) · open gaps: [UPSTREAM_OPEN.md](./UPSTREAM
 | Target | Repo / crate | Entry | Maturity |
 |--------|--------------|-------|----------|
 | Web (browser) | `mode` `@tishlang/tish-desktop-api` `web-bridge.js` | Vite + `--surface web` | **full** (subset caps) |
-| Desktop webview | `tish_desktop` / `tish_app` + Tauri | `cargo:tish_app` `run()` | **full** |
+| Desktop webview | `tishlang_desktop` / `tishlang_app` + Tauri | `cargo:tishlang_app` `run()` | **full** |
 | macOS native | `tish-apple` `tish-macos` | `macos.run` / `macos.attach` | **full** |
 | iOS native | `tish-apple` `tish-ios` | `ios.run` + staticlib | **partial** (vs AppKit) |
 | Windows native | `tish-ms` | `attach_native` | **stub** (window + notify) |
@@ -40,8 +40,8 @@ Desktop Tauri covers macOS / Windows / Linux **webview** shells. Native attach o
 | `@tishlang/tish-desktop-ui-theme` | Optional DOM UI | full | full | n/a | n/a | n/a | n/a |
 | `@tishlang/lattish` | Optional React-like UI | full | full | optional | — | optional | planned |
 | `@tishlang/lattish/adapters/rn` | RN-ish tags → DOM | full | full | **not** native | — | **not** native | missing |
-| `cargo:tish_app` / `tish_desktop` | Shell + BrokerCore | — | full | attach | attach stub | — | attach stub |
-| `tish_broker` | Tauri-free `state.*` | via JS | full | full | full | full | planned |
+| `cargo:tishlang_app` / `tishlang_desktop` | Shell + BrokerCore | — | full | attach | attach stub | — | attach stub |
+| `tishlang_broker` | Tauri-free `state.*` | via JS | full | full | full | full | planned |
 | `tish:macos` | AppKit host | — | — | full | — | — | — |
 | `tish:ios` | UIKit host + broker | — | — | — | — | full | — |
 | `tish-ms` / `tish-lin` / `tish-android` | Sibling native hosts | — | — | — | stub | — | stub |
@@ -176,7 +176,7 @@ Win/lin/android native hosts have **no** JSX tag table yet (stub window only).
 |---------|--------|-------------|
 | Desktop Tauri webview | `window.__TISH_APP__` (`bridge.js`) | IPC → handlers → `state.*` → CapProviders |
 | macOS WK | `__TISH_APP__` (`bridge={true}`) | `onBridgeInvoke` → `brokerInvoke` / handlers |
-| iOS WK | same bootstrap | `onBridgeInvoke` → `invoke` → `tish_broker` |
+| iOS WK | same bootstrap | `onBridgeInvoke` → `invoke` → `tishlang_broker` |
 | Pure web | `web-bridge.js` | in-memory `state.*` + Notification stub |
 
 Protocol string: `desktop/v1` (kept for client reuse across hosts).

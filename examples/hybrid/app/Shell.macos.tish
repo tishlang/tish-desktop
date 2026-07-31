@@ -1,6 +1,6 @@
 // SC4 shell root: Native ‖ Webview + Tauri plugin demos via brokerInvoke.
 import { useState } from "tish:macos"
-import { brokerInvoke, stateSet, stateGet } from "cargo:tish_app"
+import { brokerInvoke, stateSet, stateGet } from "cargo:tishlang_app"
 import { NativePane } from "./NativePane"
 import { DEMO, DEMO_HINT } from "./demo.tish"
 

@@ -1,5 +1,5 @@
 // File browser shell — sandboxed FS root = ./fixture (run from example cwd).
-import { run, useExtensions, createWindow } from "cargo:tish_desktop"
+import { run, useExtensions, createWindow } from "cargo:tishlang_desktop"
 
 useExtensions(["tish.ext.file-browser"])
 

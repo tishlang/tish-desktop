@@ -1,0 +1,67 @@
+name: Checkout tish path-dep siblings
+description: >
+  Clone tishlang/tish and tishlang/tish-apple as siblings of $GITHUB_WORKSPACE and stub the
+  platform hosts that have no public repo, so Cargo can resolve this workspace. Shared by the
+  rust and rust-macos jobs, which previously carried two drifting copies of this logic.
+
+inputs:
+  head-ref:
+    description: >
+      PR head branch. When a sibling has a branch of the same name it is used instead of the
+      default branch, so a change spanning repos can go green in both.
+    required: false
+    default: ""
+
+outputs:
+  tish-sha:
+    description: Commit SHA of the tish checkout — cache key for its target directory.
+    value: ${{ steps.clone.outputs.tish-sha }}
+
+runs:
+  using: composite
+  steps:
+    # The Cargo path-deps (../../../tish, ../../../tish-apple) resolve to SIBLINGS of
+    # $GITHUB_WORKSPACE. actions/checkout refuses any path outside the workspace, so clone
+    # the (public) sources directly to those sibling paths instead.
+    #
+    # A change that spans repos (a crate rename, an ABI bump) would otherwise deadlock: this
+    # PR needs the sibling's matching branch and the sibling's PR needs this one, so both sit
+    # red until someone merges blind. Ordinary PRs have no matching branch and fall back to
+    # the default branch.
+    - name: Clone tish + tish-apple
+      id: clone
+      shell: bash
+      env:
+        HEAD_REF: ${{ inputs.head-ref }}
+      run: |
+        set -euo pipefail
+        clone_sibling() {
+          repo="$1"
+          url="https://github.com/tishlang/$repo.git"
+          if [ -n "${HEAD_REF:-}" ] && git ls-remote --exit-code --heads "$url" "$HEAD_REF" >/dev/null 2>&1; then
+            echo ">> $repo: coordinated branch $HEAD_REF"
+            git clone --depth 1 --branch "$HEAD_REF" "$url" "../$repo"
+          else
+            echo ">> $repo: default branch"
+            git clone --depth 1 "$url" "../$repo"
+          fi
+        }
+        clone_sibling tish
+        clone_sibling tish-apple
+        echo "tish-sha=$(git -C ../tish rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+    - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
+      # These optional platform-host crates have no public repo yet, but Cargo must read every
+      # path-dep manifest to resolve the workspace. Write empty stub crates so resolution
+      # succeeds; their features stay OFF, so the stubs never compile.
+      shell: bash
+      run: |
+        set -euo pipefail
+        for c in tish-ms tish-lin tish-android; do
+          d="../$c/crates/$c"
+          if [ ! -f "$d/Cargo.toml" ]; then
+            mkdir -p "$d/src"
+            printf '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2021"\n' "$c" > "$d/Cargo.toml"
+            : > "$d/src/lib.rs"
+          fi
+        done

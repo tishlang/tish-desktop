@@ -1,10 +1,10 @@
-//! BrokerCore — re-exports Tauri-free core from `tish_broker` plus desktop transports.
+//! BrokerCore — re-exports Tauri-free core from `tishlang_broker` plus desktop transports.
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
-pub use tish_broker::{
+pub use tishlang_broker::{
     unsupported, unsupported_on, SharedState, SurfaceInfo, SurfaceKind, SurfaceRegistry,
     GLOBAL_SHARED_STATE, GLOBAL_SURFACES,
 };
@@ -13,7 +13,7 @@ pub use tish_broker::{
 pub fn emit_state_changed(app: &AppHandle, path: &str, value: &Value, revision: u64, source: &str) {
     let _ = app.emit(
         "state:changed",
-        tish_broker::state_changed_payload(path, value, revision, source),
+        tishlang_broker::state_changed_payload(path, value, revision, source),
     );
 }
 

@@ -1,5 +1,5 @@
 // Native chrome demo — full broker surface for OS chrome + advanced APIs.
-import { run, createWindow } from "cargo:tish_desktop"
+import { run, createWindow } from "cargo:tishlang_desktop"
 
 createWindow({
   label: "main",

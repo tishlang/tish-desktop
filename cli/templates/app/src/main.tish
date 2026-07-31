@@ -1,5 +1,5 @@
-// Minimal Tish Desktop shell — Tauri runs inside cargo:tish_desktop.
-import { run, handle, createWindow } from "cargo:tish_desktop"
+// Minimal Tish Desktop shell — Tauri runs inside cargo:tishlang_desktop.
+import { run, handle, createWindow } from "cargo:tishlang_desktop"
 
 handle("app.hello", (args) => {
   return { ok: true, message: "hello from shell Tish", args: args }
