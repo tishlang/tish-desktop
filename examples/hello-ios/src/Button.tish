@@ -1,0 +1,13 @@
+// Universal fallback — prefer Button.ios.tish under --platform ios.
+
+export fn Button(props) {
+  let label = props.label !== null ? props.label : "Button"
+  let onPress = props.onPress
+  return (
+    <button onClick={() => {
+      if (onPress) {
+        onPress()
+      }
+    }}>{label}</button>
+  )
+}

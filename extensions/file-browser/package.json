@@ -1,5 +1,5 @@
 {
-  "name": "@tish-desktop/ext-file-browser",
+  "name": "@tishlang/tish-desktop-ext-file-browser",
   "version": "0.1.0",
   "private": true,
   "tish": {

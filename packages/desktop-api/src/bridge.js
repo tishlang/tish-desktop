@@ -1,15 +1,40 @@
 /**
- * Injects window.__TISH_DESKTOP__ using Tauri's global API (withGlobalTauri).
+ * Injects window.__TISH_APP__ (and compat __TISH_DESKTOP__).
  * Rebind-safe for Vite HMR — call installBridge() from UI boot and hot.accept.
+ *
+ * Prefer an existing **host** bridge (tish-macos / tish-ios WK bootstrap with
+ * `webkit.messageHandlers.tish` + `__dispatch`) over the Tauri transport. Nested
+ * `<webview bridge>` pages load this module after document-start injection; overwriting
+ * with Tauri broke `state:changed` sync and `invoke` in hybrid SC4.
  */
 export function installBridge() {
   const g = typeof window !== "undefined" ? window : globalThis;
+
+  const existing = g.__TISH_APP__ || g.__TISH_DESKTOP__;
+  const hostWk =
+    typeof g.webkit !== "undefined" &&
+    g.webkit?.messageHandlers?.tish != null;
+  // Nested host WK (tish-macos/ios bootstrap): never replace with Tauri.
+  // Bootstrap has `__dispatch` for broker → pane events (`state:changed`).
+  if (hostWk) {
+    if (existing && typeof existing.__dispatch === "function") {
+      g.__TISH_APP__ = existing;
+      g.__TISH_DESKTOP__ = existing;
+      return existing;
+    }
+    console.warn(
+      "[tish-app] WK host bridge present but __dispatch missing — skip Tauri install (reload if sync is broken)"
+    );
+    if (existing) return existing;
+  }
+
   if (!g.__TAURI__?.core?.invoke) {
-    console.warn("[tish-desktop] Tauri core.invoke not available yet");
+    console.warn("[tish-app] Tauri core.invoke not available yet");
   }
 
   const api = {
     protocol: "desktop/v1",
+    surface: "webview",
     getCurrentWindowLabel() {
       try {
         return g.__TAURI__?.webviewWindow?.getCurrentWebviewWindow?.()?.label ?? "main";
@@ -25,7 +50,6 @@ export function installBridge() {
       return core.invoke("desktop_invoke", { cmd, args });
     },
     async listen(eventName, handler) {
-      // Resolve __TAURI__ at call time — withGlobalTauri may not be ready at boot.
       const event = g.__TAURI__?.event;
       if (!event?.listen) {
         throw new Error("Tauri event.listen unavailable");
@@ -39,11 +63,12 @@ export function installBridge() {
     },
   };
 
-  g.__TISH_DESKTOP__ = api;
+  g.__TISH_APP__ = api;
+  g.__TISH_DESKTOP__ = api; // compat alias
   return api;
 }
 
 export function getBridge() {
   const g = typeof window !== "undefined" ? window : globalThis;
-  return g.__TISH_DESKTOP__ || installBridge();
+  return g.__TISH_APP__ || g.__TISH_DESKTOP__ || installBridge();
 }

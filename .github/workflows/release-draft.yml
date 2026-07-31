@@ -19,6 +19,12 @@ jobs:
           node-version: "22"
       - uses: dtolnay/rust-toolchain@stable
       - name: Build release artifacts
+        # macOS: pin target-cpu so `tish build` does not fall back to
+        # `-C target-cpu=native`, which degrades to `generic` on GitHub's virtualized
+        # Apple-Silicon runners and breaks ring's const-eval feature assertions.
+        # See the rust-macos job in ci.yml for the full write-up.
+        env:
+          RUSTFLAGS: ${{ runner.os == 'macOS' && '-C target-cpu=apple-m1' || '' }}
         run: node scripts/distribute/build-release.mjs --platform ${{ runner.os }}
         continue-on-error: true
       - uses: actions/upload-artifact@v4

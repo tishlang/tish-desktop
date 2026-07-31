@@ -1,0 +1,8 @@
+import { mountApp } from "../app/App.tish"
+
+fn mount() {
+  let root = document.getElementById("root")
+  mountApp(root)
+}
+
+mount()

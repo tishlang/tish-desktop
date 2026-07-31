@@ -45,16 +45,31 @@ pub fn value_to_json(v: &Value) -> Option<serde_json::Value> {
         Value::Number(n) => serde_json::Number::from_f64(*n).map(serde_json::Value::Number),
         Value::String(s) => Some(serde_json::Value::String(s.to_string())),
         Value::Array(a) => {
-            let items: Option<Vec<_>> = a.borrow().iter().map(value_to_json).collect();
-            items.map(serde_json::Value::Array)
+            // Clone elems first — under send-values, VmRef is a non-reentrant Mutex.
+            // Holding borrow() while recursing into nested arrays/objects self-deadlocks.
+            let items: Vec<Value> = a.borrow().clone();
+            let out: Option<Vec<_>> = items.iter().map(value_to_json).collect();
+            out.map(serde_json::Value::Array)
         }
         Value::Object(o) => {
+            // Same: drop the object lock before recursing into property values.
+            let entries: Vec<(String, Value)> = o
+                .borrow()
+                .strings
+                .iter()
+                .map(|(k, val)| (k.to_string(), val.clone()))
+                .collect();
             let mut map = serde_json::Map::new();
-            for (k, val) in o.borrow().strings.iter() {
-                map.insert(k.to_string(), value_to_json(val)?);
+            for (k, val) in entries {
+                // Skip functions / natives — JSON round-trip can't preserve them
+                // (e.g. createSurface({ root: Sidebar })).
+                if let Some(j) = value_to_json(&val) {
+                    map.insert(k, j);
+                }
             }
             Some(serde_json::Value::Object(map))
         }
+        // Functions, natives, etc. — not JSON-representable
         _ => None,
     }
 }

@@ -1,11 +1,19 @@
 {
-  "name": "tish-desktop",
+  "name": "tish-mode",
   "version": "0.1.0",
   "private": true,
-  "description": "Tish-first desktop runtime on Tauri 2",
+  "description": "Tish Mode monorepo — app runtime workspace. Publishable packages live under @tishlang/tish-desktop* and crates tish_desktop / tish_broker / tish_app.",
+  "license": "PIF",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tishlang/tish-desktop.git"
+  },
+  "bin": {
+    "mode": "cli/bin/mode.js"
+  },
   "scripts": {
     "check": "cargo check -p tish_desktop",
-    "tish-desktop": "node cli/bin/tish-desktop.js",
+    "mode": "node cli/bin/mode.js",
     "format": "tish-format examples packages cli scripts 2>/dev/null || npx --yes @tishlang/tish-format examples packages cli",
     "format:check": "tish-format --check examples packages cli 2>/dev/null || npx --yes @tishlang/tish-format --check examples packages cli",
     "lint:tish": "tish-lint examples packages cli 2>/dev/null || npx --yes @tishlang/tish-lint examples packages cli",
@@ -16,6 +24,10 @@
     "example:file-browser:rebuild": "npm --prefix examples/file-browser install && npm --prefix examples/file-browser run dev -- --rebuild",
     "example:native-chrome": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run dev",
     "example:native-chrome:rebuild": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run dev -- --rebuild",
+    "example:byo-ui": "npm --prefix examples/byo-ui install && npm --prefix examples/byo-ui run dev",
+    "example:hybrid": "npm --prefix examples/hybrid install && npm --prefix examples/hybrid run dev",
+    "example:hello-ios": "node cli/bin/mode.js ios --example hello-ios",
+    "check:bare-deps": "node -e \"const p=require('./examples/byo-ui/package.json'); const d={...p.dependencies,...p.devDependencies}; for (const k of Object.keys(d)) { if (k==='lattish'||k==='@tishlang/tish-desktop-ui-theme') { console.error('bare example must not depend on',k); process.exit(1);} } console.log('byo-ui: no lattish/ui-theme');\"",
     "build:basic": "npm --prefix examples/basic install && npm --prefix examples/basic run build:ui && npm --prefix examples/basic run build:shell",
     "build:file-browser": "npm --prefix examples/file-browser install && npm --prefix examples/file-browser run build:ui && npm --prefix examples/file-browser run build:shell",
     "build:native-chrome": "npm --prefix examples/native-chrome install && npm --prefix examples/native-chrome run build:ui && npm --prefix examples/native-chrome run build:shell",

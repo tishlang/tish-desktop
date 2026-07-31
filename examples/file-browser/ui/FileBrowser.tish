@@ -1,9 +1,9 @@
 /** @jsxImportSource lattish */
 import { useState, useEffect } from "lattish"
 import { tw } from "tish-tailwind/tw"
-import { invoke, listen } from "@tish-desktop/desktop-api"
-import { parentPath } from "@tish-desktop/shared"
-import { Button, ScrollArea } from "@tish-desktop/ui-theme"
+import { invoke, listen } from "@tishlang/tish-desktop-api"
+import { parentPath } from "@tishlang/tish-desktop-shared"
+import { Button, ScrollArea } from "@tishlang/tish-desktop-ui-theme"
 import * as store from "./fileBrowserStore.tish"
 
 export fn FileBrowser() {

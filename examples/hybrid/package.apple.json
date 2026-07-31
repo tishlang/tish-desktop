@@ -1,0 +1,11 @@
+{
+  "tish": {
+    "source": "./src/main.tish",
+    "rustDependencies": {
+      "tish_app": {
+        "path": "../../crates/tish_app",
+        "features": ["platform-apple"]
+      }
+    }
+  }
+}

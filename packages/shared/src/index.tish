@@ -1,4 +1,5 @@
 // Pure shared helpers — safe for shell (native) and UI (JS) targets.
+// No dependency on lattish or ui-theme.
 export const PROTOCOL = "desktop/v1"
 export {
   EVT_TICK,
@@ -11,7 +12,16 @@ export {
   EVT_AUTH_CHANGED,
   EVT_AUTH_ERROR,
   EVT_UPDATER_PROGRESS,
+  EVT_STATE_CHANGED,
 } from "./events.tish"
+export {
+  Platform,
+  platformIsNative,
+  platformIsWebview,
+  platformIsWeb,
+  platformSelect,
+  setPlatformFacts,
+} from "./platform.tish"
 
 export fn joinPath(base, name) {
   if (base.endsWith("/")) return base + name

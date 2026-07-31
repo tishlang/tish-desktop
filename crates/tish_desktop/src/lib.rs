@@ -1,14 +1,28 @@
-//! `cargo:tish_desktop` — Tauri 2 host for Tish-first desktop apps.
+//! `cargo:tish_desktop` / `cargo:tish_app` — cross-device app runtime host.
 //!
-//! Shell Tish configures handlers/windows then calls `run(config)`.
+//! Shell Tish configures handlers/surfaces then calls `run(config)`.
 //! UI talks over broker protocol `desktop/v1` via `desktop_invoke` / events.
+//! Shared microfrontend state is `state.*` (persisted KV remains `store.*`).
 
+mod app_open;
+mod broker;
+mod local_invoke;
+mod caps;
 mod commands;
 mod extensions;
 mod fs_sandbox;
+mod platform;
 mod state;
 mod value_util;
+mod webview_resource;
 mod windows;
+// macOS window-chrome (traffic-light inset + tint), ported from the reference IDE. objc2, so apple+macos only.
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod app_icon;
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod traffic_lights;
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod traffic_light_tint;
 
 use std::sync::Arc;
 
@@ -30,6 +44,48 @@ pub fn handle(args: &[Value]) -> Value {
     };
     PENDING_HANDLERS.lock().insert(name, f);
     ok_json(serde_json::json!({ "ok": true }))
+}
+
+/// `emit(event, payload?, opts?)` — emit a Tauri event to the webview(s). `opts.window` targets a
+/// single window by label; otherwise it broadcasts to all. This is how shell Tish (and, via
+/// `emit_event`, Rust extension crates) push streaming output — pty/lsp/dap chunks, watcher
+/// notifications, chat deltas — that the request/response `desktop_invoke` path cannot carry.
+/// Returns `{ ok: bool }` (false when no AppHandle is live yet, e.g. before `run()`).
+pub fn emit(args: &[Value]) -> Value {
+    let Some(event) = arg_str(args, 0) else {
+        return err_str("emit(event, payload?, opts?): event required");
+    };
+    let payload = args
+        .get(1)
+        .and_then(value_util::value_to_json)
+        .unwrap_or(serde_json::Value::Null);
+    let window = match args.get(2) {
+        Some(Value::Object(m)) => match m.borrow().strings.get("window") {
+            Some(Value::String(s)) => Some(s.to_string()),
+            _ => None,
+        },
+        _ => None,
+    };
+    ok_json(serde_json::json!({ "ok": emit_event_to(&event, payload, window.as_deref()) }))
+}
+
+/// Emit a Tauri event from Rust extension code (broadcasts to all webviews). The Value-ABI
+/// `emit()` above is the Tish-facing entry; this is the direct Rust one for `cargo:` extensions.
+pub fn emit_event(event: &str, payload: serde_json::Value) -> bool {
+    emit_event_to(event, payload, None)
+}
+
+fn emit_event_to(event: &str, payload: serde_json::Value, window: Option<&str>) -> bool {
+    let Some(app) = local_invoke::APP_HANDLE.lock().clone() else {
+        return false;
+    };
+    match window {
+        Some(label) => match app.get_webview_window(label) {
+            Some(w) => w.emit(event, payload).is_ok(),
+            None => false,
+        },
+        None => app.emit(event, payload).is_ok(),
+    }
 }
 
 /// `useExtensions(["id", ...])` — record enabled extension ids for the next run.
@@ -71,22 +127,145 @@ pub fn register_rust_extension(args: &[Value]) -> Value {
     ok_json(serde_json::json!({ "ok": true }))
 }
 
-/// `createWindow(spec)` — only valid after run has started; prefer windows in run(config).
+/// `createWindow(spec)` — queue a webview window (prefer `createSurface` for kind).
 pub fn create_window(args: &[Value]) -> Value {
-    let Some(spec_json) = arg_object_json(args, 0) else {
+    let Some(mut spec_json) = arg_object_json(args, 0) else {
         return err_str("createWindow(spec) requires object");
     };
-    // Queued into pending config if not running yet
+    if spec_json.get("kind").is_none() {
+        if let Some(obj) = spec_json.as_object_mut() {
+            obj.insert("kind".into(), serde_json::json!("webview"));
+        }
+    }
+    queue_surface_spec(spec_json)
+}
+
+/// `createSurface({ id?, label, kind: "webview"|"native", url?, root?, … })`
+pub fn create_surface(args: &[Value]) -> Value {
+    let Some(spec_val) = args.first() else {
+        return err_str("createSurface(spec) requires object");
+    };
+    // Pull `root` off the live Value first — JSON conversion omits functions.
+    let root_fn = match spec_val {
+        Value::Object(o) => o.borrow().strings.get("root").cloned(),
+        _ => None,
+    };
+    let Some(mut spec_json) = arg_object_json(args, 0) else {
+        return err_str("createSurface(spec) requires object");
+    };
+    let kind = spec_json
+        .get("kind")
+        .and_then(|v| v.as_str())
+        .unwrap_or("webview")
+        .to_string();
+
+    let has_root = root_fn.is_some();
+
+    if kind == "native" {
+        let host = platform::current_host();
+        let id = spec_json
+            .get("id")
+            .or_else(|| spec_json.get("label"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("native")
+            .to_string();
+        broker::GLOBAL_SURFACES.register(broker::SurfaceInfo {
+            id: id.clone(),
+            kind: broker::SurfaceKind::Native,
+            platform: Some(host.name().into()),
+            label: Some(id.clone()),
+        });
+        if let Some(root) = root_fn {
+            broker::PENDING_NATIVE_ROOTS
+                .lock()
+                .push((id.clone(), root));
+        }
+        if !host.supports_native_surface() {
+            return ok_json(broker::unsupported_on("createSurface.native", host.name()));
+        }
+        return ok_json(serde_json::json!({
+            "ok": true,
+            "queued": true,
+            "kind": "native",
+            "host": host.name(),
+            "hasRoot": has_root,
+            "hint": "run({ platformAttach: { apple: { outerHost: true } } }) drains PENDING_NATIVE_ROOTS via attach_app",
+        }));
+    }
+
+    if let Some(obj) = spec_json.as_object_mut() {
+        obj.remove("root"); // not part of WindowSpec JSON
+    }
+    queue_surface_spec(spec_json)
+}
+
+fn queue_surface_spec(spec_json: serde_json::Value) -> Value {
     let mut cfg = PENDING_CONFIG.lock();
     let mut c = cfg.clone().unwrap_or_default();
     match serde_json::from_value::<state::WindowSpec>(spec_json) {
         Ok(spec) => {
+            let id = spec.id.clone().unwrap_or_else(|| spec.label.clone());
+            let kind = match spec.kind.as_deref() {
+                Some("native") => broker::SurfaceKind::Native,
+                Some("web") => broker::SurfaceKind::Web,
+                _ => broker::SurfaceKind::Webview,
+            };
+            broker::GLOBAL_SURFACES.register(broker::SurfaceInfo {
+                id,
+                kind,
+                platform: None,
+                label: Some(spec.label.clone()),
+            });
             c.windows.push(spec);
             *cfg = Some(c);
             ok_json(serde_json::json!({ "ok": true, "queued": true }))
         }
         Err(e) => err_str(e.to_string()),
     }
+}
+
+/// Shell helper: `stateSet(path, value)` — broker shared state (plan `path` contract).
+pub fn state_set(args: &[Value]) -> Value {
+    let Some(path) = arg_str(args, 0) else {
+        return err_str("stateSet(path, value): path required");
+    };
+    let value = args
+        .get(1)
+        .and_then(|v| value_util::value_to_json(v))
+        .unwrap_or(serde_json::Value::Null);
+    match local_invoke::invoke_local(
+        "state.set",
+        serde_json::json!({ "path": path, "value": value, "source": "shell" }),
+    ) {
+        Ok(out) => ok_json(out),
+        Err(e) => err_str(e),
+    }
+}
+
+/// `brokerInvoke(cmd, args?)` — in-process invoke for shell / WK `onBridgeInvoke`.
+pub fn broker_invoke(args: &[Value]) -> Value {
+    local_invoke::broker_invoke(args)
+}
+
+/// Shell helper: `stateGet(path)`.
+pub fn state_get(args: &[Value]) -> Value {
+    let Some(path) = arg_str(args, 0) else {
+        return err_str("stateGet(path): path required");
+    };
+    let (value, revision) = broker::GLOBAL_SHARED_STATE.get(&path);
+    ok_json(serde_json::json!({
+        "ok": true,
+        "path": path,
+        "value": value,
+        "revision": revision,
+    }))
+}
+
+/// `pendingNativeRoots()` — ids queued via `createSurface({ kind: "native", root })`.
+pub fn pending_native_roots(_args: &[Value]) -> Value {
+    let roots = broker::PENDING_NATIVE_ROOTS.lock();
+    let ids: Vec<String> = roots.iter().map(|(id, _)| id.clone()).collect();
+    ok_json(serde_json::json!({ "ok": true, "ids": ids, "count": ids.len() }))
 }
 
 pub fn list_windows(_args: &[Value]) -> Value {
@@ -145,9 +324,28 @@ pub fn run(args: &[Value]) -> Value {
         }
     }
 
-    if config.windows.is_empty() {
+    let apple_attach = config
+        .platform_attach
+        .as_ref()
+        .and_then(|p| p.apple.as_ref())
+        .cloned();
+    let pending_native = broker::PENDING_NATIVE_ROOTS.lock().len();
+    // Pure-native: AppKit owns NSApplication.run (no Tauri). Only when the shell did not
+    // request Tauri as outerHost — hybrid SC4 with plugins uses outerHost:true + webview(s).
+    let want_tauri_host = apple_attach
+        .as_ref()
+        .map(|a| a.outer_host)
+        .unwrap_or(false);
+    let pure_native_apple = apple_attach.is_some()
+        && config.windows.is_empty()
+        && pending_native > 0
+        && !want_tauri_host;
+
+    if config.windows.is_empty() && !pure_native_apple {
         config.windows.push(state::WindowSpec {
             label: "main".into(),
+            kind: Some("webview".into()),
+            id: Some("main".into()),
             url: Some("http://localhost:5173/".into()),
             title: Some("Tish Desktop".into()),
             width: 960.0,
@@ -155,16 +353,60 @@ pub fn run(args: &[Value]) -> Value {
             title_bar_style: "transparent".into(),
             hidden_title: false,
             decorations: true,
+            layout: None,
         });
     }
 
-    let handlers = std::mem::take(&mut *PENDING_HANDLERS.lock());
+    // Keep PENDING_HANDLERS for brokerInvoke / WK bridge; AppState gets clones.
+    let handlers = PENDING_HANDLERS.lock().clone();
     let tick_ms = config.tick_ms.unwrap_or(0);
     if tick_ms > 0 {
         eprintln!("tish_desktop: tick loop interval {tick_ms}ms");
     }
+    if let Some(profile) = config.profile.as_deref() {
+        eprintln!("tish_desktop: run profile={profile}");
+    }
     let plugins = config.plugins.clone();
     let window_specs = config.windows.clone();
+
+    if let Some(ref a) = apple_attach {
+        let roots = std::mem::take(&mut *broker::PENDING_NATIVE_ROOTS.lock());
+        let outer_host = if pure_native_apple {
+            false
+        } else {
+            a.outer_host
+        };
+        let auto_run = if pure_native_apple {
+            true
+        } else {
+            a.auto_run_event_loop
+        };
+        eprintln!(
+            "tish_desktop: platformAttach.apple outerHost={} autoRunEventLoop={} pureNative={} attachingNativeRoots={}",
+            outer_host,
+            auto_run,
+            pure_native_apple,
+            roots.len()
+        );
+        let host = platform::current_host();
+        let opts = serde_json::json!({
+            "outerHost": outer_host,
+            "autoRunEventLoop": auto_run,
+            "autoShow": true,
+            "title": "Hybrid",
+        });
+        for (id, root) in roots {
+            match host.attach_native(&root, &opts) {
+                Ok(v) => eprintln!("tish_desktop: attached native surface id={id} → {v}"),
+                Err(e) => eprintln!("tish_desktop: attach native id={id} failed: {e}"),
+            }
+        }
+        if pure_native_apple {
+            // attach_native blocked in NSApplication.run when autoRunEventLoop=true.
+            eprintln!("tish_desktop: pure native AppKit event loop exited");
+            return Value::Null;
+        }
+    }
 
     let state = AppState::new(config);
     for (k, v) in handlers {
@@ -190,8 +432,18 @@ fn build_and_run(
     let mut builder = tauri::Builder::default();
 
     if plugins.single_instance {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             let _ = windows::focus(app, "main");
+            // A second launch (`<binary> <path>` / Finder "Open With" on a packaged build) delivers
+            // its args here — forward file/folder paths to the running instance (open-paths event).
+            // Skip argv[0] (the binary) and any -flags; app_open tags each path with isDir.
+            let paths: Vec<String> = argv
+                .iter()
+                .skip(1)
+                .filter(|a| !a.starts_with('-'))
+                .cloned()
+                .collect();
+            app_open::emit_open_paths(app, &paths);
         }));
     }
     if plugins.dialog {
@@ -231,6 +483,18 @@ fn build_and_run(
         builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     }
 
+    // Host-defined resource protocols (RunConfig.resource_protocols): register each `<scheme>://`
+    // generically — the scheme + trusted path substring come from config, nothing app-specific here.
+    // A hosting app uses this to serve its own local files (e.g. extension assets) to sandboxed
+    // webview iframes; without it those iframe requests fail ("Load failed").
+    let resource_protocols = state.config.lock().resource_protocols.clone();
+    for rp in resource_protocols {
+        let path_contains = rp.path_contains;
+        builder = builder.register_uri_scheme_protocol(rp.scheme, move |_app, request| {
+            webview_resource::serve(request.uri().path(), &path_contains)
+        });
+    }
+
     builder
         .manage(state)
         .invoke_handler(tauri::generate_handler![
@@ -238,20 +502,55 @@ fn build_and_run(
             commands::desktop_invoke,
             commands::desktop_emit_tick,
         ])
-        .on_window_event(|window, event| {
-            if let WindowEvent::ThemeChanged(theme) = event {
+        .on_window_event(|window, event| match event {
+            WindowEvent::ThemeChanged(theme) => {
                 let theme = format!("{theme:?}").to_lowercase();
                 let _ = window.app_handle().emit(
                     "theme:changed",
                     serde_json::json!({ "theme": theme }),
                 );
             }
+            // Per-window lifecycle → let the app tear down that window's resources (ptys, sessions).
+            WindowEvent::CloseRequested { .. } => {
+                let _ = window.app_handle().emit(
+                    "window-close",
+                    serde_json::json!({ "label": window.label() }),
+                );
+            }
+            WindowEvent::Destroyed => {
+                let _ = window.app_handle().emit(
+                    "window-destroyed",
+                    serde_json::json!({ "label": window.label() }),
+                );
+            }
+            _ => {}
         })
         .setup(move |app| {
             let handle = app.handle().clone();
+            local_invoke::set_app_handle(handle.clone());
+            // Optional app-branding icon (RunConfig.icon) for the tray + macOS dock.
+            let icon_path = app.state::<AppState>().config.lock().icon.clone();
+            // Optional custom deep-link scheme (RunConfig.deep_link_scheme), registered below.
+            let deep_link_scheme = app.state::<AppState>().config.lock().deep_link_scheme.clone();
+
+            // macOS traffic-light chrome: install the relayout observers (idempotent, no-op elsewhere).
+            #[cfg(all(feature = "platform-apple", target_os = "macos"))]
+            {
+                traffic_lights::init(&handle);
+                traffic_light_tint::init(&handle);
+                if let Some(ref p) = icon_path {
+                    app_icon::set_dock_icon_scheduled(&handle, p.clone());
+                }
+            }
 
             if plugins.deep_link {
                 use tauri_plugin_deep_link::DeepLinkExt;
+                // Register the app's custom scheme at runtime so the RUNNING instance handles
+                // `<scheme>://…` (dev + already-running). Packaged default-handler status still comes
+                // from the bundle Info.plist. Best-effort — a failure just means no deep links in dev.
+                if let Some(ref scheme) = deep_link_scheme {
+                    let _ = app.deep_link().register(scheme.as_str());
+                }
                 let dl = handle.clone();
                 app.deep_link().on_open_url(move |event| {
                     for url in event.urls() {
@@ -289,11 +588,19 @@ fn build_and_run(
                 let show_i = MenuItem::with_id(app, "tray:show", "Show", true, None::<&str>)?;
                 let quit_i = MenuItem::with_id(app, "tray:quit", "Quit", true, None::<&str>)?;
                 let tray_menu = Menu::with_items(app, &[&show_i, &quit_i])?;
-                let tray = TrayIconBuilder::new()
-                    .menu(&tray_menu)
-                    .tooltip("Tish Desktop")
+                let mut tray_builder = TrayIconBuilder::new().menu(&tray_menu).tooltip("Tish Desktop");
+                // Brand the menu-bar icon from RunConfig.icon (else the tray shows blank/default).
+                if let Some(ref p) = icon_path {
+                    if let Ok(img) = tauri::image::Image::from_path(p) {
+                        tray_builder = tray_builder.icon(img);
+                    }
+                }
+                let tray = tray_builder
                     .on_menu_event(move |app, event| {
                         let id = event.id().0.clone();
+                        // Generic: emit `tray:action` { id } and let the hosting app map ids to its
+                        // own actions (a dynamic menu set via tray.setMenu). Two conventional ids get
+                        // built-in behavior so the default tray works with no host wiring.
                         let _ = app.emit("tray:action", serde_json::json!({ "id": id }));
                         if id == "tray:quit" {
                             app.exit(0);
@@ -326,8 +633,26 @@ fn build_and_run(
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .map_err(|e| e.to_string())
+        .build(tauri::generate_context!())
+        .map_err(|e| e.to_string())?
+        .run(|app_handle, event| {
+            // macOS: files/folders dropped on the running dock icon (or Finder "Open With") arrive
+            // as RunEvent::Opened — forward them to the webview as an `open-paths` event.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                let paths: Vec<String> = urls
+                    .iter()
+                    .filter_map(|u| u.to_file_path().ok())
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .collect();
+                app_open::emit_open_paths(app_handle, &paths);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (app_handle, event);
+            }
+        });
+    Ok(())
 }
 
 /// Export module object for `tish:` npm-style packages (optional).
@@ -336,12 +661,17 @@ pub fn tish_desktop_object() -> Value {
     let mut m = ObjectMap::default();
     m.insert(Arc::from("run"), Value::native(run));
     m.insert(Arc::from("handle"), Value::native(handle));
+    m.insert(Arc::from("emit"), Value::native(emit));
     m.insert(Arc::from("useExtensions"), Value::native(use_extensions));
     m.insert(
         Arc::from("registerRustExtension"),
         Value::native(register_rust_extension),
     );
     m.insert(Arc::from("createWindow"), Value::native(create_window));
+    m.insert(Arc::from("createSurface"), Value::native(create_surface));
+    m.insert(Arc::from("brokerInvoke"), Value::native(broker_invoke));
+    m.insert(Arc::from("stateSet"), Value::native(state_set));
+    m.insert(Arc::from("stateGet"), Value::native(state_get));
     m.insert(Arc::from("listWindows"), Value::native(list_windows));
     m.insert(Arc::from("focusWindow"), Value::native(focus_window));
     m.insert(Arc::from("closeWindow"), Value::native(close_window));

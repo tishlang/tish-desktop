@@ -1,0 +1,2 @@
+// Shared App entry kept for multi-window / legacy mounts.
+export { DemoPane } from "../ui/DemoPane.tish"

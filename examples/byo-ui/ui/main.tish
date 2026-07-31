@@ -1,0 +1,66 @@
+// Plain DOM UI — no lattish / ui-theme.
+import { invoke, stateSet, stateGet, listen, Platform } from "@tishlang/tish-app-api"
+import { EVT_STATE_CHANGED } from "@tishlang/tish-desktop-shared"
+
+fn mount() {
+  let root = document.getElementById("root")
+  root.innerHTML = ""
+
+  let h1 = document.createElement("h1")
+  h1.textContent = "BYO UI"
+  root.appendChild(h1)
+
+  let meta = document.createElement("p")
+  meta.className = "muted"
+  meta.textContent = "Platform.OS=" + Platform.OS + " surface=" + Platform.surface
+  root.appendChild(meta)
+
+  let status = document.createElement("pre")
+  status.id = "status"
+  status.textContent = "…"
+  root.appendChild(status)
+
+  let row = document.createElement("div")
+  row.className = "row"
+
+  let helloBtn = document.createElement("button")
+  helloBtn.textContent = "Hello shell"
+  helloBtn.onclick = () => {
+    invoke("app.hello", { from: "byo-ui" }).then((r) => {
+      status.textContent = JSON.stringify(r, null, 2)
+    }, (e) => {
+      status.textContent = String(e)
+    })
+  }
+  row.appendChild(helloBtn)
+
+  let stateBtn = document.createElement("button")
+  stateBtn.textContent = "Set shared state"
+  stateBtn.onclick = () => {
+    let id = "doc-" + Date.now()
+    stateSet("selection.docId", id).then((r) => {
+      status.textContent = "state.set path=selection.docId value=" + id + " rev=" + r.revision
+    })
+  }
+  row.appendChild(stateBtn)
+
+  let readBtn = document.createElement("button")
+  readBtn.textContent = "Read state"
+  readBtn.onclick = () => {
+    stateGet("selection.docId").then((r) => {
+      status.textContent = JSON.stringify(r, null, 2)
+    })
+  }
+  row.appendChild(readBtn)
+
+  root.appendChild(row)
+
+  listen(EVT_STATE_CHANGED, (payload) => {
+    let el = document.createElement("div")
+    el.className = "muted"
+    el.textContent = "state:changed " + payload.key + " → " + JSON.stringify(payload.value)
+    root.appendChild(el)
+  })
+}
+
+mount()

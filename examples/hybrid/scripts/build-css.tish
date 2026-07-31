@@ -1,0 +1,24 @@
+import { emitStylesheet } from "tish-tailwind"
+import { readFile, writeFile, mkdir } from "tish:fs"
+
+await emitStylesheet({
+  sourceFiles: [
+    "ui/DemoPane.tish",
+    "ui/main.tish",
+    "ui/chrome.tish",
+    "ui/Extensions.tish",
+    "../../packages/ui-theme/src/ui/Button.tish",
+    "../../packages/ui-theme/src/ui/Section.tish",
+    "../../packages/ui-theme/src/ui/Input.tish",
+    "../../packages/ui-theme/src/ui/Badge.tish",
+  ],
+  outputPath: "public/assets/app.tw.css",
+})
+
+mkdir("public/assets", { recursive: true })
+let fonts = readFile("../../packages/ui-theme/src/fonts.css")
+let theme = readFile("../../packages/ui-theme/src/theme.css")
+let utils = readFile("../../packages/ui-theme/src/theme-utilities.css")
+let tw = readFile("public/assets/app.tw.css")
+writeFile("public/assets/app.css", fonts + "\n" + theme + "\n" + utils + "\n" + tw)
+console.log("wrote public/assets/app.css (theme + utilities + tailwind)")

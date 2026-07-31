@@ -1,0 +1,12 @@
+// Shared hybrid demo contract — state.* paths both panes read/write.
+// No UI here; native (AppKit) and webview (lattish) both import these.
+
+export const DEMO = {
+  count: "demo.count",
+  note: "demo.note",
+  flag: "demo.flag",
+  docId: "selection.docId",
+}
+
+export const DEMO_TITLE = "Hybrid"
+export const DEMO_HINT = "Native ‖ Webview share BrokerCore state.*"

@@ -1,11 +1,11 @@
 [package]
 name = "tish_desktop"
 version = "0.1.0"
-edition = "2021"
-description = "cargo:tish_desktop — Tauri 2 host for Tish-first desktop apps"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/tishlang/tish-desktop"
-homepage = "https://tishlang.com"
+edition.workspace = true
+description = "cargo:tish_desktop / cargo:tish_app — cross-device Tish app runtime (Tauri desktop + platform adapters)"
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
 readme = "README.md"
 keywords = ["tish", "tauri", "desktop", "webview"]
 categories = ["gui", "development-tools"]
@@ -15,8 +15,22 @@ name = "tish_desktop"
 crate-type = ["rlib"]
 
 [[bin]]
-name = "tish-desktop"
+name = "mode"
 path = "src/bin/tish_desktop.rs"
+
+[features]
+default = ["webview-tauri"]
+# Classic desktop webview host (Tauri). Always on by default.
+webview-tauri = []
+# Path-depend tish-apple for native macOS attach under an outer host. Also pulls objc2 for the
+# in-host macOS window chrome (traffic-light inset + tint), ported from the reference IDE.
+platform-apple = ["dep:tishlang_macos", "dep:objc2", "dep:objc2-foundation", "dep:objc2-app-kit"]
+# Path-depend sibling native hosts (real attach + notify — not forever-unsupported).
+platform-ms = ["dep:tish-ms"]
+platform-lin = ["dep:tish-lin"]
+platform-android = ["dep:tish-android"]
+caps-notification = []
+caps-store-persist = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -24,11 +38,21 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # Must match the `tish` CLI's Value ABI (same physical crate). Path for monorepo
 # `tish build`; for crates.io publish, switch to a versioned line that matches the
-# published tishlang_core the CLI was built against (ecosystem 2.39.x today).
+# published tishlang_core the CLI was built against (ecosystem 3.0.x today —
+# crates-release.yml rewrites this automatically).
 tishlang_core = { path = "../../../tish/crates/tish_core", features = ["send-values"] }
+tish_broker = { path = "../tish_broker" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri = { version = "2", features = ["tray-icon", "devtools"] }
+tauri = { version = "2", features = ["tray-icon", "devtools", "image-png"] }
+tishlang_macos = { path = "../../../tish-apple/crates/tish-macos", optional = true }
+# macOS window-chrome (traffic-light inset + tint), gated on platform-apple. Versions pinned to the 3.0 train.
+objc2 = { version = "0.6", optional = true }
+objc2-foundation = { version = "0.3", optional = true, features = ["NSString", "NSObject", "NSGeometry", "NSNotification", "NSKeyValueObserving", "NSDictionary", "NSArray"] }
+objc2-app-kit = { version = "0.3", optional = true, features = ["NSApplication", "NSMenu", "NSMenuItem", "NSControl", "NSWindow", "NSButton", "NSView", "NSResponder", "NSColor", "NSBezierPath", "NSGraphics", "NSImage", "objc2-core-foundation"] }
+tish-ms = { path = "../../../tish-ms/crates/tish-ms", optional = true }
+tish-lin = { path = "../../../tish-lin/crates/tish-lin", optional = true }
+tish-android = { path = "../../../tish-android/crates/tish-android", optional = true }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"
@@ -50,7 +74,7 @@ once_cell = "1"
 url = "2"
 notify-rust = "4"
 keyring = "3"
-keepawake = "0.5"
+keepawake = "0.6"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 sha2 = "0.10"
 base64 = "0.22"

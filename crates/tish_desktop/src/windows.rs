@@ -37,6 +37,9 @@ pub fn create_from_spec(app: &AppHandle, spec: &WindowSpec) -> Result<(), String
         .visible(false)
         .decorations(spec.decorations)
         .background_color(WINDOW_BG)
+        // Marker (runs before page scripts) so a webview app can detect it's hosted by tish-desktop
+        // and route its IPC through the `desktop_invoke` broker instead of direct Tauri commands.
+        .initialization_script("window.__TISH_DESKTOP__ = true;")
         .on_page_load(|window: WebviewWindow, payload: PageLoadPayload<'_>| {
             if payload.event() == PageLoadEvent::Finished {
                 let _ = window.show();

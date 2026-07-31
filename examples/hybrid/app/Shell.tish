@@ -1,0 +1,4 @@
+// Fallback when platform resolve has no Shell.macos / Shell.web.
+export fn Shell() {
+  return null
+}

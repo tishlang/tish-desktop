@@ -2,7 +2,7 @@ import { exit, exec } from "tish:process"
 import { firstPositional, joinPath, pathExists, q, repoRoot } from "../paths.tish"
 
 fn usage() {
-  console.log("Usage: tish-desktop distribute <step>")
+  console.log("Usage: mode distribute <step>")
   console.log("")
   console.log("Steps (scripts under scripts/distribute/):")
   console.log("  build      node scripts/distribute/build-release.mjs")

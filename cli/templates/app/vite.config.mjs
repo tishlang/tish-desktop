@@ -10,16 +10,16 @@ export default defineConfig({
   plugins: [tish({ jsxImportSource: "lattish" })],
   resolve: {
     alias: {
-      "@tish-desktop/desktop-api/bridge": path.resolve(
+      "@tishlang/tish-desktop-api/bridge": path.resolve(
         root,
         "packages/desktop-api/src/bridge.js"
       ),
-      "@tish-desktop/desktop-api": path.resolve(
+      "@tishlang/tish-desktop-api": path.resolve(
         root,
         "packages/desktop-api/src/desktopHost.tish"
       ),
-      "@tish-desktop/shared": path.resolve(root, "packages/shared/src/index.tish"),
-      "@tish-desktop/ui-theme": path.resolve(root, "packages/ui-theme/src/index.tish"),
+      "@tishlang/tish-desktop-shared": path.resolve(root, "packages/shared/src/index.tish"),
+      "@tishlang/tish-desktop-ui-theme": path.resolve(root, "packages/ui-theme/src/index.tish"),
       lattish: path.resolve(root, "../lattish/src/Lattish.tish"),
       "lattish/jsx-runtime": path.resolve(root, "../lattish/src/jsx-runtime.tish"),
       "tish-tailwind/tw": path.resolve(root, "../tish-tailwind/src/tw.tish"),

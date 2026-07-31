@@ -1,0 +1,49 @@
+/** @jsxImportSource lattish */
+// Second Tauri webview (dev:multi) — same contract as DemoPane, thinner chrome.
+import { createRoot, useState, useEffect } from "lattish"
+import { Button, Badge } from "@tishlang/tish-desktop-ui-theme"
+import { setPlatformFacts } from "@tishlang/tish-desktop-shared"
+import { invoke, useSharedState, stateSet } from "@tishlang/tish-app-api"
+import { DEMO } from "../app/demo.tish"
+
+setPlatformFacts("macos", "webview")
+
+fn Chrome() {
+  let [docId, setDocId] = useState(null)
+
+  useEffect(() => {
+    useSharedState(DEMO.docId, (v) => {
+      if (v !== null && v !== undefined) setDocId(String(v))
+      else setDocId(null)
+    })
+    invoke("state.get", { path: DEMO.docId }).then((r) => {
+      if (r && r.value !== null && r.value !== undefined) setDocId(String(r.value))
+    })
+  }, [])
+
+  let pick = (id, words, edits) => {
+    invoke("app.openDoc", { id: id, wordCount: words, edits: edits }).then(() => {
+      stateSet(DEMO.docId, id).then(() => setDocId(id))
+    })
+  }
+
+  return (
+    <div class="p-4 font-sans text-foreground">
+      <div class="flex items-center gap-2 mb-2">
+        <h1 class="text-lg font-semibold">Chrome</h1>
+        <Badge>webview</Badge>
+      </div>
+      <p class="text-sm text-muted-foreground mb-3">Second surface — shares {DEMO.docId}</p>
+      <pre class="mb-3 rounded-lg border border-border bg-card p-2 text-xs text-muted-foreground">
+        {"selected=" + (docId === null ? "none" : docId)}
+      </pre>
+      <div class="flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => pick("demo-1", 40, 1)}>demo-1</Button>
+        <Button variant="secondary" onClick={() => pick("demo-2", 20, 0)}>demo-2</Button>
+        <Button variant="outline" onClick={() => pick("demo-3", 10, 2)}>demo-3</Button>
+      </div>
+    </div>
+  )
+}
+
+createRoot(document.getElementById("root")).render(Chrome)

@@ -1,0 +1,8 @@
+/** @jsxImportSource lattish */
+// Pure web entry — same DemoPane as the SC4 webview (web-bridge).
+import { createRoot } from "lattish"
+import { setPlatformFacts } from "@tishlang/tish-desktop-shared"
+import { DemoPane } from "./DemoPane.tish"
+
+setPlatformFacts("web", "web")
+createRoot(document.getElementById("root")).render(DemoPane)

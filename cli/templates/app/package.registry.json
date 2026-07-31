@@ -1,0 +1,32 @@
+{
+  "name": "__APP_NAME__",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "tish": {
+    "source": "./src/main.tish",
+    "rustDependencies": {
+      "tish_desktop": "__PKG_VERSION__"
+    }
+  },
+  "scripts": {
+    "build:css": "tish run --feature fs scripts/build-css.tish",
+    "build:ui": "npm run build:css && vite build",
+    "dev:ui": "npm run build:css && vite",
+    "build:shell": "tish build --target native --native-backend rust src/main.tish -o __SHELL_OUT__",
+    "dev": "mode dev",
+    "start": "npm run build:ui && npm run build:shell && ./__SHELL_OUT__"
+  },
+  "dependencies": {
+    "@tishlang/tish-desktop-api": "__PKG_VERSION__",
+    "@tishlang/tish-desktop-shared": "__PKG_VERSION__",
+    "@tishlang/tish-desktop-ui-theme": "__PKG_VERSION__",
+    "@tishlang/lattish": "latest",
+    "tish-tailwind": "latest"
+  },
+  "devDependencies": {
+    "@tishlang/tish-desktop": "__PKG_VERSION__",
+    "@tishlang/vite-plugin-tish": "^2.39.0",
+    "vite": "^6.0.0"
+  }
+}

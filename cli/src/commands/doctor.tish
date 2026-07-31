@@ -1,0 +1,91 @@
+import { exit, env, cwd, exec } from "tish:process"
+import { readFile } from "tish:fs"
+import {
+  flagValue,
+  joinPath,
+  pathExists,
+  q,
+  resolveTish,
+} from "../paths.tish"
+
+fn capLevel(name, surface, platform) {
+  if (name === "notification") {
+    if (surface === "web") return "Partial"
+    return "Full"
+  }
+  if (name === "store") {
+    if (surface === "web" || platform === "ios") return "Unsupported"
+    return "Full"
+  }
+  if (name === "tray") {
+    if (surface === "web" || platform === "ios" || surface === "native") return "Unsupported"
+    return "Full"
+  }
+  return "Unsupported"
+}
+
+fn capture(cmd) {
+  let out = "/tmp/tish-desktop-doctor-resolve.txt"
+  let code = exec(cmd + " > " + q(out) + " 2>&1")
+  let text = ""
+  if (pathExists(out)) {
+    text = String(readFile(out)).trim()
+  }
+  return { code: code, text: text }
+}
+
+export fn runDoctor(args) {
+  // `--desk-platform` / `--desk-surface` are rewritten from `--platform` /
+  // `--surface` by cli/bin/mode.js so `tish run` is not disrupted.
+  let platform = flagValue(args, "--desk-platform")
+  if (platform === null) platform = flagValue(args, "--platform")
+  if (platform === null) platform = "macos"
+
+  let surface = flagValue(args, "--desk-surface")
+  if (surface === null) surface = flagValue(args, "--surface")
+  if (surface === null) surface = "webview"
+
+  let tish = resolveTish()
+  console.log("mode doctor")
+  console.log("  (alias of plan name: tish app doctor)")
+  console.log("  platform: " + platform)
+  console.log("  surface:  " + surface)
+  console.log("  tish:     " + tish)
+
+  let probe = flagValue(args, "--resolve")
+  if (probe === null) probe = "./Button"
+  let importer = flagValue(args, "--importer")
+  if (importer === null) {
+    let here = cwd()
+    importer = joinPath(here, "src/main.tish")
+    if (!pathExists(importer)) importer = joinPath(here, "ui/main.tish")
+    if (!pathExists(importer)) importer = joinPath(here, "app/App.tish")
+  }
+
+  console.log("  resolve:  " + probe + " (importer " + importer + ")")
+  let resolveCmd = q(tish) + " resolve-id " + q(probe) + " --importer " + q(importer)
+  resolveCmd = resolveCmd + " --platform " + q(platform) + " --surface " + q(surface)
+  let r = capture(resolveCmd)
+  if (r.text !== "") {
+    console.log("  -> " + r.text.split("\n")[0])
+  } else {
+    console.log("  -> (resolve-id failed — rebuild tish CLI with platform resolve)")
+  }
+
+  console.log("")
+  console.log("Cap matrix (sample for this profile):")
+  console.log("  notification  " + capLevel("notification", surface, platform))
+  console.log("  store         " + capLevel("store", surface, platform))
+  console.log("  tray          " + capLevel("tray", surface, platform))
+  console.log("")
+  console.log("Notes:")
+  console.log("  state.*       Full (BrokerCore; path + revision) — not store.*")
+  console.log("  webview.*     Partial (Tauri load/postMessage; apple WK via macos.webview*)")
+  console.log("  unsupported   { ok:false, code:unsupported, capability, platform, message }")
+  console.log("")
+  console.log("Upgrade path (Web -> Webview -> Hybrid):")
+  console.log("  npm run build:web | build:shell | build:shell:apple / dev:hybrid")
+  console.log("  See docs/HYBRID.md · docs/UNIFIED_APP.md")
+  console.log("HMR: platform file edits reload; switching TISH_PLATFORM/SURFACE needs Vite restart.")
+  exit(0)
+}

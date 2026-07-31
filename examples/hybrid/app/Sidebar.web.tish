@@ -1,0 +1,6 @@
+// Pure-web leftover stub — prefer ui/DemoPane via web-main.tish.
+export fn Sidebar() {
+  return null
+}
+
+export fn mountSidebar(_rootEl) {}

@@ -1,0 +1,27 @@
+// Shared App entry — BYO DOM mount (no lattish).
+import { Button } from "./Button"
+import { invoke } from "@tishlang/tish-app-api"
+
+export fn mountApp(rootEl) {
+  rootEl.innerHTML = ""
+  let h1 = document.createElement("h1")
+  h1.textContent = "__APP_NAME__"
+  rootEl.appendChild(h1)
+  let p = document.createElement("p")
+  p.className = "muted"
+  p.textContent = "Bare scaffold (no lattish)."
+  rootEl.appendChild(p)
+  let out = document.createElement("pre")
+  let btn = Button({
+    title: "Hello",
+    onPress: () => {
+      invoke("app.hello", { from: "ui" }).then((r) => {
+        out.textContent = JSON.stringify(r, null, 2)
+      }, (e) => {
+        out.textContent = String(e)
+      })
+    },
+  })
+  rootEl.appendChild(btn)
+  rootEl.appendChild(out)
+}

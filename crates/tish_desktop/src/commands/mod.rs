@@ -1,21 +1,23 @@
 //! Broker dispatch: the webview calls `desktop_invoke(cmd, args)` which routes
 //! to a Tish-registered handler or one of the command modules below.
 
-mod chrome;
+pub(crate) mod chrome;
 mod clipboard;
 mod core;
-mod dialog_extra;
+pub(crate) mod dialog_extra;
 mod helpers;
 mod menu_set;
 mod power_process;
 pub(crate) mod secrets_auth;
 mod shell_os;
 mod shortcut;
-mod store_auto;
+pub(crate) mod state_shared;
+pub(crate) mod store_auto;
+pub(crate) mod webview_cap;
 mod window_extra;
 
 use serde_json::json;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::AppState;
 
@@ -25,29 +27,76 @@ pub fn desktop_protocol() -> serde_json::Value {
 }
 
 #[tauri::command]
-pub fn desktop_invoke(
+pub async fn desktop_invoke(
     app: AppHandle,
-    state: State<'_, AppState>,
     cmd: String,
     args: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
     let args = args.unwrap_or(json!({}));
-    dispatch(&app, &state, &cmd, args)
+    // A Tish `handle()` command is app logic (fs / process / http / index) that can block for a
+    // long time; run it OFF the main thread so the webview never beachballs. The rest — state.*,
+    // CapProviders, and the window/menu/dialog glue — is fast and (on macOS) main-thread-only, so
+    // it stays inline. NativeFn + AppState are Send + Sync, so the handler moves safely. State is
+    // fetched from the AppHandle (not taken as a command param) so no non-Send borrow crosses the
+    // await and the command future stays Send.
+    let is_handler = app.state::<AppState>().handlers.lock().contains_key(&cmd);
+    // Diagnostic trace: a command that logs `→` but never `←` is the one hanging the boot (a `←`
+    // with a large ms is merely slow). Gated on TISH_DESKTOP_TRACE_INVOKE=1 so it's silent by default.
+    let trace = std::env::var("TISH_DESKTOP_TRACE_INVOKE").as_deref() == Ok("1");
+    if trace {
+        eprintln!("[desktop_invoke] → {cmd} (handler={is_handler})");
+    }
+    let started = std::time::Instant::now();
+    let out = if is_handler {
+        let app2 = app.clone();
+        let cmd2 = cmd.clone();
+        match tauri::async_runtime::spawn_blocking(move || {
+            let state = app2.state::<AppState>();
+            dispatch(&app2, state.inner(), &cmd2, args)
+        })
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => Err(format!("desktop_invoke worker failed: {e}")),
+        }
+    } else {
+        let state = app.state::<AppState>();
+        dispatch(&app, state.inner(), &cmd, args)
+    };
+    if trace {
+        eprintln!(
+            "[desktop_invoke] ← {cmd} ({}ms)",
+            started.elapsed().as_millis()
+        );
+    }
+    out
 }
 
 /// Extra command modules, tried in order. Each returns `None` if it doesn't own `cmd`.
 type ExtraDispatch =
     fn(&AppHandle, &AppState, &str, &serde_json::Value) -> Option<Result<serde_json::Value, String>>;
 
-const EXTRA_MODULES: &[ExtraDispatch] = &[
+/// In-process entry for shell / nested WK `brokerInvoke` when Tauri `AppHandle` is live.
+pub fn invoke_for_handle(
+    app: &AppHandle,
+    state: &AppState,
+    cmd: &str,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    dispatch(app, state, cmd, args)
+}
+
+/// Legacy modules after CapProviders. `dialog.*` / `notification.*` / `store.*` /
+/// `webview.*` are claimed by CapProviders first; chrome still owns tray/window bits
+/// and `dialog.message` fallback is routed via DialogProvider.
+const LEGACY_MODULES: &[ExtraDispatch] = &[
     core::try_dispatch,
     chrome::try_dispatch,
     window_extra::try_dispatch,
-    dialog_extra::try_dispatch,
     clipboard::try_dispatch,
     shortcut::try_dispatch,
     shell_os::try_dispatch,
-    store_auto::try_dispatch,
+    store_auto::try_dispatch, // autostart.* / updater.* (store.* already CapProvider)
     power_process::try_dispatch,
     secrets_auth::try_dispatch,
     menu_set::try_dispatch,
@@ -59,11 +108,20 @@ fn dispatch(
     cmd: &str,
     args: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
+    // Plan order: handlers → state.* → CapProvider → legacy try_dispatch → unknown
     if state.handlers.lock().contains_key(cmd) {
         return state.call_handler(cmd, args);
     }
 
-    for try_dispatch in EXTRA_MODULES {
+    if let Some(result) = state_shared::try_dispatch(app, state, cmd, &args) {
+        return result;
+    }
+
+    if let Some(result) = crate::caps::try_caps(app, state, cmd, &args) {
+        return result;
+    }
+
+    for try_dispatch in LEGACY_MODULES {
         if let Some(result) = try_dispatch(app, state, cmd, &args) {
             return result;
         }

@@ -1,0 +1,4 @@
+// Legacy name kept for multi/web resolve; SC4 uses Shell.macos.tish.
+export fn Sidebar() {
+  return null
+}

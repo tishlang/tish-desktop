@@ -21,20 +21,145 @@ jobs:
       - name: Lint Tish
         run: npm run lint:tish
         continue-on-error: true
+      - name: Bare / BYO example must not depend on lattish
+        run: npm run check:bare-deps
 
   rust:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Pinned to the toolchain the project develops against, so CI and local builds
+      # resolve the same rustc. Keep both rust jobs on the same version.
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: "1.94.0"
           components: rustfmt, clippy
-      - name: Checkout tish core (path dep / patch)
-        uses: actions/checkout@v4
+      - name: Install Tauri Linux system deps
+        # Tauri's Linux (gtk/webkit/glib/soup) build-scripts need these dev packages;
+        # without them cargo fails with "Package glib-2.0 was not found in pkg-config".
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
+            librsvg2-dev libayatana-appindicator3-dev \
+            build-essential file libssl-dev
+      - uses: actions/setup-node@v4
         with:
-          repository: tishlang/tish
-          path: ../tish
-        continue-on-error: true
-      - name: Check
-        run: cargo check -p tish_desktop
-        continue-on-error: true
+          node-version: "22"
+      # The Cargo path-deps (../../../tish, ../../../tish-apple) resolve to SIBLINGS of
+      # $GITHUB_WORKSPACE. actions/checkout refuses any path outside the workspace, so
+      # clone the (public) sources directly to those sibling paths instead.
+      - name: Checkout tish core (path dep)
+        run: git clone --depth 1 https://github.com/tishlang/tish.git ../tish
+      - name: Checkout tish-apple (platform-apple path dep)
+        run: git clone --depth 1 https://github.com/tishlang/tish-apple.git ../tish-apple
+      - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
+        # These optional platform-host crates have no public repo yet, but Cargo must
+        # read every path-dep manifest to resolve the workspace. Write empty stub crates
+        # so resolution succeeds; their features stay OFF here, so the stubs never compile.
+        run: |
+          for c in tish-ms tish-lin tish-android; do
+            d="../$c/crates/$c"
+            if [ ! -f "$d/Cargo.toml" ]; then
+              mkdir -p "$d/src"
+              printf '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2021"\n' "$c" > "$d/Cargo.toml"
+              : > "$d/src/lib.rs"
+            fi
+          done
+      - name: Install local tish CLI
+        run: cargo install --path ../tish/crates/tish --force --bin tish
+      - name: Check (default features)
+        run: cargo check -p tish_desktop -p tish_app
+      # platform-apple is NOT checked here. It pulls objc2, which is a hard
+      # `compile_error!` off Apple targets, so the step could only ever be red-and-ignored.
+      # The rust-macos job compile-checks that feature for real.
+      # platform-ms / platform-lin / platform-android are not compile-tested either: their
+      # host crates have no public repo, only the resolution stubs above. The default check
+      # here plus the macOS job exercise the real, buildable configurations.
+      - name: Typed shell --check warn (byo-ui + hybrid + basic)
+        run: |
+          npm --prefix examples/byo-ui install
+          npm --prefix examples/hybrid install
+          npm --prefix examples/basic install
+          npm --prefix examples/byo-ui run build:shell
+          npm --prefix examples/hybrid run build:shell
+          npm --prefix examples/basic run build:shell
+      - name: Hybrid Phase 2 tree + SC4 scripts
+        run: npm --prefix examples/hybrid run check:tree
+      - name: Doctor smoke (resolve + cap matrix)
+        working-directory: examples/hybrid
+        run: |
+          IMPORTER="$(pwd)/app/App.tish"
+          node ../../cli/bin/mode.js doctor \
+            --platform macos --surface webview \
+            --resolve ./Button --importer "$IMPORTER"
+      - name: Prove attach_app wiring references
+        # grep, not rg: ripgrep is not on the ubuntu-latest image.
+        run: |
+          grep -nE "attach_app|broadcast_event" \
+            crates/tish_desktop/src/platform/apple.rs \
+            crates/tish_desktop/src/local_invoke.rs
+
+  rust-macos:
+    runs-on: macos-15
+    # `tish build --target native` (tish_build_utils::run_cargo_build) appends
+    # `-C target-cpu=native` unless RUSTFLAGS already pins a target-cpu. GitHub's
+    # Apple-Silicon runners are virtualized, LLVM cannot identify the host core, and
+    # `native` degrades to `generic` — which drops `aes`/`sha2` from the aarch64 feature
+    # set that aarch64-apple-darwin normally guarantees. ring then fails const-eval:
+    #   assertion failed: (CAPS_STATIC & MIN_STATIC_FEATURES) == MIN_STATIC_FEATURES
+    #   assertion failed: CAPS_STATIC == MIN_STATIC_FEATURES
+    # Not a rustc-version or ring-version problem (there is no ring > 0.17.14): pin the
+    # CPU to apple-m1, which is exactly rustc's own default for this target and the
+    # floor for every Apple-Silicon runner, so the flag is a no-op on real hardware.
+    env:
+      RUSTFLAGS: "-C target-cpu=apple-m1"
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned to the toolchain the project develops against (same as the rust job).
+      # aarch64-apple-ios-sim is needed by the hello-ios staticlib step.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          targets: aarch64-apple-ios-sim
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Record host CPU detection
+        # Diagnostic: shows what `-C target-cpu=native` would have resolved to on this
+        # runner, so a future recurrence is one log line away from being explained.
+        run: |
+          rustc --print target-cpus --target aarch64-apple-darwin | head -3
+          rustc --print cfg -C target-cpu=native --target aarch64-apple-darwin \
+            | grep -E 'target_feature="(neon|aes|sha2|sha3)"' || true
+      # Siblings of $GITHUB_WORKSPACE (see the rust job) — clone directly since
+      # actions/checkout can't write outside the workspace.
+      - name: Checkout tish core
+        run: git clone --depth 1 https://github.com/tishlang/tish.git ../tish
+      - name: Checkout tish-apple
+        run: git clone --depth 1 https://github.com/tishlang/tish-apple.git ../tish-apple
+      - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
+        # Same as the linux job: Cargo reads every path-dep manifest to resolve the
+        # workspace, so stub the optional platform crates that have no public repo.
+        run: |
+          for c in tish-ms tish-lin tish-android; do
+            d="../$c/crates/$c"
+            if [ ! -f "$d/Cargo.toml" ]; then
+              mkdir -p "$d/src"
+              printf '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2021"\n' "$c" > "$d/Cargo.toml"
+              : > "$d/src/lib.rs"
+            fi
+          done
+      - name: Check with platform-apple
+        run: cargo check -p tish_desktop --features platform-apple -p tish_app
+      - name: Install tish CLI + hybrid apple shell build (SC4)
+        run: |
+          cargo install --path ../tish/crates/tish --force --bin tish
+          npm --prefix examples/hybrid install
+          npm --prefix examples/hybrid run check:tree
+          npm --prefix examples/hybrid run build:shell:apple
+          test -x examples/hybrid/dist/hybrid-shell-apple
+      - name: hello-ios staticlib (BrokerCore + tish:ios host)
+        run: |
+          npm --prefix examples/hello-ios install
+          npm --prefix examples/hello-ios run build

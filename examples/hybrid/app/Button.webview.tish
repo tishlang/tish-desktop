@@ -1,0 +1,11 @@
+// Shell-webview specialization (broker-aware chrome).
+export fn Button(props) {
+  let title = props.title === null ? "Button" : props.title
+  let el = document.createElement("button")
+  el.textContent = title
+  el.className = "btn btn-shell"
+  if (props.onPress) {
+    el.onclick = () => props.onPress()
+  }
+  return el
+}

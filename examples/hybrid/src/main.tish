@@ -1,0 +1,55 @@
+// Hybrid desktop — multi-window mode (v1): dual createSurface(webview).
+// SC4 native+webview: `src/main.apple.tish` via `npm run build:shell:apple` / `dev:hybrid`.
+// Canonical BYO API: imperative createSurface + run() — no NativeSurface/WebSurface JSX required.
+import { run, handle, createSurface, stateSet } from "cargo:tish_app"
+
+fn scoreDoc(wordCount: number, edits: number): number {
+  return wordCount * 1.5 + edits * 0.25
+}
+
+handle("app.openDoc", (args) => {
+  let id = args.id
+  // Avoid `=== undefined` — native codegen does not emit a Rust `undefined` binding.
+  let words: number = 0
+  let edits: number = 0
+  if (args.wordCount !== null) words = args.wordCount
+  if (args.edits !== null) edits = args.edits
+  let s: number = scoreDoc(words, edits)
+  stateSet("selection.docId", id)
+  stateSet("selection.score", s)
+  return { ok: true, score: s }
+})
+
+// Chrome + main — dual Tauri webviews sharing state.* (phase 0b proof).
+createSurface({
+  id: "chrome",
+  kind: "webview",
+  label: "chrome",
+  url: "http://localhost:5177/chrome.html",
+  title: "Hybrid — Chrome",
+  width: 320,
+  height: 640,
+  titleBarStyle: "transparent"
+})
+
+createSurface({
+  id: "main",
+  kind: "webview",
+  label: "main",
+  url: "http://localhost:5177/",
+  title: "Hybrid — Main",
+  width: 720,
+  height: 640,
+  titleBarStyle: "transparent"
+})
+
+run({
+  profile: "desktop",
+  plugins: {
+    notification: true,
+    store: true,
+    menu: true,
+    tray: false,
+    singleInstance: false
+  }
+})

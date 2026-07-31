@@ -1,0 +1,134 @@
+// SC4 shell root: Native ‖ Webview + Tauri plugin demos via brokerInvoke.
+import { useState } from "tish:macos"
+import { brokerInvoke, stateSet, stateGet } from "cargo:tish_app"
+import { NativePane } from "./NativePane"
+import { DEMO, DEMO_HINT } from "./demo.tish"
+
+export fn Shell() {
+  let [count, setCount] = useState(0)
+  let [note, setNote] = useState("")
+  let [flag, setFlag] = useState(false)
+  let [docId, setDocId] = useState("a")
+  let [pluginLog, setPluginLog] = useState("")
+
+  let readPath = (path) => {
+    let r = stateGet(path)
+    if (r === null) return null
+    let v = r.value
+    if (v !== null) return v
+    return null
+  }
+
+  let hydrate = () => {
+    let c = readPath(DEMO.count)
+    if (c !== null) setCount(c)
+    let n = readPath(DEMO.note)
+    if (n !== null) setNote(n)
+    let f = readPath(DEMO.flag)
+    if (f !== null) setFlag(f === true)
+    let d = readPath(DEMO.docId)
+    if (d !== null) setDocId(d)
+  }
+
+  let bump = () => {
+    let n = count + 1
+    stateSet(DEMO.count, n)
+    setCount(n)
+  }
+
+  let changeNote = (v) => {
+    stateSet(DEMO.note, v)
+    setNote(v)
+  }
+
+  let changeFlag = (v) => {
+    stateSet(DEMO.flag, v)
+    setFlag(v)
+  }
+
+  let select = (id) => {
+    stateSet(DEMO.docId, id)
+    setDocId(id)
+  }
+
+  let notify = () => {
+    brokerInvoke("notification.show", {
+      title: "Hybrid",
+      body: "count " + count + " · doc " + docId + " · flag " + (flag === true ? "on" : "off"),
+    })
+  }
+
+  let plugin = (cmd, args) => {
+    let r = brokerInvoke(cmd, args)
+    setPluginLog(cmd + " → " + String(r))
+  }
+
+  let clipWrite = () => {
+    plugin("clipboard.writeText", { text: "hybrid-native · " + count })
+  }
+  let clipRead = () => {
+    plugin("clipboard.readText", {})
+  }
+  let dialogMsg = () => {
+    plugin("dialog.message", {
+      title: "Hybrid",
+      message: "From native pane via Tauri dialog plugin",
+    })
+  }
+  let osInfo = () => {
+    plugin("os.info", {})
+  }
+
+  let onBridge = (msg) => {
+    let args = {}
+    if (msg.args !== null) {
+      args = msg.args
+    }
+    let r = brokerInvoke(msg.cmd, args)
+    let cmd = msg.cmd
+    if (cmd === "state.set" || cmd === "state.patch" || cmd === "app.openDoc") {
+      hydrate()
+    }
+    return r
+  }
+
+  // Header + fill split: Column passes remaining height to the last element child
+  // (not trailing JSX whitespace). Native pane scrolls when the window is short.
+  return (
+    <column padding={10} gap={8}>
+      <text>{"Hybrid — Native ‖ Webview + Tauri plugins"}</text>
+      <text>{DEMO_HINT}</text>
+      <split height={"fill"} dividerPosition={340}>
+        <scrollable height={"fill"} direction="vertical" drawsBackground={false}>
+          <NativePane
+            count={count}
+            note={note}
+            flag={flag}
+            docId={docId}
+            pluginLog={pluginLog}
+            onBump={bump}
+            onNote={changeNote}
+            onFlag={changeFlag}
+            onSelect={select}
+            onRefresh={hydrate}
+            onNotify={notify}
+            onClipWrite={clipWrite}
+            onClipRead={clipRead}
+            onDialog={dialogMsg}
+            onOsInfo={osInfo}
+          />
+        </scrollable>
+        <column padding={8} gap={6}>
+          <text>{"Webview (lattish + ui-theme)"}</text>
+          <webview
+            id="wk-main"
+            bridge={true}
+            height={"fill"}
+            src={"http://localhost:5177/"}
+            onBridgeInvoke={onBridge}
+          />
+        </column>
+      </split>
+    </column>
+  )
+}

@@ -1,0 +1,11 @@
+// Pure browser Button (`--surface web`). Same API as Button.tish.
+export fn Button(props) {
+  let title = props.title === null ? "Button" : props.title
+  let el = document.createElement("button")
+  el.textContent = title
+  el.className = "btn btn-web"
+  if (props.onPress) {
+    el.onclick = () => props.onPress()
+  }
+  return el
+}

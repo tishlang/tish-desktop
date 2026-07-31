@@ -1,0 +1,39 @@
+// BYO UI example — no lattish. Typed shell helper + createSurface + state.*.
+import { run, handle, createSurface, stateSet } from "cargo:tish_app"
+
+fn greet(from: string): string {
+  return "hello from typed shell, " + from
+}
+
+handle("app.hello", (args) => {
+  let name: string = "ui"
+  if (args !== null && args.from !== null) {
+    name = String(args.from)
+  }
+  return { ok: true, message: greet(name), from: name }
+})
+
+stateSet("selection.docId", null)
+
+createSurface({
+  id: "main",
+  kind: "webview",
+  label: "main",
+  url: "http://localhost:5176/",
+  title: "BYO UI — Tish App",
+  width: 880,
+  height: 560,
+  titleBarStyle: "transparent"
+})
+
+run({
+  tickMs: 0,
+  plugins: {
+    dialog: true,
+    notification: true,
+    store: true,
+    menu: true,
+    tray: false,
+    singleInstance: false
+  }
+})

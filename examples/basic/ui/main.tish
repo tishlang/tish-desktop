@@ -1,6 +1,6 @@
 /** @jsxImportSource lattish */
 import { createRoot, useState, useEffect } from "lattish"
-import { invoke, listen, getCurrentWindowLabel, PROTOCOL } from "@tish-desktop/desktop-api"
+import { invoke, listen, getCurrentWindowLabel, PROTOCOL } from "@tishlang/tish-desktop-api"
 
 fn App() {
   let [ping, setPing] = useState(null)

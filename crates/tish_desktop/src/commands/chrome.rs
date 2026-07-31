@@ -1,7 +1,7 @@
 //! Dock badge, window chrome, tray, context menu, notifications, opener.
 
 use serde_json::{json, Value};
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::plugin::PermissionState;
 use tauri::window::{ProgressBarState, ProgressBarStatus};
 use tauri::{AppHandle, UserAttentionType};
@@ -25,6 +25,7 @@ pub fn try_dispatch(
         "dialog.message" => dialog_message(app, state, args),
         "dock.badge" => dock_badge(app, args),
         "dock.badgeLabel" => dock_badge_label(app, args),
+        "dock.setIcon" => dock_set_icon(app, args),
         "window.title" => window_title(app, args),
         "window.titleBarStyle" => window_title_bar_style(app, args),
         "window.decorations" => window_decorations(app, args),
@@ -34,14 +35,72 @@ pub fn try_dispatch(
         "window.attention" => window_attention(app, args),
         "tray.tooltip" => tray_tooltip(state, args),
         "tray.title" => tray_title(state, args),
+        "tray.setMenu" => tray_set_menu(app, state, args),
         "menu.context" => menu_context(app, state, args),
         "notification.permissionState" => notification_permission_state(app, state),
         "notification.requestPermission" => notification_request_permission(app, state),
         "notification.show" => notification_show(app, state, args),
         "opener.open" => opener_open(app, state, args),
+        // macOS traffic-light chrome (theme-driven inset + color tint); no-op off apple/macos.
+        "window.trafficLightInset" => traffic_light_inset(app, args),
+        "window.reapplyTrafficLightInset" => reapply_traffic_light_inset(app),
+        "window.trafficLightTint" => traffic_light_tint_cmd(app, args),
+        "window.reapplyTrafficLightTint" => reapply_traffic_light_tint_cmd(app),
         _ => return None,
     };
     Some(result)
+}
+
+// ---- traffic-light chrome (apple/macos does the work; everything else is a successful no-op) ----
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn traffic_light_inset(app: &AppHandle, args: &Value) -> Result<Value, String> {
+    crate::traffic_lights::set_inset(
+        app,
+        args.get("padX").and_then(|v| v.as_f64()),
+        args.get("padY").and_then(|v| v.as_f64()),
+        args.get("spacing").and_then(|v| v.as_f64()),
+    );
+    Ok(json!({ "ok": true }))
+}
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn reapply_traffic_light_inset(app: &AppHandle) -> Result<Value, String> {
+    crate::traffic_lights::reapply(app);
+    Ok(json!({ "ok": true }))
+}
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn traffic_light_tint_cmd(app: &AppHandle, args: &Value) -> Result<Value, String> {
+    let s = |k: &str| args.get(k).and_then(|v| v.as_str()).map(|x| x.to_string());
+    crate::traffic_light_tint::set_tint(
+        app,
+        s("close"),
+        s("minimize"),
+        s("zoom"),
+        args.get("diameter").and_then(|v| v.as_f64()),
+        args.get("opacity").and_then(|v| v.as_f64()),
+    );
+    Ok(json!({ "ok": true }))
+}
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn reapply_traffic_light_tint_cmd(app: &AppHandle) -> Result<Value, String> {
+    crate::traffic_light_tint::reapply(app);
+    Ok(json!({ "ok": true }))
+}
+
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn traffic_light_inset(_app: &AppHandle, _args: &Value) -> Result<Value, String> {
+    Ok(json!({ "ok": true }))
+}
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn reapply_traffic_light_inset(_app: &AppHandle) -> Result<Value, String> {
+    Ok(json!({ "ok": true }))
+}
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn traffic_light_tint_cmd(_app: &AppHandle, _args: &Value) -> Result<Value, String> {
+    Ok(json!({ "ok": true }))
+}
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn reapply_traffic_light_tint_cmd(_app: &AppHandle) -> Result<Value, String> {
+    Ok(json!({ "ok": true }))
 }
 
 fn dialog_message(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, String> {
@@ -87,10 +146,38 @@ fn dock_badge_label(app: &AppHandle, args: &Value) -> Result<Value, String> {
         .map(|s| s.to_string());
     let empty = label.as_ref().map(|s| s.is_empty()).unwrap_or(true);
     let next = if empty { None } else { label.clone() };
+    // `set_badge_label` is macOS-only in Tauri (unlike `set_badge_count`, which is cross-platform);
+    // no-op elsewhere so tish_desktop still compiles for linux/windows.
+    #[cfg(target_os = "macos")]
     catch_err("dock.badgeLabel", || {
         win.set_badge_label(next.clone()).map_err(|e| e.to_string())
     })?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = &win;
     Ok(json!({ "ok": true, "label": next }))
+}
+
+/// `dock.setIcon({ path })` — change the macOS dock icon at runtime from a PNG (or any
+/// NSImage-readable) file. Dispatches to the main thread (AppKit requires it; broker handlers run
+/// off-main). A successful no-op on non-macOS. Generic: any app on tish-desktop can rebrand its dock
+/// icon on the fly (state/notification variants), complementing the startup `RunConfig.icon`.
+#[allow(unused_variables)]
+fn dock_set_icon(app: &AppHandle, args: &Value) -> Result<Value, String> {
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or("path required")?
+        .to_string();
+    #[cfg(all(feature = "platform-apple", target_os = "macos"))]
+    {
+        let handle = app.clone();
+        handle
+            .run_on_main_thread(move || crate::app_icon::set_dock_icon(&path))
+            .map_err(|e| e.to_string())?;
+        return Ok(json!({ "ok": true }));
+    }
+    #[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+    Ok(json!({ "ok": true, "unsupported": true }))
 }
 
 fn window_title(app: &AppHandle, args: &Value) -> Result<Value, String> {
@@ -191,6 +278,40 @@ fn window_attention(app: &AppHandle, args: &Value) -> Result<Value, String> {
     win.request_user_attention(attention)
         .map_err(|e| e.to_string())?;
     Ok(json!({ "ok": true, "kind": kind }))
+}
+
+/// Rebuild the tray's context menu from a host-supplied item list. Each item is
+/// `{ id, label, enabled? }` or `{ separator: true }`. Lets a hosted app own a dynamic tray menu
+/// instead of the runtime's default. Item clicks fire through the tray's on_menu_event (set at
+/// build time), which emits a generic `tray:action` { id } for the host to interpret.
+fn tray_set_menu(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value, String> {
+    if !state.has_permission("tray") {
+        return Err("tray permission denied".into());
+    }
+    let items = args
+        .get("items")
+        .and_then(|v| v.as_array())
+        .ok_or("items required")?;
+    let menu = Menu::new(app).map_err(|e| e.to_string())?;
+    for it in items {
+        if it.get("separator").and_then(|v| v.as_bool()).unwrap_or(false) {
+            let sep = PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?;
+            menu.append(&sep).map_err(|e| e.to_string())?;
+            continue;
+        }
+        let id = it.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let label = it.get("label").and_then(|v| v.as_str()).unwrap_or("");
+        let enabled = it.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+        let mi =
+            MenuItem::with_id(app, id, label, enabled, None::<&str>).map_err(|e| e.to_string())?;
+        menu.append(&mi).map_err(|e| e.to_string())?;
+    }
+    let tray = state.tray.lock();
+    let Some(tray) = tray.as_ref() else {
+        return Err("tray not available".into());
+    };
+    tray.set_menu(Some(menu)).map_err(|e| e.to_string())?;
+    Ok(json!({ "ok": true }))
 }
 
 fn tray_tooltip(state: &AppState, args: &Value) -> Result<Value, String> {

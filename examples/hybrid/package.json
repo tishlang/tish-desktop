@@ -1,0 +1,44 @@
+{
+  "name": "tish-desktop-example-hybrid",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "tish": {
+    "source": "./src/main.tish",
+    "platform": "macos",
+    "surface": "webview",
+    "rustDependencies": {
+      "tish_app": { "path": "../../crates/tish_app" }
+    }
+  },
+  "scripts": {
+    "build:css": "tish run --feature fs scripts/build-css.tish",
+    "dev:web": "npm run build:css && TISH_PLATFORM=web TISH_SURFACE=web vite --config vite.web.config.mjs",
+    "dev:ui": "npm run build:css && TISH_PLATFORM=macos TISH_SURFACE=webview vite",
+    "dev:desktop": "npm run build:shell && ./dist/hybrid-shell",
+    "dev:shell": "npm run build:shell && ./dist/hybrid-shell",
+    "dev:multi": "node ./scripts/dev-multi.mjs",
+    "dev:hybrid": "node ./scripts/dev-hybrid.mjs",
+    "dev:hybrid:rebuild": "node ./scripts/dev-hybrid.mjs --rebuild",
+    "build:web": "npm run build:css && TISH_PLATFORM=web TISH_SURFACE=web vite build --config vite.web.config.mjs",
+    "build:ui": "npm run build:css && TISH_PLATFORM=macos TISH_SURFACE=webview vite build",
+    "build:shell": "tish build --target native --native-backend rust --check warn src/main.tish -o dist/hybrid-shell",
+    "build:shell:apple": "node ./scripts/build-shell-apple.mjs",
+    "check:tree": "node ./scripts/check-tree.mjs",
+    "dev": "node ../../cli/bin/mode.js dev --example hybrid",
+    "start": "npm run build:ui && npm run build:shell && ./dist/hybrid-shell"
+  },
+  "dependencies": {
+    "@tishlang/tish-app-api": "file:../../packages/app-api",
+    "@tishlang/tish-desktop-api": "file:../../packages/desktop-api",
+    "@tishlang/tish-desktop-shared": "file:../../packages/shared",
+    "@tishlang/tish-desktop-ui-theme": "file:../../packages/ui-theme",
+    "lattish": "file:../../../lattish",
+    "tish-macos": "file:../../../tish-apple/crates/tish-macos",
+    "tish-tailwind": "file:../../../tish-tailwind"
+  },
+  "devDependencies": {
+    "@tishlang/vite-plugin-tish": "file:../../../tish/npm/vite-plugin-tish",
+    "vite": "^6.0.0"
+  }
+}
