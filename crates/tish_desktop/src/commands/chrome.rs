@@ -146,9 +146,14 @@ fn dock_badge_label(app: &AppHandle, args: &Value) -> Result<Value, String> {
         .map(|s| s.to_string());
     let empty = label.as_ref().map(|s| s.is_empty()).unwrap_or(true);
     let next = if empty { None } else { label.clone() };
+    // `set_badge_label` is macOS-only in Tauri (unlike `set_badge_count`, which is cross-platform);
+    // no-op elsewhere so tish_desktop still compiles for linux/windows.
+    #[cfg(target_os = "macos")]
     catch_err("dock.badgeLabel", || {
         win.set_badge_label(next.clone()).map_err(|e| e.to_string())
     })?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = &win;
     Ok(json!({ "ok": true, "label": next }))
 }
 
