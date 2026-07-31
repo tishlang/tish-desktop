@@ -100,7 +100,7 @@ jobs:
           rg -n "attach_app|broadcast_event" crates/tish_desktop/src/platform/apple.rs crates/tish_desktop/src/local_invoke.rs
 
   rust-macos:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       # Pinned: ring 0.17.14 (newest published) panics at const-eval on stable newer than
