@@ -49,10 +49,30 @@ jobs:
       # The Cargo path-deps (../../../tish, ../../../tish-apple) resolve to SIBLINGS of
       # $GITHUB_WORKSPACE. actions/checkout refuses any path outside the workspace, so
       # clone the (public) sources directly to those sibling paths instead.
-      - name: Checkout tish core (path dep)
-        run: git clone --depth 1 https://github.com/tishlang/tish.git ../tish
-      - name: Checkout tish-apple (platform-apple path dep)
-        run: git clone --depth 1 https://github.com/tishlang/tish-apple.git ../tish-apple
+      #
+      # A change that spans repos (a crate rename, an ABI bump) would otherwise deadlock:
+      # this PR needs the sibling's matching branch, and the sibling's PR needs this one,
+      # so both sit red until someone merges blind. Prefer a sibling branch with the SAME
+      # name as this PR's head branch, and fall back to the default branch when there
+      # isn't one — which is every ordinary PR.
+      - name: Checkout path-dep siblings (tish, tish-apple)
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          clone_sibling() {
+            repo="$1"
+            url="https://github.com/tishlang/$repo.git"
+            if [ -n "${HEAD_REF:-}" ] && git ls-remote --exit-code --heads "$url" "$HEAD_REF" >/dev/null 2>&1; then
+              echo ">> $repo: coordinated branch $HEAD_REF"
+              git clone --depth 1 --branch "$HEAD_REF" "$url" "../$repo"
+            else
+              echo ">> $repo: default branch"
+              git clone --depth 1 "$url" "../$repo"
+            fi
+          }
+          clone_sibling tish
+          clone_sibling tish-apple
       - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
         # These optional platform-host crates have no public repo yet, but Cargo must
         # read every path-dep manifest to resolve the workspace. Write empty stub crates
@@ -133,11 +153,26 @@ jobs:
           rustc --print cfg -C target-cpu=native --target aarch64-apple-darwin \
             | grep -E 'target_feature="(neon|aes|sha2|sha3)"' || true
       # Siblings of $GITHUB_WORKSPACE (see the rust job) — clone directly since
-      # actions/checkout can't write outside the workspace.
-      - name: Checkout tish core
-        run: git clone --depth 1 https://github.com/tishlang/tish.git ../tish
-      - name: Checkout tish-apple
-        run: git clone --depth 1 https://github.com/tishlang/tish-apple.git ../tish-apple
+      # actions/checkout can't write outside the workspace, preferring a coordinated
+      # branch of the same name so cross-repo changes don't deadlock.
+      - name: Checkout path-dep siblings (tish, tish-apple)
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          clone_sibling() {
+            repo="$1"
+            url="https://github.com/tishlang/$repo.git"
+            if [ -n "${HEAD_REF:-}" ] && git ls-remote --exit-code --heads "$url" "$HEAD_REF" >/dev/null 2>&1; then
+              echo ">> $repo: coordinated branch $HEAD_REF"
+              git clone --depth 1 --branch "$HEAD_REF" "$url" "../$repo"
+            else
+              echo ">> $repo: default branch"
+              git clone --depth 1 "$url" "../$repo"
+            fi
+          }
+          clone_sibling tish
+          clone_sibling tish-apple
       - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
         # Same as the linux job: Cargo reads every path-dep manifest to resolve the
         # workspace, so stub the optional platform crates that have no public repo.
