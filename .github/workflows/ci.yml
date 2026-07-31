@@ -28,9 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Pinned to the toolchain the project builds with (ring 0.17.14, the newest
-      # published, panics at const-eval on newer stable for aarch64-apple — see rust-macos).
-      # Pin both jobs to the same known-good rustc for reproducibility.
+      # Pinned to the toolchain the project develops against, so CI and local builds
+      # resolve the same rustc. Keep both rust jobs on the same version.
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.0"
@@ -71,13 +70,12 @@ jobs:
         run: cargo install --path ../tish/crates/tish --force --bin tish
       - name: Check (default features)
         run: cargo check -p tish_desktop -p tish_app
-      - name: Check platform-apple feature gates (compile metadata)
-        # Full link of tish-macos needs macOS; ensure the feature resolves on Linux.
-        run: cargo check -p tish_desktop --features platform-apple
-        continue-on-error: true
-      # platform-ms / platform-lin / platform-android are not compile-tested here: their
-      # host crates have no public repo, only the resolution stubs above. The default and
-      # platform-apple checks already exercise the real, buildable configurations.
+      # platform-apple is NOT checked here. It pulls objc2, which is a hard
+      # `compile_error!` off Apple targets, so the step could only ever be red-and-ignored.
+      # The rust-macos job compile-checks that feature for real.
+      # platform-ms / platform-lin / platform-android are not compile-tested either: their
+      # host crates have no public repo, only the resolution stubs above. The default check
+      # here plus the macOS job exercise the real, buildable configurations.
       - name: Typed shell --check warn (byo-ui + hybrid + basic)
         run: |
           npm --prefix examples/byo-ui install
@@ -96,19 +94,44 @@ jobs:
             --platform macos --surface webview \
             --resolve ./Button --importer "$IMPORTER"
       - name: Prove attach_app wiring references
+        # grep, not rg: ripgrep is not on the ubuntu-latest image.
         run: |
-          rg -n "attach_app|broadcast_event" crates/tish_desktop/src/platform/apple.rs crates/tish_desktop/src/local_invoke.rs
+          grep -nE "attach_app|broadcast_event" \
+            crates/tish_desktop/src/platform/apple.rs \
+            crates/tish_desktop/src/local_invoke.rs
 
   rust-macos:
     runs-on: macos-15
+    # `tish build --target native` (tish_build_utils::run_cargo_build) appends
+    # `-C target-cpu=native` unless RUSTFLAGS already pins a target-cpu. GitHub's
+    # Apple-Silicon runners are virtualized, LLVM cannot identify the host core, and
+    # `native` degrades to `generic` — which drops `aes`/`sha2` from the aarch64 feature
+    # set that aarch64-apple-darwin normally guarantees. ring then fails const-eval:
+    #   assertion failed: (CAPS_STATIC & MIN_STATIC_FEATURES) == MIN_STATIC_FEATURES
+    #   assertion failed: CAPS_STATIC == MIN_STATIC_FEATURES
+    # Not a rustc-version or ring-version problem (there is no ring > 0.17.14): pin the
+    # CPU to apple-m1, which is exactly rustc's own default for this target and the
+    # floor for every Apple-Silicon runner, so the flag is a no-op on real hardware.
+    env:
+      RUSTFLAGS: "-C target-cpu=apple-m1"
     steps:
       - uses: actions/checkout@v4
-      # Pinned: ring 0.17.14 (newest published) panics at const-eval on stable newer than
-      # this for aarch64-apple-darwin (`_AARCH64_APPLE_TARGETS_EXPECTED_FEATURES`). 1.94.0
-      # is the toolchain the project builds with; there is no ring > 0.17.14 to update to.
+      # Pinned to the toolchain the project develops against (same as the rust job).
+      # aarch64-apple-ios-sim is needed by the hello-ios staticlib step.
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.0"
+          targets: aarch64-apple-ios-sim
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Record host CPU detection
+        # Diagnostic: shows what `-C target-cpu=native` would have resolved to on this
+        # runner, so a future recurrence is one log line away from being explained.
+        run: |
+          rustc --print target-cpus --target aarch64-apple-darwin | head -3
+          rustc --print cfg -C target-cpu=native --target aarch64-apple-darwin \
+            | grep -E 'target_feature="(neon|aes|sha2|sha3)"' || true
       # Siblings of $GITHUB_WORKSPACE (see the rust job) — clone directly since
       # actions/checkout can't write outside the workspace.
       - name: Checkout tish core
