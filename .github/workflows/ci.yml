@@ -5,6 +5,15 @@ on:
   push:
     branches: [main, master]
 
+# This workflow costs ~35 runner-minutes, so a rapid re-push otherwise doubles it while the
+# first run is already obsolete. Same shape as tish's native-smoke.yml.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   tish:
     runs-on: ubuntu-latest
@@ -26,6 +35,14 @@ jobs:
 
   rust:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # `tish build --native-backend rust` generates a crate and shells out to cargo. Its default
+      # nested profile is lto="fat" + codegen-units=1 + strip — the slowest possible release
+      # config, for binaries CI only ever compiles and links, never runs or measures. This flag
+      # switches to opt-level=1 / lto=false / codegen-units=16 / incremental, and enables mold
+      # on Linux. Release artifacts are built elsewhere and are unaffected.
+      TISH_FAST_NATIVE_BUILD: "1"
     steps:
       - uses: actions/checkout@v4
       # Pinned to the toolchain the project develops against, so CI and local builds
@@ -34,6 +51,16 @@ jobs:
         with:
           toolchain: "1.94.0"
           components: rustfmt, clippy
+
+      # NOTE: deliberately no sccache. `tish build --native-backend rust` strips RUSTC_WRAPPER
+      # (tish_build_utils::run_cargo_build env_removes it), so it cannot help the steps that
+      # dominate this job — and tish's own http-perf.yml / native-smoke.yml document it flaking
+      # exactly that nested compile. rust-cache is the mechanism that works here.
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          cache-workspace-crates: "true"
+
       - name: Install Tauri Linux system deps
         # Tauri's Linux (gtk/webkit/glib/soup) build-scripts need these dev packages;
         # without them cargo fails with "Package glib-2.0 was not found in pkg-config".
@@ -46,64 +73,62 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      # The Cargo path-deps (../../../tish, ../../../tish-apple) resolve to SIBLINGS of
-      # $GITHUB_WORKSPACE. actions/checkout refuses any path outside the workspace, so
-      # clone the (public) sources directly to those sibling paths instead.
-      #
-      # A change that spans repos (a crate rename, an ABI bump) would otherwise deadlock:
-      # this PR needs the sibling's matching branch, and the sibling's PR needs this one,
-      # so both sit red until someone merges blind. Prefer a sibling branch with the SAME
-      # name as this PR's head branch, and fall back to the default branch when there
-      # isn't one — which is every ordinary PR.
-      - name: Checkout path-dep siblings (tish, tish-apple)
-        env:
-          HEAD_REF: ${{ github.head_ref }}
+
+      - name: Checkout path-dep siblings
+        id: siblings
+        uses: ./.github/actions/tish-siblings
+        with:
+          head-ref: ${{ github.head_ref }}
+
+      # The single most valuable cache in this job. tish_native/src/build.rs resolves the nested
+      # cargo target dir as <tish-checkout>/target, but ONLY if that directory already exists —
+      # otherwise every `tish build` gets its own scratch target and recompiles Tauri from
+      # scratch. Building the CLI below populates it, and every example shell then shares it.
+      # Keyed on the tish commit so a sibling bump invalidates cleanly; the prefix restore-key
+      # still gives a warm start when it moves.
+      - name: Cache the tish sibling target dir
+        uses: actions/cache@v4
+        with:
+          path: ../tish/target
+          key: tish-target-${{ runner.os }}-${{ steps.siblings.outputs.tish-sha }}
+          restore-keys: |
+            tish-target-${{ runner.os }}-
+
+      - name: Build the tish CLI
+        # `cargo build` rather than `cargo install`: install builds in a temp dir and leaves
+        # <tish-checkout>/target absent, which is what forced every example shell to recompile
+        # Tauri independently. This is also how tish builds its own CLI (native-smoke.yml).
         run: |
           set -euo pipefail
-          clone_sibling() {
-            repo="$1"
-            url="https://github.com/tishlang/$repo.git"
-            if [ -n "${HEAD_REF:-}" ] && git ls-remote --exit-code --heads "$url" "$HEAD_REF" >/dev/null 2>&1; then
-              echo ">> $repo: coordinated branch $HEAD_REF"
-              git clone --depth 1 --branch "$HEAD_REF" "$url" "../$repo"
-            else
-              echo ">> $repo: default branch"
-              git clone --depth 1 "$url" "../$repo"
-            fi
-          }
-          clone_sibling tish
-          clone_sibling tish-apple
-      - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
-        # These optional platform-host crates have no public repo yet, but Cargo must
-        # read every path-dep manifest to resolve the workspace. Write empty stub crates
-        # so resolution succeeds; their features stay OFF here, so the stubs never compile.
-        run: |
-          for c in tish-ms tish-lin tish-android; do
-            d="../$c/crates/$c"
-            if [ ! -f "$d/Cargo.toml" ]; then
-              mkdir -p "$d/src"
-              printf '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2021"\n' "$c" > "$d/Cargo.toml"
-              : > "$d/src/lib.rs"
-            fi
-          done
-      - name: Install local tish CLI
-        run: cargo install --path ../tish/crates/tish --force --bin tish
+          cargo build --release -p tishlang --bin tish --manifest-path ../tish/Cargo.toml
+          echo "$(cd ../tish/target/release && pwd)" >> "$GITHUB_PATH"
+
       - name: Check (default features)
         run: cargo check -p tishlang_desktop -p tishlang_app
       # platform-apple is NOT checked here. It pulls objc2, which is a hard
       # `compile_error!` off Apple targets, so the step could only ever be red-and-ignored.
       # The rust-macos job compile-checks that feature for real.
       # platform-ms / platform-lin / platform-android are not compile-tested either: their
-      # host crates have no public repo, only the resolution stubs above. The default check
+      # host crates have no public repo, only the resolution stubs. The default check
       # here plus the macOS job exercise the real, buildable configurations.
-      - name: Typed shell --check warn (byo-ui + hybrid + basic)
+
+      - name: Typed shell --check warn (hybrid)
+        # hybrid is the richest shell (Phase 2 tree + SC4), so it is the one PRs always build.
+        run: |
+          npm --prefix examples/hybrid install
+          npm --prefix examples/hybrid run build:shell
+
+      - name: Typed shell --check warn (byo-ui + basic)
+        # These two exercise the same host through thinner surfaces. They add ~7 min for little
+        # extra signal on a PR, so they run on main — where a regression still lands before any
+        # release — and on demand via the run-all-examples label.
+        if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-all-examples')
         run: |
           npm --prefix examples/byo-ui install
-          npm --prefix examples/hybrid install
           npm --prefix examples/basic install
           npm --prefix examples/byo-ui run build:shell
-          npm --prefix examples/hybrid run build:shell
           npm --prefix examples/basic run build:shell
+
       - name: Hybrid Phase 2 tree + SC4 scripts
         run: npm --prefix examples/hybrid run check:tree
       - name: Doctor smoke (resolve + cap matrix)
@@ -122,6 +147,7 @@ jobs:
 
   rust-macos:
     runs-on: macos-15
+    timeout-minutes: 45
     # `tish build --target native` (tish_build_utils::run_cargo_build) appends
     # `-C target-cpu=native` unless RUSTFLAGS already pins a target-cpu. GitHub's
     # Apple-Silicon runners are virtualized, LLVM cannot identify the host core, and
@@ -134,6 +160,8 @@ jobs:
     # floor for every Apple-Silicon runner, so the flag is a no-op on real hardware.
     env:
       RUSTFLAGS: "-C target-cpu=apple-m1"
+      # See the rust job — fast nested profile for compile-and-link verification.
+      TISH_FAST_NATIVE_BUILD: "1"
     steps:
       - uses: actions/checkout@v4
       # Pinned to the toolchain the project develops against (same as the rust job).
@@ -142,6 +170,13 @@ jobs:
         with:
           toolchain: "1.94.0"
           targets: aarch64-apple-ios-sim
+
+      # No sccache here either — see the rust job.
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          cache-workspace-crates: "true"
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -152,49 +187,43 @@ jobs:
           rustc --print target-cpus --target aarch64-apple-darwin | head -3
           rustc --print cfg -C target-cpu=native --target aarch64-apple-darwin \
             | grep -E 'target_feature="(neon|aes|sha2|sha3)"' || true
-      # Siblings of $GITHUB_WORKSPACE (see the rust job) — clone directly since
-      # actions/checkout can't write outside the workspace, preferring a coordinated
-      # branch of the same name so cross-repo changes don't deadlock.
-      - name: Checkout path-dep siblings (tish, tish-apple)
-        env:
-          HEAD_REF: ${{ github.head_ref }}
+
+      - name: Checkout path-dep siblings
+        id: siblings
+        uses: ./.github/actions/tish-siblings
+        with:
+          head-ref: ${{ github.head_ref }}
+
+      - name: Cache the tish sibling target dir
+        # See the rust job: this directory existing is what lets the shell builds share one
+        # cargo target instead of recompiling Tauri per build.
+        uses: actions/cache@v4
+        with:
+          path: ../tish/target
+          key: tish-target-${{ runner.os }}-${{ steps.siblings.outputs.tish-sha }}
+          restore-keys: |
+            tish-target-${{ runner.os }}-
+
+      - name: Build the tish CLI
         run: |
           set -euo pipefail
-          clone_sibling() {
-            repo="$1"
-            url="https://github.com/tishlang/$repo.git"
-            if [ -n "${HEAD_REF:-}" ] && git ls-remote --exit-code --heads "$url" "$HEAD_REF" >/dev/null 2>&1; then
-              echo ">> $repo: coordinated branch $HEAD_REF"
-              git clone --depth 1 --branch "$HEAD_REF" "$url" "../$repo"
-            else
-              echo ">> $repo: default branch"
-              git clone --depth 1 "$url" "../$repo"
-            fi
-          }
-          clone_sibling tish
-          clone_sibling tish-apple
-      - name: Stub absent platform siblings (tish-ms / tish-lin / tish-android)
-        # Same as the linux job: Cargo reads every path-dep manifest to resolve the
-        # workspace, so stub the optional platform crates that have no public repo.
-        run: |
-          for c in tish-ms tish-lin tish-android; do
-            d="../$c/crates/$c"
-            if [ ! -f "$d/Cargo.toml" ]; then
-              mkdir -p "$d/src"
-              printf '[package]\nname = "%s"\nversion = "0.0.0"\nedition = "2021"\n' "$c" > "$d/Cargo.toml"
-              : > "$d/src/lib.rs"
-            fi
-          done
+          cargo build --release -p tishlang --bin tish --manifest-path ../tish/Cargo.toml
+          echo "$(cd ../tish/target/release && pwd)" >> "$GITHUB_PATH"
+
       - name: Check with platform-apple
         run: cargo check -p tishlang_desktop --features platform-apple -p tishlang_app
-      - name: Install tish CLI + hybrid apple shell build (SC4)
+
+      - name: Hybrid apple shell build (SC4)
         run: |
-          cargo install --path ../tish/crates/tish --force --bin tish
           npm --prefix examples/hybrid install
           npm --prefix examples/hybrid run check:tree
           npm --prefix examples/hybrid run build:shell:apple
           test -x examples/hybrid/dist/hybrid-shell-apple
+
       - name: hello-ios staticlib (BrokerCore + tish:ios host)
+        # Cross-compiles to aarch64-apple-ios-sim, so it shares nothing with the host builds
+        # above and costs ~4 min. Runs on main and on demand rather than on every PR.
+        if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-all-examples')
         run: |
           npm --prefix examples/hello-ios install
           npm --prefix examples/hello-ios run build
