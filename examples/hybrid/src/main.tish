@@ -12,8 +12,12 @@ handle("app.openDoc", (args) => {
   // Avoid `=== undefined` — native codegen does not emit a Rust `undefined` binding.
   let words: number = 0
   let edits: number = 0
-  if (args.wordCount !== null) words = args.wordCount
-  if (args.edits !== null) edits = args.edits
+  if (args.wordCount !== null) {
+    words = args.wordCount
+  }
+  if (args.edits !== null) {
+    edits = args.edits
+  }
   let s: number = scoreDoc(words, edits)
   stateSet("selection.docId", id)
   stateSet("selection.score", s)
@@ -45,11 +49,5 @@ createSurface({
 
 run({
   profile: "desktop",
-  plugins: {
-    notification: true,
-    store: true,
-    menu: true,
-    tray: false,
-    singleInstance: false
-  }
+  plugins: { notification: true, store: true, menu: true, tray: false, singleInstance: false }
 })

@@ -3,11 +3,9 @@
 export fn Button(props) {
   let label = props.label !== null ? props.label : "Button"
   let onPress = props.onPress
-  return (
-    <button onClick={() => {
-      if (onPress) {
-        onPress()
-      }
-    }}>{"ios:" + label}</button>
-  )
+  return <button onClick={() => {
+    if (onPress) {
+      onPress()
+    }
+  }}>{"ios:" + label}</button>
 }

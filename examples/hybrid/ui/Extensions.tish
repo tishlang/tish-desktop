@@ -12,18 +12,14 @@ fn Extensions() {
   let [log, setLog] = useState("Ready — clipboard / dialog / os via Tauri plugins")
 
   let run = (cmd, args) => {
-    invoke(cmd, args === null || args === undefined ? {} : args).then(
-      (r) => {
-        setLog(cmd + " → " + JSON.stringify(r))
-      },
-      (e) => {
+    invoke(cmd, args === null || args === undefined ? {} : args).then((r) => {
+      setLog(cmd + " → " + JSON.stringify(r))
+    }, (e) => {
         setLog(cmd + " ✗ " + String(e))
-      }
-    )
+      })
   }
 
-  return (
-    <div class="p-5 font-sans text-foreground">
+  return <div class="p-5 font-sans text-foreground">
       <div class="flex items-center gap-2 mb-1">
         <h1 class="text-xl font-semibold tracking-tight">Tauri extensions</h1>
         <Badge>plugins</Badge>
@@ -37,11 +33,7 @@ fn Extensions() {
       </pre>
 
       <Section title="Clipboard" hint="plugins.clipboard">
-        <Button
-          onClick={() =>
-            run("clipboard.writeText", { text: DEMO_TITLE + " · " + Date.now() })
-          }
-        >
+        <Button onClick={() => run("clipboard.writeText", { text: DEMO_TITLE + " · " + Date.now() })}>
           Write text
         </Button>
         <Button variant="secondary" onClick={() => run("clipboard.readText", {})}>
@@ -50,15 +42,10 @@ fn Extensions() {
       </Section>
 
       <Section title="Dialog" hint="plugins.dialog">
-        <Button
-          variant="outline"
-          onClick={() =>
-            run("dialog.message", {
-              title: DEMO_TITLE,
-              message: "Hello from Tauri dialog plugin",
-            })
-          }
-        >
+        <Button variant="outline" onClick={() => run("dialog.message", {
+    title: DEMO_TITLE,
+    message: "Hello from Tauri dialog plugin"
+  })}>
           Message
         </Button>
       </Section>
@@ -72,7 +59,6 @@ fn Extensions() {
         </Button>
       </Section>
     </div>
-  )
 }
 
 createRoot(document.getElementById("root")).render(Extensions)

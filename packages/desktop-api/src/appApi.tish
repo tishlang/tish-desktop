@@ -6,7 +6,9 @@ import { EVT_STATE_CHANGED } from "@tishlang/tish-desktop-shared"
 fn bridge() {
   let g = globalThis
   let b = g.__TISH_APP__
-  if (b === null || b === undefined) b = g.__TISH_DESKTOP__
+  if (b === null || b === undefined) {
+    b = g.__TISH_DESKTOP__
+  }
   if (b === null || b === undefined) {
     console.error("tish-app bridge not installed — import bridge.js or web-bridge.js first")
     return null
@@ -16,7 +18,9 @@ fn bridge() {
 
 export fn getCurrentWindowLabel() {
   let b = bridge()
-  if (b === null) return "main"
+  if (b === null) {
+    return "main"
+  }
   return b.getCurrentWindowLabel()
 }
 
@@ -56,9 +60,15 @@ export fn statePatch(path, value) {
 export fn useSharedState(path, onChange) {
   return listen(EVT_STATE_CHANGED, (payload) => {
     let p = payload.path
-    if (p === undefined) p = payload.key
-    if (path !== null && path !== undefined && p !== path) return
-    if (onChange) onChange(payload.value, p, payload.revision, payload.source)
+    if (p === undefined) {
+      p = payload.key
+    }
+    if (path !== null && path !== undefined && p !== path) {
+      return
+    }
+    if (onChange) {
+      onChange(payload.value, p, payload.revision, payload.source)
+    }
   })
 }
 

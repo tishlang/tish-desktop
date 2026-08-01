@@ -25,14 +25,17 @@ export fn NativePane(props) {
   let logLabel = pluginLog === null || pluginLog === "" ? "—" : String(pluginLog)
 
   let pickA = () => {
-    if (onSelect) onSelect("a")
+    if (onSelect) {
+      onSelect("a")
+    }
   }
   let pickB = () => {
-    if (onSelect) onSelect("b")
+    if (onSelect) {
+      onSelect("b")
+    }
   }
 
-  return (
-    <column padding={12} gap={10}>
+  return <column padding={12} gap={10}>
       <text>{"Native"}</text>
       <text>{"count=" + count + "  flag=" + flagLabel}</text>
       <text>{"doc=" + docLabel + "  (" + DEMO.count + ")"}</text>
@@ -53,5 +56,4 @@ export fn NativePane(props) {
       <Button title="OS info" onPress={onOsInfo} />
       <text>{logLabel}</text>
     </column>
-  )
 }

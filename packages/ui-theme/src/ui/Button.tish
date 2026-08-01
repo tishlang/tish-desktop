@@ -1,7 +1,9 @@
 /** @jsxImportSource lattish */
 
 fn cx(base, extra) {
-  if (extra === null || extra === undefined || extra === "") return base
+  if (extra === null || extra === undefined || extra === "") {
+    return base
+  }
   return base + " " + extra
 }
 
@@ -25,9 +27,15 @@ fn variantClass(variant) {
 }
 
 fn sizeClass(size) {
-  if (size === "sm") return "h-8 px-3 text-xs"
-  if (size === "lg") return "h-11 px-5 text-base"
-  if (size === "icon") return "h-9 w-9 p-0"
+  if (size === "sm") {
+    return "h-8 px-3 text-xs"
+  }
+  if (size === "lg") {
+    return "h-11 px-5 text-base"
+  }
+  if (size === "icon") {
+    return "h-9 w-9 p-0"
+  }
   return "h-9 px-4 text-sm"
 }
 
@@ -38,12 +46,7 @@ export fn Button(props) {
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-opacity disabled:pointer-events-none disabled:opacity-50",
     cx(variantClass(variant), cx(sizeClass(size), props.class))
   )
-  return <button
-      type={props.type !== null && props.type !== undefined ? props.type : "button"}
-      class={className}
-      disabled={props.disabled}
-      onClick={props.onClick}
-    >
+  return <button type={props.type !== null && props.type !== undefined ? props.type : "button"} class={className} disabled={props.disabled} onClick={props.onClick}>
       {props.children}
     </button>
 }

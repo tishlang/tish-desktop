@@ -21,13 +21,19 @@ fn usage() {
   console.log("")
   console.log("Commands:")
   console.log("  init [dir]              Scaffold a desktop app")
-  console.log("  dev [--example name]    Vite UI + native shell (parity with scripts/dev-example.mjs)")
+  console.log(
+    "  dev [--example name]    Vite UI + native shell (parity with scripts/dev-example.mjs)"
+  )
   console.log("  build [dir]             Production UI + native shell → dist/")
   console.log("  ios [--example name]    Build + launch iOS example on Simulator (no Xcode UI)")
-  console.log("  doctor                  Platform/surface, resolve probe, cap matrix (≡ tish app doctor)")
+  console.log(
+    "  doctor                  Platform/surface, resolve probe, cap matrix (≡ tish app doctor)"
+  )
   console.log("  info                    Print tish / rustc / platform summary")
   console.log("  icon [dir]              Generate icon set into project icons/")
-  console.log("  distribute <step>       Run scripts/distribute/* (build|sign|notarize|updater|release)")
+  console.log(
+    "  distribute <step>       Run scripts/distribute/* (build|sign|notarize|updater|release)"
+  )
   console.log("  help                    Show this message")
   console.log("")
   console.log("Init options:")

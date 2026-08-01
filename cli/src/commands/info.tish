@@ -59,7 +59,9 @@ export fn runInfo(_args) {
     platform = String(env["OSTYPE"])
   } else {
     let u = capture("uname -s")
-    if (u.text !== "") platform = u.text.split("\n")[0]
+    if (u.text !== "") {
+      platform = u.text.split("\n")[0]
+    }
   }
   console.log("platform: " + platform)
   console.log("")

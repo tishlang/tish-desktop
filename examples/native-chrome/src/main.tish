@@ -31,11 +31,7 @@ run({
     auth: true,
     singleInstance: false
   },
-  shellAllow: [
-    { name: "echo", cmd: "echo", argsPrefix: [] }
-  ],
+  shellAllow: [{ name: "echo", cmd: "echo", argsPrefix: [] }],
   httpAllow: ["example.com"],
-  auth: {
-    tokenHosts: ["oauth2.googleapis.com", "github.com", "login.microsoftonline.com"]
-  }
+  auth: { tokenHosts: ["oauth2.googleapis.com", "github.com", "login.microsoftonline.com"] }
 })

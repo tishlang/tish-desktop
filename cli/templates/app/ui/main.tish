@@ -31,12 +31,8 @@ fn App() {
 
       {hello !== null ? <Card class="mt-4">
           <CardHeader>
-            <h2 class="font-semibold">Response</h2>
-          </CardHeader>
-          <CardBody>
-            <pre class="text-sm whitespace-pre-wrap">{JSON.stringify(hello, null, 2)}</pre>
-          </CardBody>
-        </Card> : null}
+            <h2 class="font-semibold">Response</h2></CardHeader><CardBody>
+            <pre class="text-sm whitespace-pre-wrap">{JSON.stringify(hello, null, 2)}</pre></CardBody></Card> : null}
     </div>
 }
 

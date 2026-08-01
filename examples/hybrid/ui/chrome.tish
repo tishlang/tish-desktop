@@ -13,11 +13,16 @@ fn Chrome() {
 
   useEffect(() => {
     useSharedState(DEMO.docId, (v) => {
-      if (v !== null && v !== undefined) setDocId(String(v))
-      else setDocId(null)
+      if (v !== null && v !== undefined) {
+        setDocId(String(v))
+      } else {
+        setDocId(null)
+      }
     })
     invoke("state.get", { path: DEMO.docId }).then((r) => {
-      if (r && r.value !== null && r.value !== undefined) setDocId(String(r.value))
+      if (r && r.value !== null && r.value !== undefined) {
+        setDocId(String(r.value))
+      }
     })
   }, [])
 
@@ -27,8 +32,7 @@ fn Chrome() {
     })
   }
 
-  return (
-    <div class="p-4 font-sans text-foreground">
+  return <div class="p-4 font-sans text-foreground">
       <div class="flex items-center gap-2 mb-2">
         <h1 class="text-lg font-semibold">Chrome</h1>
         <Badge>webview</Badge>
@@ -43,7 +47,6 @@ fn Chrome() {
         <Button variant="outline" onClick={() => pick("demo-3", 10, 2)}>demo-3</Button>
       </div>
     </div>
-  )
 }
 
 createRoot(document.getElementById("root")).render(Chrome)

@@ -5,7 +5,7 @@ export const DEMO = {
   count: "demo.count",
   note: "demo.note",
   flag: "demo.flag",
-  docId: "selection.docId",
+  docId: "selection.docId"
 }
 
 export const DEMO_TITLE = "Hybrid"

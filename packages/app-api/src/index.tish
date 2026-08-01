@@ -1,13 +1,2 @@
 // Public alias — same surface as @tishlang/tish-desktop-api.
-export {
-  getCurrentWindowLabel,
-  invoke,
-  listen,
-  emit,
-  stateGet,
-  stateSet,
-  statePatch,
-  useSharedState,
-  Platform,
-  PROTOCOL,
-} from "@tishlang/tish-desktop-api"
+export { getCurrentWindowLabel, invoke, listen, emit, stateGet, stateSet, statePatch, useSharedState, Platform, PROTOCOL } from "@tishlang/tish-desktop-api"

@@ -11,9 +11,9 @@ await emitStylesheet({
     "__ROOT__/packages/ui-theme/src/ui/Badge.tish",
     "__ROOT__/packages/ui-theme/src/ui/Separator.tish",
     "__ROOT__/packages/ui-theme/src/ui/ScrollArea.tish",
-    "__ROOT__/packages/ui-theme/src/ui/Toolbar.tish",
+    "__ROOT__/packages/ui-theme/src/ui/Toolbar.tish"
   ],
-  outputPath: "public/assets/app.tw.css",
+  outputPath: "public/assets/app.tw.css"
 })
 
 mkdir("public/assets", { recursive: true })

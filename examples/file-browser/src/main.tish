@@ -9,7 +9,7 @@ createWindow({
   title: "Tish Desktop — File Browser",
   width: 1100,
   height: 720,
-  titleBarStyle: "transparent",
+  titleBarStyle: "transparent"
 })
 
 run({
@@ -20,7 +20,7 @@ run({
     menu: true,
     deepLink: true,
     opener: true,
-    // Off in examples so basic + file-browser can run without fighting the same app id.
-    singleInstance: false,
-  },
+    singleInstance: false
+  }
 })
+// Off in examples so basic + file-browser can run without fighting the same app id.
