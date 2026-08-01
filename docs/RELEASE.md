@@ -54,6 +54,25 @@ through OIDC. The workflow skips versions already on npm, so it coexists with a 
 
 ---
 
+## crates.io publish order spans two repos
+
+The crate graph interleaves this repo with [tish-apple](https://github.com/tishlang/tish-apple), so
+**neither repo's release workflow can finish on its own**:
+
+| # | Repo | Crates | Waiting on |
+|---|------|--------|------------|
+| 1 | tish-desktop | `tishlang_broker` | nothing — publishes immediately |
+| 2 | tish-apple | `tishlang_apple_common`, `tishlang_macos`, `tishlang_ios` | `tishlang_broker` from step 1 |
+| 3 | tish-desktop | `tishlang_desktop`, `tishlang_app` | `tishlang_macos` from step 2 |
+
+`tishlang_desktop` keeps `tishlang_macos` as an optional `platform-apple` dependency, and cargo
+requires every dependency — optional included — to resolve on crates.io at publish time. So the
+first tish-desktop run publishes `tishlang_broker` and then stops with an error naming this
+sequence. That is expected on a first release, not a broken workflow.
+
+Both workflows skip versions already on crates.io, so step 3 is just re-dispatching:
+**Actions → Crates.io release → Run workflow**, same tag. It resumes at `tishlang_desktop`.
+
 ## Every Release
 
 ### Step 1: Commit with a release-triggering message

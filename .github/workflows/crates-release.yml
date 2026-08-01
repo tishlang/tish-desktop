@@ -73,14 +73,23 @@ jobs:
             rm -f "crates/$dir/Cargo.toml.bak"
           done
 
-          # Path dep → versioned crates.io (cargo publish rejects path deps).
+          # Cross-repo path dep → version only. tishlang_core is already on crates.io, and its
+          # path does not exist on the release runner, so the path MUST go. Applied to the sample
+          # extension too: it is publish = false, but Cargo loads every workspace member to
+          # resolve, so an unrewritten path there fails the whole publish.
           perl -i -0pe "s/tishlang_core = \\{ path = \"[^\"]+\", features = \\[\"send-values\"\\] \\}/tishlang_core = { version = \"$CORE\", features = [\"send-values\"] }/s" \
-            crates/tish_desktop/Cargo.toml
+            crates/tish_desktop/Cargo.toml \
+            crates/tish_desktop_sample_ext/Cargo.toml
 
-          # Workspace path → versioned (publish order: broker → desktop → app).
-          perl -i -0pe "s/tishlang_broker = \\{ path = \"[^\"]+\" \\}/tishlang_broker = { version = \"$VERSION\" }/s" \
+          # Intra-workspace deps keep the path AND gain a version (publish order:
+          # broker → desktop → app). Cargo resolves these locally through the path and emits
+          # only the version into the published .crate. Stripping the path instead makes the
+          # workspace unresolvable during the very first publish, because the version being
+          # referenced is the one this run is in the middle of uploading:
+          #   error: no matching package named `tishlang_broker` found
+          perl -i -0pe "s/tishlang_broker = \\{ path = \"([^\"]+)\" \\}/tishlang_broker = { path = \"\$1\", version = \"$VERSION\" }/s" \
             crates/tish_desktop/Cargo.toml
-          perl -i -0pe "s/tishlang_desktop = \\{ path = \"[^\"]+\" \\}/tishlang_desktop = { version = \"$VERSION\" }/s" \
+          perl -i -0pe "s/tishlang_desktop = \\{ path = \"([^\"]+)\" \\}/tishlang_desktop = { path = \"\$1\", version = \"$VERSION\" }/s" \
             crates/tish_app/Cargo.toml
 
           # macOS host (platform-apple): keep the feature + dep, but point tishlang_macos at the
@@ -162,7 +171,14 @@ jobs:
               fi
               cat "$log"
               if ! grep -qiE '429|too many|rate.?limit|try again (later|after)' "$log"; then
-                echo "::error::cargo publish $crate failed (not a rate limit) — see log above"
+                # The publish order interleaves this repo with tishlang/tish-apple, so a missing
+                # cross-repo dependency is an EXPECTED intermediate state, not a broken release.
+                # Say so, with the exact next step, instead of leaving a bare cargo error.
+                if grep -q 'no matching package named `tishlang_macos`' "$log"; then
+                  echo "::error::$crate needs tishlang_macos on crates.io first. The release order spans two repos: (1) this workflow publishes tishlang_broker, (2) run tishlang/tish-apple's Crates.io release for tishlang_apple_common + tishlang_macos + tishlang_ios, (3) re-dispatch this workflow with tag=${TAG} — already-published crates are skipped, so it resumes at $crate."
+                else
+                  echo "::error::cargo publish $crate failed (not a rate limit) — see log above"
+                fi
                 rm -f "$log"; return 1
               fi
               after=$(grep -oiE 'try again after [^.]*(GMT|UTC)' "$log" | head -1 | sed -E 's/.*try again after //I' || true)
