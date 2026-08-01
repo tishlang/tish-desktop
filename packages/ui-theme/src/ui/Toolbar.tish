@@ -1,18 +1,17 @@
 /** @jsxImportSource lattish */
 
 fn cx(base, extra) {
-  if (extra === null || extra === undefined || extra === "") return base
+  if (extra === null || extra === undefined || extra === "") {
+    return base
+  }
   return base + " " + extra
 }
 
 export fn Toolbar(props) {
-  return <div
-      class={cx(
-        "flex items-center gap-2 h-12 px-4 border-b border-border bg-background select-none",
-        props.class
-      )}
-      onMouseDown={props.onMouseDown}
-    >
+  return <div class={cx(
+    "flex items-center gap-2 h-12 px-4 border-b border-border bg-background select-none",
+    props.class
+  )} onMouseDown={props.onMouseDown}>
       {props.children}
     </div>
 }

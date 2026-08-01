@@ -14,25 +14,51 @@ export fn DemoPane() {
 
   useEffect(() => {
     useSharedState(DEMO.count, (v) => {
-      if (v !== null && v !== undefined) setCount(v)
+      if (v !== null && v !== undefined) {
+        setCount(v)
+      }
     })
     useSharedState(DEMO.note, (v) => {
-      if (v !== null && v !== undefined) setNote(String(v))
-      else setNote("")
+      if (v !== null && v !== undefined) {
+        setNote(String(v))
+      } else {
+        setNote("")
+      }
     })
     useSharedState(DEMO.flag, (v) => {
       setFlag(v === true)
     })
     useSharedState(DEMO.docId, (v) => {
-      if (v !== null && v !== undefined) setDocId(String(v))
+      if (v !== null && v !== undefined) {
+        setDocId(String(v))
+      }
     })
-    ;[DEMO.count, DEMO.note, DEMO.flag, DEMO.docId].forEach((path) => {
+    // Avoid statement-leading `[...]` — tish-format drops the ASI `;` and then fails --check.
+    let seedPaths = []
+    seedPaths.push(DEMO.count)
+    seedPaths.push(DEMO.note)
+    seedPaths.push(DEMO.flag)
+    seedPaths.push(DEMO.docId)
+    seedPaths.forEach((path) => {
       invoke("state.get", { path: path }).then((r) => {
-        if (!r || r.value === null || r.value === undefined) return
-        if (path === DEMO.count) setCount(r.value)
-        else if (path === DEMO.note) setNote(String(r.value))
-        else if (path === DEMO.flag) setFlag(r.value === true)
-        else if (path === DEMO.docId) setDocId(String(r.value))
+        if (!r || r.value === null || r.value === undefined) {
+          return
+        }
+        if (path === DEMO.count) {
+          setCount(r.value)
+        } else {
+          if (path === DEMO.note) {
+            setNote(String(r.value))
+          } else {
+            if (path === DEMO.flag) {
+              setFlag(r.value === true)
+            } else {
+              if (path === DEMO.docId) {
+                setDocId(String(r.value))
+              }
+            }
+          }
+        }
       })
     })
   }, [])
@@ -61,21 +87,19 @@ export fn DemoPane() {
   let notify = () => {
     invoke("notification.show", {
       title: DEMO_TITLE,
-      body: "webview · count " + count + " · doc " + docId,
+      body: "webview · count " + count + " · doc " + docId
     })
   }
 
   let plugin = (cmd, args) => {
-    invoke(cmd, args === null || args === undefined ? {} : args).then(
-      (r) => setLog(cmd + " → " + JSON.stringify(r)),
-      (e) => setLog(cmd + " ✗ " + String(e))
-    )
+    invoke(cmd, args === null || args === undefined ? {} : args).then((r) => setLog(
+      cmd + " → " + JSON.stringify(r)
+    ), (e) => setLog(cmd + " ✗ " + String(e)))
   }
 
   let flagLabel = flag ? "on" : "off"
 
-  return (
-    <div class="p-5 font-sans text-foreground">
+  return <div class="p-5 font-sans text-foreground">
       <div class="flex items-center gap-2 mb-1">
         <h1 class="text-xl font-semibold tracking-tight">Webview</h1>
         <Badge>desktop/v1</Badge>
@@ -102,26 +126,18 @@ export fn DemoPane() {
       </Section>
 
       <Section title="Tauri extensions" hint="Same CapProviders as the companion Tauri window">
-        <Button
-          variant="secondary"
-          onClick={() =>
-            plugin("clipboard.writeText", { text: "hybrid-wk · " + count })
-          }
-        >
+        <Button variant="secondary" onClick={() => plugin("clipboard.writeText", {
+    text: "hybrid-wk · " + count
+  })}>
           Clipboard write
         </Button>
         <Button variant="secondary" onClick={() => plugin("clipboard.readText", {})}>
           Clipboard read
         </Button>
-        <Button
-          variant="outline"
-          onClick={() =>
-            plugin("dialog.message", {
-              title: DEMO_TITLE,
-              message: "From nested WK via Tauri dialog plugin",
-            })
-          }
-        >
+        <Button variant="outline" onClick={() => plugin("dialog.message", {
+    title: DEMO_TITLE,
+    message: "From nested WK via Tauri dialog plugin"
+  })}>
           Dialog
         </Button>
         <Button variant="ghost" onClick={() => plugin("os.info", {})}>
@@ -129,11 +145,7 @@ export fn DemoPane() {
         </Button>
       </Section>
 
-      {log !== "" ? (
-        <pre class="mt-2 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground whitespace-pre-wrap">
-          {log}
-        </pre>
-      ) : null}
+      {log !== "" ? <pre class="mt-2 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground whitespace-pre-wrap">
+          {log}</pre> : null}
     </div>
-  )
 }

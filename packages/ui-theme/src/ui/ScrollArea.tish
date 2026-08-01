@@ -1,7 +1,9 @@
 /** @jsxImportSource lattish */
 
 fn cx(base, extra) {
-  if (extra === null || extra === undefined || extra === "") return base
+  if (extra === null || extra === undefined || extra === "") {
+    return base
+  }
   return base + " " + extra
 }
 

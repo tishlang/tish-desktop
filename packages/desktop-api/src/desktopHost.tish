@@ -1,15 +1,4 @@
 // UI façade over window.__TISH_APP__ / __TISH_DESKTOP__ (injected by bridge.js).
 // Re-exports app-api helpers for backward compatibility.
 
-export {
-  getCurrentWindowLabel,
-  invoke,
-  listen,
-  emit,
-  stateGet,
-  stateSet,
-  statePatch,
-  useSharedState,
-  Platform,
-  PROTOCOL,
-} from "./appApi.tish"
+export { getCurrentWindowLabel, invoke, listen, emit, stateGet, stateSet, statePatch, useSharedState, Platform, PROTOCOL } from "./appApi.tish"

@@ -29,8 +29,8 @@ fn mount() {
     invoke("app.hello", { from: "byo-ui" }).then((r) => {
       status.textContent = JSON.stringify(r, null, 2)
     }, (e) => {
-      status.textContent = String(e)
-    })
+        status.textContent = String(e)
+      })
   }
   row.appendChild(helloBtn)
 

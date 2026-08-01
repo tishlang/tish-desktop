@@ -1,9 +1,6 @@
 // Runtime platform facts (build-injected or broker-reported). Kit-agnostic.
 
-export const Platform = {
-  OS: "web",
-  surface: "web",
-}
+export const Platform = { OS: "web", surface: "web" }
 
 export fn platformIsNative() {
   return Platform.surface === "native"
@@ -23,10 +20,18 @@ export fn platformSelect(map) {
   let m = map === null || map === undefined ? {} : map
   let os = Platform.OS
   let surface = Platform.surface
-  if (m[os] !== undefined) return m[os]
-  if (surface === "webview" && m.webview !== undefined) return m.webview
-  if (surface === "web" && m.web !== undefined) return m.web
-  if (surface === "native" && m.native !== undefined) return m.native
+  if (m[os] !== undefined) {
+    return m[os]
+  }
+  if (surface === "webview" && m.webview !== undefined) {
+    return m.webview
+  }
+  if (surface === "web" && m.web !== undefined) {
+    return m.web
+  }
+  if (surface === "native" && m.native !== undefined) {
+    return m.native
+  }
   if ((os === "macos" || os === "windows" || os === "linux") && m.desktop !== undefined) {
     return m.desktop
   }
@@ -34,7 +39,9 @@ export fn platformSelect(map) {
     return m.mobile
   }
   // `default` is a Tish keyword — use bracket access.
-  if (m["default"] !== undefined) return m["default"]
+  if (m["default"] !== undefined) {
+    return m["default"]
+  }
   return null
 }
 

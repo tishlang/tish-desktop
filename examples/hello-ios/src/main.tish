@@ -49,16 +49,13 @@ fn App() {
 
   let notify = () => {
     invoke("notification.requestPermission", {})
-    invoke("notification.show", {
-      title: "Hello iOS",
-      body: "doc " + docId + " · count " + count,
-    })
+    invoke("notification.show", { title: "Hello iOS", body: "doc " + docId + " · count " + count })
   }
 
   let alert = () => {
     invoke("dialog.message", {
       title: "Hello iOS",
-      message: "doc " + docId + " · note " + note + " · flag " + flag,
+      message: "doc " + docId + " · note " + note + " · flag " + flag
     })
   }
 
@@ -76,8 +73,7 @@ fn App() {
     setMode("webview")
   }
 
-  let modeBar = (
-    <div>
+  let modeBar = <div>
       <span>{"Surface: " + mode + " (same features in both)"}</span>
       <row>
         <button onClick={goNative}>{"Native"}</button>
@@ -85,51 +81,25 @@ fn App() {
       </row>
       <rule />
     </div>
-  )
 
   if (mode === "webview") {
-    let html = demoWebviewHtml({
-      count: count,
-      note: note,
-      flag: flag,
-      docId: docId,
-    })
-    return (
-      <column>
+    let html = demoWebviewHtml({ count: count, note: note, flag: flag, docId: docId })
+    return <column>
         {modeBar}
-        <webview
-          id={"demo-main"}
-          bridge={true}
-          height={560}
-          html={html}
-          onBridgeInvoke={(msg) => invoke(msg.cmd, msg.args ?? {})}
-        />
+        <webview id={"demo-main"} bridge={true} height={560} html={html} onBridgeInvoke={(msg) => invoke(
+      msg.cmd,
+      msg.args ?? {}
+    )} />
       </column>
-    )
   }
 
-  return (
-    <scrollable height={640}>
+  return <scrollable height={640}>
       {modeBar}
-      <NativePane
-        count={count}
-        setCount={setCount}
-        note={note}
-        setNote={setNote}
-        flag={flag}
-        setFlag={setFlag}
-        docId={docId}
-        shared={shared}
-        onSelect={select}
-        onRefresh={hydrate}
-        onNotify={notify}
-        onAlert={alert}
-        onCount={(n) => persist("demo.count", n)}
-        onNote={(v) => persist("demo.note", v)}
-        onFlag={(v) => persist("demo.flag", v)}
-      />
+      <NativePane count={count} setCount={setCount} note={note} setNote={setNote} flag={flag} setFlag={setFlag} docId={docId} shared={shared} onSelect={select} onRefresh={hydrate} onNotify={notify} onAlert={alert} onCount={(n) => persist(
+    "demo.count",
+    n
+  )} onNote={(v) => persist("demo.note", v)} onFlag={(v) => persist("demo.flag", v)} />
     </scrollable>
-  )
 }
 
 ios.run(App)

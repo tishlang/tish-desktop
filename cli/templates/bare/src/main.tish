@@ -24,11 +24,4 @@ createSurface({
   titleBarStyle: "transparent"
 })
 
-run({
-  plugins: {
-    dialog: true,
-    menu: true,
-    notification: true,
-    singleInstance: false
-  }
-})
+run({ plugins: { dialog: true, menu: true, notification: true, singleInstance: false } })

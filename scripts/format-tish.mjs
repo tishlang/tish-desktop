@@ -5,8 +5,8 @@
  * `tish-format` takes exactly ONE <FILE> — it accepts neither directories nor multiple
  * paths. The npm scripts used to call `tish-format examples packages cli`, which the CLI
  * rejected with "error: unexpected argument 'packages' found" before formatting anything.
- * Because the CI step is continue-on-error, that failure was only ever an annotation, so
- * the formatter silently never ran and 52 of 73 files drifted.
+ * CI previously used continue-on-error, so that failure was only an annotation and 52 of
+ * 73 files drifted. format:check is now a hard gate.
  *
  * Usage:
  *   node scripts/format-tish.mjs            # format in place

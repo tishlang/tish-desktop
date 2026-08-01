@@ -12,20 +12,19 @@ handle("app.openDoc", (args) => {
   let id = args.id
   let words: number = 0
   let edits: number = 0
-  if (args.wordCount !== null) words = args.wordCount
-  if (args.edits !== null) edits = args.edits
+  if (args.wordCount !== null) {
+    words = args.wordCount
+  }
+  if (args.edits !== null) {
+    edits = args.edits
+  }
   let s: number = scoreDoc(words, edits)
   stateSet(DEMO.docId, id)
   stateSet("selection.score", s)
   return { ok: true, score: s }
 })
 
-createSurface({
-  id: "main",
-  kind: "native",
-  title: "Hybrid",
-  root: Shell
-})
+createSurface({ id: "main", kind: "native", title: "Hybrid", root: Shell })
 
 // Tauri companion window — keeps AppHandle / plugins alive and demos the same
 // clipboard / dialog / os caps from a real Tauri webview bridge.
@@ -42,12 +41,7 @@ createSurface({
 
 run({
   profile: "desktop",
-  platformAttach: {
-    apple: {
-      outerHost: true,
-      autoRunEventLoop: false
-    }
-  },
+  platformAttach: { apple: { outerHost: true, autoRunEventLoop: false } },
   plugins: {
     notification: true,
     store: true,

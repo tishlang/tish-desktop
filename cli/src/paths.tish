@@ -7,25 +7,43 @@ export fn pathExists(p) {
 }
 
 export fn joinPath(a, b) {
-  if (a === null || a === "") return b
-  if (b === null || b === "") return a
-  if (a === ".") return b
-  if (a.endsWith("/")) return a + b
+  if (a === null || a === "") {
+    return b
+  }
+  if (b === null || b === "") {
+    return a
+  }
+  if (a === ".") {
+    return b
+  }
+  if (a.endsWith("/")) {
+    return a + b
+  }
   return a + "/" + b
 }
 
 export fn dirname(p) {
-  if (p === null || p === "") return "."
+  if (p === null || p === "") {
+    return "."
+  }
   let i = p.lastIndexOf("/")
-  if (i < 0) return "."
-  if (i === 0) return "/"
+  if (i < 0) {
+    return "."
+  }
+  if (i === 0) {
+    return "/"
+  }
   return p.slice(0, i)
 }
 
 export fn basename(p) {
-  if (p === null || p === "") return ""
+  if (p === null || p === "") {
+    return ""
+  }
   let i = p.lastIndexOf("/")
-  if (i < 0) return p
+  if (i < 0) {
+    return p
+  }
   return p.slice(i + 1)
 }
 
@@ -50,7 +68,9 @@ export fn userArgs() {
 export fn hasFlag(args, flag) {
   let i = 0
   while (i < args.length) {
-    if (args[i] === flag) return true
+    if (args[i] === flag) {
+      return true
+    }
     i = i + 1
   }
   return false
@@ -59,7 +79,9 @@ export fn hasFlag(args, flag) {
 export fn flagValue(args, flag) {
   let i = 0
   while (i < args.length) {
-    if (args[i] === flag && i + 1 < args.length) return args[i + 1]
+    if (args[i] === flag && i + 1 < args.length) {
+      return args[i + 1]
+    }
     if (String(args[i]).startsWith(flag + "=")) {
       return String(args[i]).slice(flag.length + 1)
     }
@@ -72,7 +94,9 @@ export fn firstPositional(args) {
   let i = 0
   while (i < args.length) {
     let a = args[i]
-    if (!String(a).startsWith("-")) return a
+    if (!String(a).startsWith("-")) {
+      return a
+    }
     if ((a === "--example" || a === "--dir" || a === "--out" || a === "--template" || a === "--ui" || a === "--platform" || a === "--surface" || a === "--desk-platform" || a === "--desk-surface" || a === "--resolve" || a === "--importer" || a === "--device" || a === "--apple") && i + 1 < args.length) {
       i = i + 2
       continue
@@ -84,9 +108,13 @@ export fn firstPositional(args) {
 
 fn looksLikeCliRoot(dir) {
   let pkg = joinPath(dir, "package.json")
-  if (!pathExists(pkg)) return false
+  if (!pathExists(pkg)) {
+    return false
+  }
   let text = readFile(pkg)
-  if (text === null || String(text).startsWith("Error:")) return false
+  if (text === null || String(text).startsWith("Error:")) {
+    return false
+  }
   return String(text).indexOf("@tishlang/tish-desktop") >= 0
 }
 
@@ -103,19 +131,31 @@ export fn inMonorepoCheckout() {
 export fn cliPackageVersion() {
   let pkg = joinPath(cliRoot(), "package.json")
   let text = readFile(pkg)
-  if (text === null || String(text).startsWith("Error:")) return "0.1.0"
+  if (text === null || String(text).startsWith("Error:")) {
+    return "0.1.0"
+  }
   let s = String(text)
   let key = "\"version\""
   let i = s.indexOf(key)
-  if (i < 0) return "0.1.0"
+  if (i < 0) {
+    return "0.1.0"
+  }
   let colon = s.indexOf(":", i + key.length)
-  if (colon < 0) return "0.1.0"
+  if (colon < 0) {
+    return "0.1.0"
+  }
   let q1 = s.indexOf("\"", colon + 1)
-  if (q1 < 0) return "0.1.0"
+  if (q1 < 0) {
+    return "0.1.0"
+  }
   let q2 = s.indexOf("\"", q1 + 1)
-  if (q2 < 0) return "0.1.0"
+  if (q2 < 0) {
+    return "0.1.0"
+  }
   let ver = s.slice(q1 + 1, q2)
-  if (ver === "") return "0.1.0"
+  if (ver === "") {
+    return "0.1.0"
+  }
   return ver
 }
 
@@ -125,22 +165,33 @@ export fn cliRoot() {
   let candidate = null
   if (argv.length >= 2 && argv[1] !== null && String(argv[1]).endsWith(".tish")) {
     let script = String(argv[1])
-    if (!script.startsWith("/")) script = joinPath(here, script)
+    if (!script.startsWith("/")) {
+      script = joinPath(here, script)
+    }
     let srcDir = dirname(script)
     let root = dirname(srcDir)
-    if (looksLikeCliRoot(root)) candidate = root
+    if (looksLikeCliRoot(root)) {
+      candidate = root
+    }
   }
   if (candidate === null && argv.length >= 1 && argv[0] !== null) {
     let exe = String(argv[0])
     if (exe.indexOf("mode") >= 0 || exe.indexOf("tish-desktop") >= 0) {
       let dist = dirname(exe)
       let root = dirname(dist)
-      if (looksLikeCliRoot(root)) candidate = root
+      if (looksLikeCliRoot(root)) {
+        candidate = root
+      }
     }
   }
   if (candidate === null) {
-    if (looksLikeCliRoot(here)) candidate = here
-    else if (looksLikeCliRoot(joinPath(here, "cli"))) candidate = joinPath(here, "cli")
+    if (looksLikeCliRoot(here)) {
+      candidate = here
+    } else {
+      if (looksLikeCliRoot(joinPath(here, "cli"))) {
+        candidate = joinPath(here, "cli")
+      }
+    }
   }
   if (candidate === null) {
     let walk = here
@@ -155,14 +206,20 @@ export fn cliRoot() {
         break
       }
       let parent = dirname(walk)
-      if (parent === walk) break
+      if (parent === walk) {
+        break
+      }
       walk = parent
       n = n + 1
     }
   }
-  if (candidate === null) candidate = here
+  if (candidate === null) {
+    candidate = here
+  }
   if (candidate === "." || !String(candidate).startsWith("/")) {
-    if (candidate === "." || candidate === "") return here
+    if (candidate === "." || candidate === "") {
+      return here
+    }
     return joinPath(here, candidate)
   }
   return candidate
@@ -172,15 +229,23 @@ export fn cliRoot() {
 export fn repoRoot() {
   let cli = cliRoot()
   let parent = dirname(cli)
-  if (looksLikeRepoRoot(parent)) return parent
+  if (looksLikeRepoRoot(parent)) {
+    return parent
+  }
   let here = cwd()
-  if (looksLikeRepoRoot(here)) return here
+  if (looksLikeRepoRoot(here)) {
+    return here
+  }
   let walk = here
   let n = 0
   while (n < 8) {
-    if (looksLikeRepoRoot(walk)) return walk
+    if (looksLikeRepoRoot(walk)) {
+      return walk
+    }
     let parent2 = dirname(walk)
-    if (parent2 === walk) break
+    if (parent2 === walk) {
+      break
+    }
     walk = parent2
     n = n + 1
   }
@@ -191,21 +256,31 @@ export fn resolveTish() {
   // Prefer explicit override, then sibling monorepo debug build (has --platform / resolve-id).
   if (env !== null) {
     let custom = env["TISH_PATH"]
-    if (custom !== null && custom !== "" && fileExists(String(custom))) return String(custom)
+    if (custom !== null && custom !== "" && fileExists(String(custom))) {
+      return String(custom)
+    }
   }
   let root = repoRoot()
   let localDebug = joinPath(root, "../tish/target/debug/tish")
-  if (fileExists(localDebug)) return localDebug
+  if (fileExists(localDebug)) {
+    return localDebug
+  }
   let localRelease = joinPath(root, "../tish/target/release/tish")
-  if (fileExists(localRelease)) return localRelease
+  if (fileExists(localRelease)) {
+    return localRelease
+  }
   let home = ""
   if (env !== null) {
     let h = env["HOME"]
-    if (h !== null && h !== "") home = String(h)
+    if (h !== null && h !== "") {
+      home = String(h)
+    }
   }
   if (home !== "") {
     let cargoTish = home + "/.cargo/bin/tish"
-    if (fileExists(cargoTish)) return cargoTish
+    if (fileExists(cargoTish)) {
+      return cargoTish
+    }
   }
   return "tish"
 }

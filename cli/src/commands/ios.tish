@@ -5,15 +5,7 @@
 //   mode ios --example hello-ios --launch-only
 //   mode ios --example hello-ios --device "iPhone 16"
 import { exit, cwd, exec, env } from "tish:process"
-import {
-  flagValue,
-  firstPositional,
-  hasFlag,
-  joinPath,
-  pathExists,
-  q,
-  repoRoot,
-} from "../paths.tish"
+import { flagValue, firstPositional, hasFlag, joinPath, pathExists, q, repoRoot } from "../paths.tish"
 
 fn usage() {
   console.log("mode ios — build + launch an iOS example on the Simulator")
@@ -34,16 +26,24 @@ fn usage() {
 fn dirnameOf(p) {
   let s = String(p)
   let i = s.lastIndexOf("/")
-  if (i < 0) return "."
-  if (i === 0) return "/"
+  if (i < 0) {
+    return "."
+  }
+  if (i === 0) {
+    return "/"
+  }
   return s.slice(0, i)
 }
 
 fn resolveAppleRoot(args) {
   let fromFlag = flagValue(args, "--apple")
-  if (fromFlag !== null) return fromFlag
+  if (fromFlag !== null) {
+    return fromFlag
+  }
   let fromEnv = env !== null ? env["TISH_APPLE"] : null
-  if (fromEnv !== null && fromEnv !== undefined && fromEnv !== "") return fromEnv
+  if (fromEnv !== null && fromEnv !== undefined && fromEnv !== "") {
+    return fromEnv
+  }
   let root = repoRoot()
   let sibling = joinPath(dirnameOf(root), "tish-apple")
   if (pathExists(joinPath(sibling, "crates/tish-ios/Cargo.toml"))) {

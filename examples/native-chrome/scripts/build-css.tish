@@ -9,9 +9,9 @@ await emitStylesheet({
     "../../packages/ui-theme/src/ui/Card.tish",
     "../../packages/ui-theme/src/ui/Input.tish",
     "../../packages/ui-theme/src/ui/Badge.tish",
-    "../../packages/ui-theme/src/ui/Toolbar.tish",
+    "../../packages/ui-theme/src/ui/Toolbar.tish"
   ],
-  outputPath: "public/assets/app.tw.css",
+  outputPath: "public/assets/app.tw.css"
 })
 
 mkdir("public/assets", { recursive: true })

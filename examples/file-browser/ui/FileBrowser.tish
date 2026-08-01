@@ -15,15 +15,27 @@ export fn FileBrowser() {
     let unlisten = null
     let timer = null
     listen("fs:changed", () => {
-      if (timer) clearTimeout(timer)
+      if (timer) {
+        clearTimeout(timer)
+      }
       timer = setTimeout(() => store.refresh(invoke), 150)
-    }).then((u) => { unlisten = u })
-    invoke("fs.watch", { path: "." }).then(() => {}, () => {})
+    }).then((u) => {
+        unlisten = u
+      })
+    invoke("fs.watch", { path: "." }).then(() => {
+    }, () => {
+    })
     return () => {
       unsub()
-      if (unlisten) unlisten()
-      if (timer) clearTimeout(timer)
-      invoke("fs.unwatch", {}).then(() => {}, () => {})
+      if (unlisten) {
+        unlisten()
+      }
+      if (timer) {
+        clearTimeout(timer)
+      }
+      invoke("fs.unwatch", {}).then(() => {
+      }, () => {
+      })
     }
   }, [])
 
@@ -36,12 +48,13 @@ export fn FileBrowser() {
   }
 
   fn onUp() {
-    if (snap.cwd === "." || snap.cwd === "") return
+    if (snap.cwd === "." || snap.cwd === "") {
+      return
+    }
     store.navigate(invoke, parentPath(snap.cwd))
   }
 
-  return (
-    <div class="min-h-screen flex bg-background text-foreground font-sans">
+  return <div class="min-h-screen flex bg-background text-foreground font-sans">
       <aside class="w-80 border-r border-border flex flex-col bg-sidebar text-sidebar-foreground">
         <div class="p-4 border-b border-sidebar-border">
           <h1 class="text-lg font-bold tracking-tight">Files</h1>
@@ -50,22 +63,12 @@ export fn FileBrowser() {
         </div>
         <ScrollArea class="flex-1 p-2">
           <ul>
-            {snap.entries.map((entry) => (
-              <li key={entry.path}>
-                <button
-                  class={tw([
-                    "w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors",
-                    snap.selected?.path === entry.path
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-accent/60",
-                  ])}
-                  onClick={() => onOpen(entry)}
-                >
-                  {entry.kind === "dir" ? "[dir] " : "[file] "}
-                  {entry.name}
-                </button>
-              </li>
-            ))}
+            {snap.entries.map((entry) => <li key={entry.path}>
+                <button class={tw([
+    "w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors",
+    snap.selected?.path === entry.path ? "bg-accent text-accent-foreground" : "hover:bg-accent/60"
+  ])} onClick={() => onOpen(entry)}>
+                  {entry.kind === "dir" ? "[dir] " : "[file] "}{entry.name}</button></li>)}
           </ul>
         </ScrollArea>
         <div class="p-2 text-xs text-muted-foreground border-t border-sidebar-border">
@@ -76,12 +79,7 @@ export fn FileBrowser() {
         <h2 class="text-xl font-semibold mb-4">
           {snap.selected !== null ? snap.selected.name : "Select a file"}
         </h2>
-        {snap.preview !== null ? (
-          <pre class="whitespace-pre-wrap text-sm bg-card text-card-foreground border border-border p-4 rounded-lg">{snap.preview}</pre>
-        ) : (
-          <p class="text-muted-foreground">Preview appears for text files under the read cap.</p>
-        )}
+        {snap.preview !== null ? <pre class="whitespace-pre-wrap text-sm bg-card text-card-foreground border border-border p-4 rounded-lg">{snap.preview}</pre> : <p class="text-muted-foreground">Preview appears for text files under the read cap.</p>}
       </main>
     </div>
-  )
 }

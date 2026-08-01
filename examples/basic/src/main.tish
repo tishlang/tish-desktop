@@ -30,7 +30,7 @@ run({
     deepLink: true,
     opener: true,
     windowState: true,
-    // Off in examples so basic + file-browser can run without fighting the same app id.
     singleInstance: false
   }
 })
+// Off in examples so basic + file-browser can run without fighting the same app id.

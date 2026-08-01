@@ -1,24 +1,24 @@
 import { exit, env, cwd, exec } from "tish:process"
 import { readFile } from "tish:fs"
-import {
-  flagValue,
-  joinPath,
-  pathExists,
-  q,
-  resolveTish,
-} from "../paths.tish"
+import { flagValue, joinPath, pathExists, q, resolveTish } from "../paths.tish"
 
 fn capLevel(name, surface, platform) {
   if (name === "notification") {
-    if (surface === "web") return "Partial"
+    if (surface === "web") {
+      return "Partial"
+    }
     return "Full"
   }
   if (name === "store") {
-    if (surface === "web" || platform === "ios") return "Unsupported"
+    if (surface === "web" || platform === "ios") {
+      return "Unsupported"
+    }
     return "Full"
   }
   if (name === "tray") {
-    if (surface === "web" || platform === "ios" || surface === "native") return "Unsupported"
+    if (surface === "web" || platform === "ios" || surface === "native") {
+      return "Unsupported"
+    }
     return "Full"
   }
   return "Unsupported"
@@ -38,12 +38,20 @@ export fn runDoctor(args) {
   // `--desk-platform` / `--desk-surface` are rewritten from `--platform` /
   // `--surface` by cli/bin/mode.js so `tish run` is not disrupted.
   let platform = flagValue(args, "--desk-platform")
-  if (platform === null) platform = flagValue(args, "--platform")
-  if (platform === null) platform = "macos"
+  if (platform === null) {
+    platform = flagValue(args, "--platform")
+  }
+  if (platform === null) {
+    platform = "macos"
+  }
 
   let surface = flagValue(args, "--desk-surface")
-  if (surface === null) surface = flagValue(args, "--surface")
-  if (surface === null) surface = "webview"
+  if (surface === null) {
+    surface = flagValue(args, "--surface")
+  }
+  if (surface === null) {
+    surface = "webview"
+  }
 
   let tish = resolveTish()
   console.log("mode doctor")
@@ -53,13 +61,19 @@ export fn runDoctor(args) {
   console.log("  tish:     " + tish)
 
   let probe = flagValue(args, "--resolve")
-  if (probe === null) probe = "./Button"
+  if (probe === null) {
+    probe = "./Button"
+  }
   let importer = flagValue(args, "--importer")
   if (importer === null) {
     let here = cwd()
     importer = joinPath(here, "src/main.tish")
-    if (!pathExists(importer)) importer = joinPath(here, "ui/main.tish")
-    if (!pathExists(importer)) importer = joinPath(here, "app/App.tish")
+    if (!pathExists(importer)) {
+      importer = joinPath(here, "ui/main.tish")
+    }
+    if (!pathExists(importer)) {
+      importer = joinPath(here, "app/App.tish")
+    }
   }
 
   console.log("  resolve:  " + probe + " (importer " + importer + ")")
@@ -86,6 +100,8 @@ export fn runDoctor(args) {
   console.log("Upgrade path (Web -> Webview -> Hybrid):")
   console.log("  npm run build:web | build:shell | build:shell:apple / dev:hybrid")
   console.log("  See docs/HYBRID.md · docs/UNIFIED_APP.md")
-  console.log("HMR: platform file edits reload; switching TISH_PLATFORM/SURFACE needs Vite restart.")
+  console.log(
+    "HMR: platform file edits reload; switching TISH_PLATFORM/SURFACE needs Vite restart."
+  )
   exit(0)
 }

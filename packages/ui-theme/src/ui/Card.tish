@@ -1,7 +1,9 @@
 /** @jsxImportSource lattish */
 
 fn cx(base, extra) {
-  if (extra === null || extra === undefined || extra === "") return base
+  if (extra === null || extra === undefined || extra === "") {
+    return base
+  }
   return base + " " + extra
 }
 
@@ -24,7 +26,10 @@ export fn CardBody(props) {
 }
 
 export fn CardFooter(props) {
-  return <div class={cx("flex items-center gap-2 p-4 border-t border-border text-muted-foreground", props.class)}>
+  return <div class={cx(
+    "flex items-center gap-2 p-4 border-t border-border text-muted-foreground",
+    props.class
+  )}>
       {props.children}
     </div>
 }

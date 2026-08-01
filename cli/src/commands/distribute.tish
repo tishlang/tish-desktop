@@ -31,22 +31,32 @@ export fn runDistribute(args) {
   let cmd = null
   if (step === "build") {
     cmd = "node " + q(joinPath(distDir, "build-release.mjs"))
-  } else if (step === "sign") {
-    cmd = "bash " + q(joinPath(distDir, "sign-macos.sh"))
-  } else if (step === "notarize") {
-    cmd = "bash " + q(joinPath(distDir, "notarize-macos.sh"))
-  } else if (step === "updater") {
-    cmd = "node " + q(joinPath(distDir, "publish-updater.mjs"))
-  } else if (step === "github") {
-    cmd = "node " + q(joinPath(distDir, "publish-github-release.mjs"))
-  } else if (step === "release") {
-    cmd =
-      "node " + q(joinPath(distDir, "build-release.mjs")) +
-      " && node " + q(joinPath(distDir, "publish-github-release.mjs"))
   } else {
-    console.error("unknown distribute step: " + step)
-    usage()
-    exit(1)
+    if (step === "sign") {
+      cmd = "bash " + q(joinPath(distDir, "sign-macos.sh"))
+    } else {
+      if (step === "notarize") {
+        cmd = "bash " + q(joinPath(distDir, "notarize-macos.sh"))
+      } else {
+        if (step === "updater") {
+          cmd = "node " + q(joinPath(distDir, "publish-updater.mjs"))
+        } else {
+          if (step === "github") {
+            cmd = "node " + q(joinPath(distDir, "publish-github-release.mjs"))
+          } else {
+            if (step === "release") {
+              cmd = "node " + q(joinPath(distDir, "build-release.mjs")) + " && node " + q(
+                joinPath(distDir, "publish-github-release.mjs")
+              )
+            } else {
+              console.error("unknown distribute step: " + step)
+              usage()
+              exit(1)
+            }
+          }
+        }
+      }
+    }
   }
 
   console.log("[distribute] " + step)

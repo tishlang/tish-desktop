@@ -10,19 +10,25 @@ import {
   joinPath,
   pathExists,
   q,
-  repoRoot,
+  repoRoot
 } from "../paths.tish"
 
 fn relPath(fromDir, toDir) {
-  if (fromDir === toDir) return "."
+  if (fromDir === toDir) {
+    return "."
+  }
   let prefix = fromDir
-  if (!prefix.endsWith("/")) prefix = prefix + "/"
+  if (!prefix.endsWith("/")) {
+    prefix = prefix + "/"
+  }
   if (String(toDir).startsWith(prefix)) {
     return String(toDir).slice(prefix.length)
   }
   // Prefer absolute when the scaffold is outside the repo tree.
   let rootPrefix = toDir
-  if (!rootPrefix.endsWith("/")) rootPrefix = rootPrefix + "/"
+  if (!rootPrefix.endsWith("/")) {
+    rootPrefix = rootPrefix + "/"
+  }
   if (!String(fromDir).startsWith(rootPrefix) && !String(fromDir).startsWith(String(toDir))) {
     return toDir
   }
@@ -43,13 +49,19 @@ fn relPath(fromDir, toDir) {
     u = u + 1
   }
   // Too many hops → absolute (avoids ../../Users/... from /tmp).
-  if (ups > 3) return toDir
+  if (ups > 3) {
+    return toDir
+  }
   let d = i
   while (d < toParts.length) {
-    if (toParts[d] !== "") parts.push(toParts[d])
+    if (toParts[d] !== "") {
+      parts.push(toParts[d])
+    }
     d = d + 1
   }
-  if (parts.length === 0) return "."
+  if (parts.length === 0) {
+    return "."
+  }
   return parts.join("/")
 }
 
@@ -126,13 +138,31 @@ fn applyRegistryOverlay(templates, target, appName, shellOut, port, pkgVersion) 
     console.error("init: registry templates missing under " + templates)
     exit(1)
   }
-  copyTemplateFile(pkgSrc, joinPath(target, "package.json"), appName, ".", shellOut, port, pkgVersion)
-  copyTemplateFile(viteSrc, joinPath(target, "vite.config.mjs"), appName, ".", shellOut, port, pkgVersion)
+  copyTemplateFile(
+    pkgSrc,
+    joinPath(target, "package.json"),
+    appName,
+    ".",
+    shellOut,
+    port,
+    pkgVersion
+  )
+  copyTemplateFile(
+    viteSrc,
+    joinPath(target, "vite.config.mjs"),
+    appName,
+    ".",
+    shellOut,
+    port,
+    pkgVersion
+  )
 }
 
 export fn runInit(args) {
   let dirArg = firstPositional(args)
-  if (dirArg === null) dirArg = "my-desktop-app"
+  if (dirArg === null) {
+    dirArg = "my-desktop-app"
+  }
   let here = cwd()
   let target = dirArg
   if (!String(dirArg).startsWith("/")) {
@@ -159,19 +189,25 @@ export fn runInit(args) {
     }
     templateName = uiName
   }
-  if (templateName === null) templateName = "lattish"
+  if (templateName === null) {
+    templateName = "lattish"
+  }
   let templateDir = "templates/app"
   if (templateName === "bare" || templateName === "none" || templateName === "byo") {
     templateDir = "templates/bare"
-  } else if (templateName === "lattish" || templateName === "app" || templateName === "default") {
-    templateDir = "templates/app"
   } else {
-    console.error("init: unknown --template/--ui " + templateName + " (use lattish|bare|none)")
-    exit(1)
+    if (templateName === "lattish" || templateName === "app" || templateName === "default") {
+      templateDir = "templates/app"
+    } else {
+      console.error("init: unknown --template/--ui " + templateName + " (use lattish|bare|none)")
+      exit(1)
+    }
   }
   let templates = joinPath(cliRoot(), templateDir)
   let appName = basename(target)
-  if (appName === "" || appName === "." || appName === "/") appName = "my-desktop-app"
+  if (appName === "" || appName === "." || appName === "/") {
+    appName = "my-desktop-app"
+  }
 
   let relRoot = monorepo ? relPath(target, root) : "."
   let shellOut = "dist/" + appName + "-shell"
@@ -181,7 +217,9 @@ export fn runInit(args) {
   if (monorepo) {
     console.log("[init] monorepo mode — path deps → " + relRoot)
   } else {
-    console.log("[init] registry mode — @tishlang/tish-desktop*@" + pkgVersion + " (outside tish-mode checkout)")
+    console.log(
+      "[init] registry mode — @tishlang/tish-desktop*@" + pkgVersion + " (outside tish-mode checkout)"
+    )
   }
   mkdir(target, true)
   walkCopy(templates, target, appName, relRoot, shellOut, port, pkgVersion, true)

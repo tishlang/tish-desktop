@@ -3,4 +3,5 @@ export fn Sidebar() {
   return null
 }
 
-export fn mountSidebar(_rootEl) {}
+export fn mountSidebar(_rootEl) {
+}

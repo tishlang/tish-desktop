@@ -13,15 +13,15 @@ export fn mountApp(rootEl) {
   rootEl.appendChild(p)
   let out = document.createElement("pre")
   let btn = Button({
-    title: "Hello",
-    onPress: () => {
-      invoke("app.hello", { from: "ui" }).then((r) => {
-        out.textContent = JSON.stringify(r, null, 2)
-      }, (e) => {
-        out.textContent = String(e)
-      })
-    },
-  })
+          title: "Hello",
+          onPress: () => {
+            invoke("app.hello", { from: "ui" }).then((r) => {
+              out.textContent = JSON.stringify(r, null, 2)
+            }, (e) => {
+                out.textContent = String(e)
+              })
+          }
+              })
   rootEl.appendChild(btn)
   rootEl.appendChild(out)
 }

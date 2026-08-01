@@ -3,31 +3,40 @@
 // backgrounded with `sh -c '… &'`. Pass --legacy-node to call the Node script.
 import { exit, cwd, exec, env } from "tish:process"
 import { readFile } from "tish:fs"
-import {
-  flagValue,
-  firstPositional,
-  hasFlag,
-  joinPath,
-  pathExists,
-  q,
-  repoRoot,
-  resolveTish,
-} from "../paths.tish"
+import { flagValue, firstPositional, hasFlag, joinPath, pathExists, q, repoRoot, resolveTish } from "../paths.tish"
 
 fn examplePort(name) {
-  if (name === "file-browser") return 5174
-  if (name === "native-chrome") return 5175
-  if (name === "byo-ui") return 5176
-  if (name === "hybrid") return 5177
+  if (name === "file-browser") {
+    return 5174
+  }
+  if (name === "native-chrome") {
+    return 5175
+  }
+  if (name === "byo-ui") {
+    return 5176
+  }
+  if (name === "hybrid") {
+    return 5177
+  }
   return 5173
 }
 
 fn exampleShellOut(name) {
-  if (name === "basic") return "dist/basic-shell"
-  if (name === "file-browser") return "dist/file-browser-shell"
-  if (name === "native-chrome") return "dist/native-chrome-shell"
-  if (name === "byo-ui") return "dist/byo-ui-shell"
-  if (name === "hybrid") return "dist/hybrid-shell"
+  if (name === "basic") {
+    return "dist/basic-shell"
+  }
+  if (name === "file-browser") {
+    return "dist/file-browser-shell"
+  }
+  if (name === "native-chrome") {
+    return "dist/native-chrome-shell"
+  }
+  if (name === "byo-ui") {
+    return "dist/byo-ui-shell"
+  }
+  if (name === "hybrid") {
+    return "dist/hybrid-shell"
+  }
   return "dist/" + name + "-shell"
 }
 
@@ -37,19 +46,29 @@ fn sleepMs(ms) {
 
 fn httpCode(url) {
   let out = "/tmp/tish-desktop-http-code.txt"
-  exec("curl -s -o /dev/null -w '%{http_code}' " + q(url) + " > " + q(out) + " 2>/dev/null || echo 000 > " + q(out))
-  if (!pathExists(out)) return "000"
+  exec(
+    "curl -s -o /dev/null -w '%{http_code}' " + q(url) + " > " + q(out) + " 2>/dev/null || echo 000 > " + q(
+      out
+    )
+  )
+  if (!pathExists(out)) {
+    return "000"
+  }
   return String(readFile(out)).trim()
 }
 
 fn waitForHttp(url, timeoutMs) {
   let maxTries = Math.floor(timeoutMs / 250)
-  if (maxTries < 1) maxTries = 1
+  if (maxTries < 1) {
+    maxTries = 1
+  }
   let n = 0
   while (n < maxTries) {
     let code = httpCode(url)
     let num = Number(code)
-    if (num >= 200 && num < 500) return true
+    if (num >= 200 && num < 500) {
+      return true
+    }
     sleepMs(250)
     n = n + 1
   }
@@ -61,7 +80,7 @@ fn warmupVite(baseUrl) {
     baseUrl + "/",
     baseUrl + "/assets/app.css",
     baseUrl + "/bridge-boot.js",
-    baseUrl + "/ui/main.tish",
+    baseUrl + "/ui/main.tish"
   ]
   let i = 0
   while (i < urls.length) {
@@ -70,28 +89,28 @@ fn warmupVite(baseUrl) {
   }
   let bodyFile = "/tmp/tish-desktop-vite-main.txt"
   exec(
-    "curl -s -H 'Accept: text/javascript' " + q(baseUrl + "/ui/main.tish") +
-      " > " + q(bodyFile) + " 2>/dev/null || true"
+    "curl -s -H 'Accept: text/javascript' " + q(baseUrl + "/ui/main.tish") + " > " + q(bodyFile) + " 2>/dev/null || true"
   )
   if (pathExists(bodyFile)) {
     let text = String(readFile(bodyFile))
-    let parts = text.split('from "')
+    let parts = text.split("from \"")
     let p = 1
     while (p < parts.length) {
       let rest = parts[p]
-      let end = rest.indexOf('"')
+      let end = rest.indexOf("\"")
       if (end > 0) {
         let spec = rest.slice(0, end)
         let next = null
         if (spec.startsWith("./")) {
           next = baseUrl + "/ui/" + spec.slice(2)
-        } else if (spec.startsWith("/")) {
-          next = baseUrl + spec
+        } else {
+          if (spec.startsWith("/")) {
+            next = baseUrl + spec
+          }
         }
         if (next !== null) {
           exec(
-            "curl -s -o /dev/null -H 'Accept: text/javascript' " + q(next) +
-              " >/dev/null 2>&1 || true"
+            "curl -s -o /dev/null -H 'Accept: text/javascript' " + q(next) + " >/dev/null 2>&1 || true"
           )
         }
       }
@@ -104,8 +123,9 @@ fn warmupVite(baseUrl) {
 fn buildShell(tishBin, exampleDir, shellOut, shellPath) {
   console.log("[dev] building shell with " + tishBin + " → " + shellOut)
   let code = exec(
-    "cd " + q(exampleDir) + " && " + q(tishBin) +
-      " build --target native --native-backend rust src/main.tish -o " + q(shellOut)
+    "cd " + q(exampleDir) + " && " + q(tishBin) + " build --target native --native-backend rust src/main.tish -o " + q(
+      shellOut
+    )
   )
   if (code !== 0) {
     console.error("[dev] shell build failed (exit " + String(code) + ")")
@@ -118,18 +138,22 @@ fn buildShell(tishBin, exampleDir, shellOut, shellPath) {
 }
 
 fn shellNeedsRebuild(root, exampleDir, shellPath) {
-  if (!pathExists(shellPath)) return true
+  if (!pathExists(shellPath)) {
+    return true
+  }
   // Recursive: any file under host/shell sources newer than the binary.
   let marker = "/tmp/tish-desktop-shell-stale.txt"
   let hostSrc = joinPath(root, "crates/tish_desktop/src")
   let hostToml = joinPath(root, "crates/tish_desktop/Cargo.toml")
   let shellSrc = joinPath(exampleDir, "src")
   exec(
-    "if [ -n \"$(find " + q(hostSrc) + " " + q(shellSrc) + " " + q(hostToml) +
-      " -type f -newer " + q(shellPath) + " 2>/dev/null | head -1)\" ]; then echo yes; else echo no; fi > " +
-      q(marker)
+    "if [ -n \"$(find " + q(hostSrc) + " " + q(shellSrc) + " " + q(hostToml) + " -type f -newer " + q(
+      shellPath
+    ) + " 2>/dev/null | head -1)\" ]; then echo yes; else echo no; fi > " + q(marker)
   )
-  if (!pathExists(marker)) return true
+  if (!pathExists(marker)) {
+    return true
+  }
   return String(readFile(marker)).trim() === "yes"
 }
 
@@ -146,8 +170,12 @@ export fn runDev(args) {
   }
 
   let name = flagValue(args, "--example")
-  if (name === null) name = firstPositional(args)
-  if (name === null) name = "basic"
+  if (name === null) {
+    name = firstPositional(args)
+  }
+  if (name === null) {
+    name = "basic"
+  }
 
   if (legacyNode) {
     let script = joinPath(root, "scripts/dev-example.mjs")
@@ -165,34 +193,39 @@ export fn runDev(args) {
       name = "app"
     } else {
       console.error("[dev] example not found: " + exampleDir)
-      console.error("      pass --example basic|file-browser|native-chrome|byo-ui|hybrid, or run inside an app dir")
+      console.error(
+        "      pass --example basic|file-browser|native-chrome|byo-ui|hybrid, or run inside an app dir"
+      )
       exit(1)
     }
   }
 
   let port = examplePort(name)
-  if (name === "app") port = 5173
+  if (name === "app") {
+    port = 5173
+  }
   let shellOut = exampleShellOut(name)
-  if (name === "app") shellOut = "dist/app-shell"
+  if (name === "app") {
+    shellOut = "dist/app-shell"
+  }
   let shellPath = joinPath(exampleDir, shellOut)
 
-  console.log("[dev] " + name + " — starting Vite :" + String(port) + ", then native desktop shell")
+  console.log(
+    "[dev] " + name + " — starting Vite :" + String(port) + ", then native desktop shell"
+  )
 
   let cssScript = joinPath(exampleDir, "scripts/build-css.tish")
   if (pathExists(cssScript)) {
-    let cssCode = exec(
-      "cd " + q(exampleDir) + " && tish run --feature fs scripts/build-css.tish"
-    )
+    let cssCode = exec("cd " + q(exampleDir) + " && tish run --feature fs scripts/build-css.tish")
     if (cssCode !== 0) {
       console.log("[dev] build-css failed (continuing; styles may be stale)")
     }
   }
 
   killVite(port)
-  let viteCmd =
-    "cd " + q(exampleDir) +
-    " && npx vite --port " + String(port) + " --strictPort >/tmp/tish-desktop-vite-" +
-    String(port) + ".log 2>&1 &"
+  let viteCmd = "cd " + q(exampleDir) + " && npx vite --port " + String(port) + " --strictPort >/tmp/tish-desktop-vite-" + String(
+    port
+  ) + ".log 2>&1 &"
   exec(viteCmd)
 
   let baseUrl = "http://localhost:" + String(port)

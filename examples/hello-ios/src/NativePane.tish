@@ -19,47 +19,37 @@ export fn NativePane(props) {
   let onNote = props.onNote
   let onFlag = props.onFlag
 
-  return (
-    <div>
+  return <div>
       <h1>Native + Broker</h1>
       <p>{"Same features as the Webview pane via host tags + invoke (no Tauri)."}</p>
       <image src={"star.fill"} symbol={true} height={28} />
       <space height={8} />
-      <textinput
-        placeholder={"Note"}
-        value={note}
-        onChange={(v) => {
-          setNote(v)
-          if (onNote) {
-            onNote(v)
-          }
-        }}
-      />
+      <textinput placeholder={"Note"} value={note} onChange={(v) => {
+    setNote(v)
+    if (onNote) {
+      onNote(v)
+    }
+  }} />
       <space height={8} />
       <row>
         <span>{"Toggle"}</span>
-        <toggler
-          checked={flag}
-          onChange={(v) => {
-            setFlag(v)
-            if (onFlag) {
-              onFlag(v)
-            }
-          }}
-        />
+        <toggler checked={flag} onChange={(v) => {
+        setFlag(v)
+        if (onFlag) {
+          onFlag(v)
+        }
+      }} />
       </row>
       <rule />
       <div>
         <span>{"Count: " + count + " note=" + note + " flag=" + flag}</span>
-        <button
-          onClick={() => {
+        <button onClick={() => {
             let n = count + 1
             setCount(n)
             if (onCount) {
               onCount(n)
             }
-          }}
-        >
+          }}>
           {"Increment"}
         </button>
       </div>
@@ -72,5 +62,4 @@ export fn NativePane(props) {
         <button onClick={onAlert}>{"Alert"}</button>
       </div>
     </div>
-  )
 }
