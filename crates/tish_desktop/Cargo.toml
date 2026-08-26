@@ -40,12 +40,12 @@ tauri-build = { version = "2", features = [] }
 # `tish build`; for crates.io publish, switch to a versioned line that matches the
 # published tishlang_core the CLI was built against (ecosystem 3.0.x today —
 # crates-release.yml rewrites this automatically).
-tishlang_core = { path = "../../../tish/crates/tish_core", features = ["send-values"] }
+tishlang_core = { version = "3.9", features = ["send-values"] }
 tishlang_broker = { path = "../tish_broker" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon", "devtools", "image-png", "macos-private-api"] }
-tishlang_macos = { path = "../../../tish-apple/crates/tish-macos", optional = true }
+tishlang_macos = { version = "1.2", optional = true }
 # macOS window-chrome (traffic-light inset + tint), gated on platform-apple. Versions pinned to the 3.0 train.
 objc2 = { version = "0.6", optional = true }
 objc2-foundation = { version = "0.3", optional = true, features = ["NSBundle", "NSString", "NSObject", "NSGeometry", "NSNotification", "NSKeyValueObserving", "NSDictionary", "NSArray"] }
