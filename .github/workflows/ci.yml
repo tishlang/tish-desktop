@@ -104,6 +104,9 @@ jobs:
         run: |
           npm --prefix examples/hybrid install
           mkdir -p examples/hybrid/node_modules/@tishlang/tish/target
+          # `npm run` puts node_modules/.bin on PATH for its own script, but later steps
+          # (doctor smoke) invoke tools that shell out to `tish` directly.
+          echo "$(cd examples/hybrid/node_modules/.bin && pwd)" >> "$GITHUB_PATH"
           npm --prefix examples/hybrid run build:shell
 
       - name: Typed shell --check warn (byo-ui + basic)
@@ -203,6 +206,9 @@ jobs:
         run: |
           npm --prefix examples/hybrid install
           mkdir -p examples/hybrid/node_modules/@tishlang/tish/target
+          # `npm run` puts node_modules/.bin on PATH for its own script, but later steps
+          # (doctor smoke) invoke tools that shell out to `tish` directly.
+          echo "$(cd examples/hybrid/node_modules/.bin && pwd)" >> "$GITHUB_PATH"
           npm --prefix examples/hybrid run check:tree
           npm --prefix examples/hybrid run build:shell:apple
           test -x examples/hybrid/dist/hybrid-shell-apple
