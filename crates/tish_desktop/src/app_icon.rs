@@ -18,7 +18,23 @@
 
 use objc2::AnyThread;
 use objc2_app_kit::{NSApplication, NSImage};
-use objc2_foundation::{MainThreadMarker, NSString};
+use objc2_foundation::{MainThreadMarker, NSBundle, NSString};
+
+/// Whether the running process is a packaged `.app` whose `Info.plist` declares an icon.
+///
+/// This is the real question — NOT whether this is a debug or release build. `tauri::is_dev()` is
+/// `!cfg!(feature = "custom-protocol")`, and a tish host builds with plain cargo rather than the
+/// Tauri CLI that would set that feature, so it reports `true` even in a shipped bundle. Asking
+/// the bundle directly works no matter how the binary was compiled or launched.
+fn bundle_supplies_icon() -> bool {
+    let bundle = NSBundle::mainBundle();
+    // A loose binary (cargo run, `dist/tish-ide-shell` straight off disk) has no bundle path
+    // ending in .app, and no icon key to read.
+    let is_app = bundle.bundlePath().to_string().ends_with(".app");
+    let key = NSString::from_str("CFBundleIconFile");
+    let has_icon = bundle.objectForInfoDictionaryKey(&key).is_some();
+    is_app && has_icon
+}
 
 /// Set the process's dock icon from a PNG (or any NSImage-readable) file. No-op off the main thread
 /// or if the image can't be loaded (best-effort branding, never fatal).
@@ -46,7 +62,7 @@ pub fn set_dock_icon(path: &str) {
 /// system-masked, and already on screen. Overwriting it with a raw NSImage is what made the icon
 /// visibly change shortly after launch.
 pub fn set_dock_icon_scheduled(app: &tauri::AppHandle, path: String) {
-    if !tauri::is_dev() {
+    if bundle_supplies_icon() {
         return;
     }
     for delay_ms in [0u64, 300, 900, 2000] {
