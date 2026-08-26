@@ -2,10 +2,9 @@
 # release is promoted from prerelease to full release. Mirrors
 # tish/.github/workflows/crates-release.yml.
 #
-# Local/monorepo builds keep path deps on tishlang_core + sibling hosts.
-# This workflow rewrites those for publish — see crates/tish_desktop/README.md.
-# tishlang_macos (platform-apple) is published from tishlang/tish-apple, so it is
-# rewritten to a versioned crates.io dep here (NOT stripped); the not-yet-published
+# Cross-repo deps (tishlang_core, tishlang_macos) are plain versioned crates.io deps in
+# Cargo.toml, so nothing about them needs rewriting here. Only the in-workspace
+# publish-order deps do — see crates/tish_desktop/README.md. The not-yet-published
 # ms/lin/android siblings are still stripped until those repos exist.
 #
 # Secret: CARGO_REGISTRY_TOKEN (crates.io API token) on this repo.
@@ -22,16 +21,6 @@ on:
         description: "Release tag to (re)publish, e.g. v0.1.0"
         required: true
         type: string
-      tishlang_core_version:
-        description: "crates.io tishlang_core version (semver req)"
-        required: false
-        default: "3.0"
-        type: string
-      tish_apple_version:
-        description: "crates.io tishlang_macos (tish-apple) version (semver req)"
-        required: false
-        default: "1.0"
-        type: string
 
 permissions:
   contents: write
@@ -43,11 +32,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      # Pin must match the published tish CLI / ecosystem train.
-      TISHLANG_CORE_VERSION: ${{ inputs.tishlang_core_version || '3.0' }}
-      # tishlang_macos (platform-apple) published version from tishlang/tish-apple.
-      # tish-apple versions on its OWN line (1.x) — it does not track the core tish train.
-      TISH_APPLE_VERSION: ${{ inputs.tish_apple_version || '1.0' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,8 +46,6 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           VERSION="${TAG#v}"
-          CORE="${TISHLANG_CORE_VERSION}"
-          APPLE="${TISH_APPLE_VERSION}"
 
           # NOTE: crate names are tishlang_*, but the directories under crates/ keep their
           # original tish_* spelling (same split as tish-apple: tishlang_macos in crates/tish-macos).
@@ -72,14 +54,6 @@ jobs:
             sed -i.bak "s/^version = .*/version = \"$VERSION\"/" "crates/$dir/Cargo.toml"
             rm -f "crates/$dir/Cargo.toml.bak"
           done
-
-          # Cross-repo path dep → version only. tishlang_core is already on crates.io, and its
-          # path does not exist on the release runner, so the path MUST go. Applied to the sample
-          # extension too: it is publish = false, but Cargo loads every workspace member to
-          # resolve, so an unrewritten path there fails the whole publish.
-          perl -i -0pe "s/tishlang_core = \\{ path = \"[^\"]+\", features = \\[\"send-values\"\\] \\}/tishlang_core = { version = \"$CORE\", features = [\"send-values\"] }/s" \
-            crates/tish_desktop/Cargo.toml \
-            crates/tish_desktop_sample_ext/Cargo.toml
 
           # Intra-workspace deps keep the path AND gain a version (publish order:
           # broker → desktop → app). Cargo resolves these locally through the path and emits
@@ -91,12 +65,6 @@ jobs:
             crates/tish_desktop/Cargo.toml
           perl -i -0pe "s/tishlang_desktop = \\{ path = \"([^\"]+)\" \\}/tishlang_desktop = { path = \"\$1\", version = \"$VERSION\" }/s" \
             crates/tish_app/Cargo.toml
-
-          # macOS host (platform-apple): keep the feature + dep, but point tishlang_macos at the
-          # PUBLISHED crate (tishlang/tish-apple) instead of the monorepo path. The crate NAME is
-          # underscore (tishlang_macos); its directory under tish-apple stays hyphenated.
-          perl -i -0pe "s/tishlang_macos = \\{ path = \"[^\"]+\", optional = true \\}/tishlang_macos = { version = \"$APPLE\", optional = true }/s" \
-            crates/tish_desktop/Cargo.toml
 
           # The remaining sibling host path deps (ms/lin/android) are monorepo-only — those repos
           # aren't published yet. Strip them and their feature gates so the crate publishes cleanly;
@@ -232,7 +200,7 @@ jobs:
             case "$crate" in
               tishlang_desktop) require_published tishlang_macos "$crate" || exit 1 ;;
             esac
-            echo "Publishing $crate v${VERSION} (tishlang_core ${TISHLANG_CORE_VERSION})..."
+            echo "Publishing $crate v${VERSION}..."
             publish_with_retry "$crate"
           done
 
