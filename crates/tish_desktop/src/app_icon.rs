@@ -1,8 +1,20 @@
-//! macOS dock-icon override. Tauri sets the app (dock) icon from the bundled `tauri.conf.json`
-//! icons at build time; a hosting app that wants its OWN dock icon (not the tish-desktop
-//! default) sets it at runtime here via `NSApplication.setApplicationIconImage:`. The tray icon is
-//! handled separately through Tauri's `TrayIconBuilder::icon` — this is only the dock. objc2, so
-//! apple + macos only.
+//! macOS dock-icon override, for DEV RUNS ONLY.
+//!
+//! In a packaged app the dock icon comes from the bundle: `Info.plist`'s `CFBundleIconFile` ->
+//! `Resources/icon.icns`. macOS composites that through the system icon mask, so it is already
+//! correct — and it is on screen from the moment the app bounces, before any Rust runs.
+//!
+//! Tauri only overrides it under `#[cfg(all(dev, target_os = "macos"))]` (see `tauri::app`), i.e.
+//! `tauri dev`, where there is no bundle and the embedded `tauri.conf.json` icon stands in. That
+//! is the ONLY case a host needs to reassert its own icon, so that is the only case we do it.
+//!
+//! Doing it in release was actively harmful: `setApplicationIconImage:` draws the NSImage RAW,
+//! with no system mask, so a host whose `RunConfig.icon` is a full-bleed square (the common case —
+//! it doubles as the tray image) had its correctly-masked bundle icon replaced by a hard-cornered
+//! square a beat after launch. That swap is the "icon flash".
+//!
+//! The tray icon is separate, via Tauri's `TrayIconBuilder::icon` — this is only the dock. objc2,
+//! so apple + macos only.
 
 use objc2::AnyThread;
 use objc2_app_kit::{NSApplication, NSImage};
@@ -25,11 +37,18 @@ pub fn set_dock_icon(path: &str) {
     unsafe { app.setApplicationIconImage(Some(&image)) };
 }
 
-/// Apply the dock icon on the main thread at a few delays after launch. Tauri sets its OWN
-/// (bundled) app icon during startup — often AFTER `setup()` runs — so a single early call is
-/// overwritten. Re-asserting on later run-loop turns makes our icon win (mirrors the traffic-light
-/// scheduled re-apply).
+/// Apply the host's dock icon, in dev only.
+///
+/// Under `tauri dev` Tauri sets its own embedded icon during startup, often AFTER `setup()` runs,
+/// so a single early call loses the race; re-asserting on later run-loop turns wins it.
+///
+/// In a release build this is a no-op: the bundle's `.icns` is already the right icon, already
+/// system-masked, and already on screen. Overwriting it with a raw NSImage is what made the icon
+/// visibly change shortly after launch.
 pub fn set_dock_icon_scheduled(app: &tauri::AppHandle, path: String) {
+    if !tauri::is_dev() {
+        return;
+    }
     for delay_ms in [0u64, 300, 900, 2000] {
         let app = app.clone();
         let path = path.clone();
