@@ -6,8 +6,12 @@
   "tish": {
     "source": "./src/main.tish",
     "rustDependencies": {
-      "tishlang_desktop": { "path": "../../crates/tish_desktop" },
-      "tishlang_desktop_sample_ext": { "path": "../../crates/tish_desktop_sample_ext" }
+      "tishlang_desktop": {
+        "path": "../../crates/tish_desktop"
+      },
+      "tishlang_desktop_sample_ext": {
+        "path": "../../crates/tish_desktop_sample_ext"
+      }
     }
   },
   "scripts": {
@@ -26,6 +30,7 @@
   },
   "devDependencies": {
     "@tishlang/vite-plugin-tish": "file:../../../tish/npm/vite-plugin-tish",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "@tishlang/tish": "3.9.2"
   }
 }

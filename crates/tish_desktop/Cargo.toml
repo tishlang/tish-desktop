@@ -36,10 +36,9 @@ caps-store-persist = []
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# Must match the `tish` CLI's Value ABI (same physical crate). Path for monorepo
-# `tish build`; for crates.io publish, switch to a versioned line that matches the
-# published tishlang_core the CLI was built against (ecosystem 3.0.x today —
-# crates-release.yml rewrites this automatically).
+# Must match the `tish` CLI's Value ABI (same physical crate), so this version and the
+# @tishlang/tish the examples build with are ONE pin -- move them together or the
+# generated shells link two copies of tishlang_core and fail on mismatched Value types.
 tishlang_core = { version = "3.9", features = ["send-values"] }
 tishlang_broker = { path = "../tish_broker" }
 serde = { version = "1", features = ["derive"] }
