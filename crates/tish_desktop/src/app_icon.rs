@@ -8,6 +8,12 @@
 //! `tauri dev`, where there is no bundle and the embedded `tauri.conf.json` icon stands in. That
 //! is the ONLY case a host needs to reassert its own icon, so that is the only case we do it.
 //!
+//! Tauri's override runs on `RuntimeRunEvent::Ready`, so `reassert_on_ready` -- called from the
+//! host's run-event handler for `RunEvent::Ready` -- lands immediately after it, deterministically.
+//! The timed schedule alone could not: `Ready` fires when the event loop is up, which on a slow dev
+//! boot is well past the last 2000 ms tick, and the host's icon would show first and then be
+//! replaced by Tauri's embedded one.
+//!
 //! Doing it in release was actively harmful: `setApplicationIconImage:` draws the NSImage RAW,
 //! with no system mask, so a host whose `RunConfig.icon` is a full-bleed square (the common case —
 //! it doubles as the tray image) had its correctly-masked bundle icon replaced by a hard-cornered
@@ -53,10 +59,25 @@ pub fn set_dock_icon(path: &str) {
     unsafe { app.setApplicationIconImage(Some(&image)) };
 }
 
+/// Reassert the host's dock icon right after Tauri sets its own.
+///
+/// Tauri's dev-only override happens on `RuntimeRunEvent::Ready` (`tauri::app::on_event_loop_event`),
+/// which the host observes as `RunEvent::Ready`. Running here is exact rather than a race: no delay
+/// can be "late enough" in general, because `Ready` waits on the event loop coming up.
+///
+/// Must be called on the main thread — the run-event handler already is.
+pub fn reassert_on_ready(path: &str) {
+    if bundle_supplies_icon() {
+        return;
+    }
+    set_dock_icon(path);
+}
+
 /// Apply the host's dock icon, in dev only.
 ///
-/// Under `tauri dev` Tauri sets its own embedded icon during startup, often AFTER `setup()` runs,
-/// so a single early call loses the race; re-asserting on later run-loop turns wins it.
+/// Under `tauri dev` Tauri sets its own embedded icon during startup, after `setup()` runs, so a
+/// single early call loses the race. This covers the window before `Ready` (and any later AppKit
+/// reset); `reassert_on_ready` is what guarantees the host icon wins Tauri's own set.
 ///
 /// In a release build this is a no-op: the bundle's `.icns` is already the right icon, already
 /// system-masked, and already on screen. Overwriting it with a raw NSImage is what made the icon

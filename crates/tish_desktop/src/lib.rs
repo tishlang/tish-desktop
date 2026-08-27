@@ -681,6 +681,20 @@ fn build_and_run(
         .build(tauri::generate_context!())
         .map_err(|e| e.to_string())?
         .run(|app_handle, event| {
+            // Tauri sets ITS OWN embedded icon on Ready in dev builds (see
+            // tauri::app::on_event_loop_event), which is after setup() and, on a slow dev boot,
+            // after the last scheduled reassert — so the host icon showed first and was then
+            // replaced by Tauri's. Reassert here: same event, immediately after, no race.
+            // No-op in a packaged app, where the bundle already supplies the right icon.
+            #[cfg(all(feature = "platform-apple", target_os = "macos"))]
+            if matches!(event, tauri::RunEvent::Ready) {
+                let icon = app_handle
+                    .try_state::<AppState>()
+                    .and_then(|s| s.config.lock().icon.clone());
+                if let Some(path) = icon {
+                    app_icon::reassert_on_ready(&path);
+                }
+            }
             // macOS: files/folders dropped on the running dock icon (or Finder "Open With") arrive
             // as RunEvent::Opened — forward them to the webview as an `open-paths` event.
             #[cfg(target_os = "macos")]
