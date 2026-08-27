@@ -35,13 +35,13 @@ export default defineConfig({
         root,
         "packages/ui-theme/src/index.tish"
       ),
-      lattish: path.resolve(root, "../lattish/src/Lattish.tish"),
+      lattish: path.resolve(__dirname, "node_modules/lattish/src/Lattish.tish"),
       "lattish/jsx-runtime": path.resolve(
         root,
-        "../lattish/src/jsx-runtime.tish"
+        "node_modules/lattish/src/jsx-runtime.tish"
       ),
-      "tish-tailwind/tw": path.resolve(root, "../tish-tailwind/src/tw.tish"),
-      "tish-tailwind": path.resolve(root, "../tish-tailwind/src/tw.tish"),
+      "tish-tailwind/tw": path.resolve(__dirname, "node_modules/tish-tailwind/src/tw.tish"),
+      "tish-tailwind": path.resolve(__dirname, "node_modules/tish-tailwind/src/tw.tish"),
     },
   },
   server: {

@@ -73,34 +73,19 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Checkout path-dep siblings
-        id: siblings
+      - name: Stub absent platform siblings
         uses: ./.github/actions/tish-siblings
-        with:
-          head-ref: ${{ github.head_ref }}
 
-      # The single most valuable cache in this job. tish_native/src/build.rs resolves the nested
-      # cargo target dir as <tish-checkout>/target, but ONLY if that directory already exists —
-      # otherwise every `tish build` gets its own scratch target and recompiles Tauri from
-      # scratch. Building the CLI below populates it, and every example shell then shares it.
-      # Keyed on the tish commit so a sibling bump invalidates cleanly; the prefix restore-key
-      # still gives a warm start when it moves.
-      - name: Cache the tish sibling target dir
+      # The nested cargo target dir the tish compiler uses for the example shells: it resolves to
+      # <runtime crate>/../../target — inside the npm package — and is only used if that directory
+      # already EXISTS, else every `tish build` gets its own scratch target and recompiles Tauri.
+      - name: Cache the tish nested target dir
         uses: actions/cache@v4
         with:
-          path: ../tish/target
-          key: tish-target-${{ runner.os }}-${{ steps.siblings.outputs.tish-sha }}
+          path: examples/*/node_modules/@tishlang/tish/target
+          key: tish-nested-target-${{ runner.os }}-${{ hashFiles('examples/*/package.json') }}
           restore-keys: |
-            tish-target-${{ runner.os }}-
-
-      - name: Build the tish CLI
-        # `cargo build` rather than `cargo install`: install builds in a temp dir and leaves
-        # <tish-checkout>/target absent, which is what forced every example shell to recompile
-        # Tauri independently. This is also how tish builds its own CLI (native-smoke.yml).
-        run: |
-          set -euo pipefail
-          cargo build --release -p tishlang --bin tish --manifest-path ../tish/Cargo.toml
-          echo "$(cd ../tish/target/release && pwd)" >> "$GITHUB_PATH"
+            tish-nested-target-${{ runner.os }}-
 
       - name: Check (default features)
         run: cargo check -p tishlang_desktop -p tishlang_app
@@ -115,6 +100,10 @@ jobs:
         # hybrid is the richest shell (Phase 2 tree + SC4), so it is the one PRs always build.
         run: |
           npm --prefix examples/hybrid install
+          mkdir -p examples/hybrid/node_modules/@tishlang/tish/target
+          # `npm run` puts node_modules/.bin on PATH for its own script, but later steps
+          # (doctor smoke) invoke tools that shell out to `tish` directly.
+          echo "$(cd examples/hybrid/node_modules/.bin && pwd)" >> "$GITHUB_PATH"
           npm --prefix examples/hybrid run build:shell
 
       - name: Typed shell --check warn (byo-ui + basic)
@@ -125,6 +114,8 @@ jobs:
         run: |
           npm --prefix examples/byo-ui install
           npm --prefix examples/basic install
+          mkdir -p examples/byo-ui/node_modules/@tishlang/tish/target
+          mkdir -p examples/basic/node_modules/@tishlang/tish/target
           npm --prefix examples/byo-ui run build:shell
           npm --prefix examples/basic run build:shell
 
@@ -187,27 +178,20 @@ jobs:
           rustc --print cfg -C target-cpu=native --target aarch64-apple-darwin \
             | grep -E 'target_feature="(neon|aes|sha2|sha3)"' || true
 
-      - name: Checkout path-dep siblings
-        id: siblings
+      - name: Stub absent platform siblings
         uses: ./.github/actions/tish-siblings
-        with:
-          head-ref: ${{ github.head_ref }}
 
-      - name: Cache the tish sibling target dir
-        # See the rust job: this directory existing is what lets the shell builds share one
-        # cargo target instead of recompiling Tauri per build.
+      # The nested cargo target dir the tish compiler uses for the example shells: it resolves to
+      # <runtime crate>/../../target — inside the npm package — and is only used if that directory
+      # already EXISTS, else every `tish build` gets its own scratch target and recompiles Tauri.
+      - name: Cache the tish nested target dir
         uses: actions/cache@v4
         with:
-          path: ../tish/target
-          key: tish-target-${{ runner.os }}-${{ steps.siblings.outputs.tish-sha }}
+          path: examples/*/node_modules/@tishlang/tish/target
+          key: tish-nested-target-${{ runner.os }}-${{ hashFiles('examples/*/package.json') }}
           restore-keys: |
-            tish-target-${{ runner.os }}-
+            tish-nested-target-${{ runner.os }}-
 
-      - name: Build the tish CLI
-        run: |
-          set -euo pipefail
-          cargo build --release -p tishlang --bin tish --manifest-path ../tish/Cargo.toml
-          echo "$(cd ../tish/target/release && pwd)" >> "$GITHUB_PATH"
 
       - name: Check with platform-apple
         run: cargo check -p tishlang_desktop --features platform-apple -p tishlang_app
@@ -215,6 +199,10 @@ jobs:
       - name: Hybrid apple shell build (SC4)
         run: |
           npm --prefix examples/hybrid install
+          mkdir -p examples/hybrid/node_modules/@tishlang/tish/target
+          # `npm run` puts node_modules/.bin on PATH for its own script, but later steps
+          # (doctor smoke) invoke tools that shell out to `tish` directly.
+          echo "$(cd examples/hybrid/node_modules/.bin && pwd)" >> "$GITHUB_PATH"
           npm --prefix examples/hybrid run check:tree
           npm --prefix examples/hybrid run build:shell:apple
           test -x examples/hybrid/dist/hybrid-shell-apple
