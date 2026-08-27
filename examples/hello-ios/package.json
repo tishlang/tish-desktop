@@ -3,17 +3,20 @@
   "private": true,
   "version": "0.0.1",
   "license": "PIF",
-  "description": "Cross-device iOS demo: native ↔ webview parity via BrokerCore (tish-desktop) + tish:ios host (tish-apple)",
+  "description": "Cross-device iOS demo: native \u2194 webview parity via BrokerCore (tish-desktop) + tish:ios host (tish-apple)",
   "dependencies": {
-    "tish-ios": "file:../../../tish-apple/crates/tish-ios"
+    "tish-ios": "npm:@tishlang/tish-ios@1.2.0"
   },
   "scripts": {
-    "build": "cargo run --manifest-path ../../../tish/Cargo.toml -q -p tishlang -- build --target native --native-backend rust --crate-type staticlib --ios-triple aarch64-apple-ios-sim --platform ios --surface native src/main.tish -o dist/hello-ios",
-    "build:device": "cargo run --manifest-path ../../../tish/Cargo.toml -q -p tishlang -- build --target native --native-backend rust --crate-type staticlib --ios-triple aarch64-apple-ios --platform ios --surface native src/main.tish -o dist/hello-ios",
-    "resolve:button": "cargo run --manifest-path ../../../tish/Cargo.toml -q -p tishlang -- resolve-id ./Button --importer src/main.tish --platform ios --surface native",
+    "build": "tish build --target native --native-backend rust --crate-type staticlib --ios-triple aarch64-apple-ios-sim --platform ios --surface native src/main.tish -o dist/hello-ios",
+    "build:device": "tish build --target native --native-backend rust --crate-type staticlib --ios-triple aarch64-apple-ios --platform ios --surface native src/main.tish -o dist/hello-ios",
+    "resolve:button": "tish resolve-id ./Button --importer src/main.tish --platform ios --surface native",
     "xcodebuild:sim": "bash scripts/xcodebuild-sim.sh",
     "launch:sim": "bash scripts/launch-sim.sh",
     "run": "bash scripts/run-sim.sh",
     "dev": "bash scripts/run-sim.sh"
+  },
+  "devDependencies": {
+    "@tishlang/tish": "3.10.3"
   }
 }
