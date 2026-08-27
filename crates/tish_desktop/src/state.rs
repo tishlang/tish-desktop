@@ -14,6 +14,7 @@ pub const PROTOCOL_VERSION: &str = "desktop/v1";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowSpec {
+    #[serde(default)]
     pub label: String,
     /// Surface kind: `webview` (default) or `native` (apple attach when enabled).
     #[serde(default)]
@@ -38,6 +39,14 @@ pub struct WindowSpec {
     /// Native layout hint: `content` | `sidebar` (apple).
     #[serde(default)]
     pub layout: Option<String>,
+    /// When false, the window stays hidden until the webview reveals it.
+    /// Default true: show on first `PageLoadEvent::Finished`.
+    #[serde(default = "default_true")]
+    pub visible: bool,
+    /// Transparent native window so a theme canvas (`dune.app-canvas: transparent`)
+    /// can show the desktop through. Requires `macOSPrivateApi` on macOS.
+    #[serde(default)]
+    pub transparent: bool,
 }
 
 fn default_width() -> f64 {

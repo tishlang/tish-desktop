@@ -24,24 +24,31 @@ pub fn try_dispatch(
         })),
         "window.list" => Ok(json!(windows::list_labels(app))),
         "window.focus" => (|| {
+            let caller = windows::caller_label();
             let label = args
                 .get("label")
                 .and_then(|v| v.as_str())
+                .or(caller.as_deref())
                 .ok_or("label required")?;
             windows::focus(app, label)?;
             Ok(json!({ "ok": true }))
         })(),
         "window.close" => (|| {
+            let caller = windows::caller_label();
             let label = args
                 .get("label")
                 .and_then(|v| v.as_str())
+                .or(caller.as_deref())
                 .ok_or("label required")?;
             windows::close(app, label)?;
             Ok(json!({ "ok": true }))
         })(),
         "window.create" => (|| {
-            let spec: crate::state::WindowSpec =
+            let mut spec: crate::state::WindowSpec =
                 serde_json::from_value(args.clone()).map_err(|e| e.to_string())?;
+            if spec.label.is_empty() {
+                spec.label = windows::next_window_label(app);
+            }
             windows::create_from_spec(app, &spec)?;
             Ok(json!({ "ok": true, "label": spec.label }))
         })(),

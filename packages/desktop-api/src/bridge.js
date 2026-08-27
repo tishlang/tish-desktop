@@ -36,11 +36,20 @@ export function installBridge() {
     protocol: "desktop/v1",
     surface: "webview",
     getCurrentWindowLabel() {
-      try {
-        return g.__TAURI__?.webviewWindow?.getCurrentWebviewWindow?.()?.label ?? "main";
-      } catch {
-        return "main";
+      if (typeof g.__TISH_WINDOW_LABEL__ === "string" && g.__TISH_WINDOW_LABEL__) {
+        return g.__TISH_WINDOW_LABEL__;
       }
+      try {
+        const l =
+          g.__TAURI__?.webviewWindow?.getCurrentWebviewWindow?.()?.label ??
+          g.__TAURI__?.window?.getCurrentWindow?.()?.label;
+        if (typeof l === "string" && l) return l;
+      } catch {
+        /* fall through */
+      }
+      return typeof g.__TISH_WINDOW_LABEL__ === "string" && g.__TISH_WINDOW_LABEL__
+        ? g.__TISH_WINDOW_LABEL__
+        : "main";
     },
     async invoke(cmd, args = {}) {
       const core = g.__TAURI__?.core;

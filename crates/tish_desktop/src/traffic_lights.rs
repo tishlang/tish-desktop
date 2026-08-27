@@ -22,7 +22,7 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject};
 use objc2::{define_class, msg_send, sel, MainThreadOnly};
 use objc2_app_kit::{
-    NSButton, NSView, NSViewFrameDidChangeNotification, NSWindow, NSWindowButton,
+    NSApplication, NSButton, NSView, NSViewFrameDidChangeNotification, NSWindow, NSWindowButton,
     NSWindowDidUpdateNotification,
 };
 use objc2_foundation::{
@@ -181,22 +181,62 @@ thread_local! {
     static APPLYING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Apply the active inset (or restore the OS default) to this window. Idempotent and cheap; called
-/// on window creation, on window events, and (via the observers) on every title-bar relayout.
-pub fn apply(window: &tauri::WebviewWindow) {
+fn window_key(ns_window: &NSWindow) -> usize {
+    ns_window as *const NSWindow as usize
+}
+
+fn remember_observed_window(ns_window: &NSWindow) {
+    OBSERVED_WINDOWS.with(|s| {
+        s.borrow_mut().insert(window_key(ns_window));
+    });
+}
+
+fn is_observed_window(ns_window: &NSWindow) -> bool {
+    OBSERVED_WINDOWS.with(|s| s.borrow().contains(&window_key(ns_window)))
+}
+
+/// Reposition from an AppKit `NSWindow` without calling back into Tauri.
+/// Observers MUST use this: `WebviewWindow::ns_window()` re-enters wry's window
+/// map, and during close that map is already `borrow_mut`'d → process abort
+/// (`RefCell already mutably borrowed`), which takes every window with it.
+fn apply_ns(ns_window: &NSWindow) {
     if APPLYING.with(|f| f.get()) {
         return;
     }
     APPLYING.with(|f| f.set(true));
     let config = *CONFIG.lock().unwrap();
-    with_ns_window(window, |ns_window| {
-        install_observers(ns_window);
-        match config {
-            Some(inset) => reposition(ns_window, inset),
-            None => restore_default(ns_window),
-        }
-    });
+    install_observers(ns_window);
+    match config {
+        Some(inset) => reposition(ns_window, inset),
+        None => restore_default(ns_window),
+    }
     APPLYING.with(|f| f.set(false));
+}
+
+fn apply_from_object(obj: Option<&AnyObject>) {
+    let Some(obj) = obj else {
+        return;
+    };
+    if let Some(window) = obj.downcast_ref::<NSWindow>() {
+        if is_observed_window(window) && standard_buttons(window).is_some() {
+            apply_ns(window);
+        }
+        return;
+    }
+    if let Some(view) = obj.downcast_ref::<NSView>() {
+        if let Some(window) = view.window() {
+            if is_observed_window(&window) && standard_buttons(&window).is_some() {
+                apply_ns(&window);
+            }
+        }
+    }
+}
+
+/// Apply the active inset (or restore the OS default) to this window. Idempotent and cheap; called
+/// on window creation, on window events, and (via the observers) on every title-bar relayout.
+#[allow(dead_code)]
+pub fn apply(window: &tauri::WebviewWindow) {
+    with_ns_window(window, apply_ns);
 }
 
 // ---- Relayout observers: re-assert the inset the instant macOS resets the buttons ----
@@ -214,6 +254,7 @@ thread_local! {
         const { RefCell::new(None) };
     // Buttons we've already wired frame-change observers to (by pointer), so we do it once each.
     static OBSERVED_BUTTONS: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
+    static OBSERVED_WINDOWS: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
 }
 
 define_class!(
@@ -227,12 +268,10 @@ define_class!(
 
     impl TrafficLightObserver {
         #[unsafe(method(onWindowRelayout:))]
-        fn on_window_relayout(&self, _note: Option<&NSNotification>) {
-            // No reentrancy guard needed: `set_origin_if_needed` no-ops once a button is at target, so
-            // our own setFrameOrigin (which posts this same notification) converges in a few nested
-            // calls instead of looping. Suppressing reentrancy here would instead drop macOS's own
-            // resets that land mid-apply (e.g. the zoom button's second layout pass) → residual flicker.
-            reapply_all();
+        fn on_window_relayout(&self, note: Option<&NSNotification>) {
+            // Apply via the notification's NSWindow/NSView — never `webview_windows()` /
+            // `ns_window()`, which re-enter wry while a close already holds `borrow_mut`.
+            apply_from_object(note.and_then(|n| n.object()).as_deref());
         }
 
         // KVO on each button's `frame`: fires SYNCHRONOUSLY on ANY frame change, including the
@@ -242,22 +281,24 @@ define_class!(
         fn observe_value(
             &self,
             _key_path: Option<&NSString>,
-            _object: Option<&AnyObject>,
+            object: Option<&AnyObject>,
             _change: Option<&NSDictionary<NSKeyValueChangeKey, AnyObject>>,
             _context: *mut c_void,
         ) {
-            reapply_all();
+            apply_from_object(object);
         }
     }
 );
 
-fn reapply_all() {
-    let Some(app) = OBSERVER_APP.get() else {
+fn apply_all_ns() {
+    let Some(mtm) = MainThreadMarker::new() else {
         return;
     };
-    use tauri::Manager;
-    for (_, window) in app.webview_windows() {
-        apply(&window);
+    let app = NSApplication::sharedApplication(mtm);
+    for window in app.windows().iter() {
+        if is_observed_window(&window) && standard_buttons(&window).is_some() {
+            apply_ns(&window);
+        }
     }
 }
 
@@ -279,6 +320,7 @@ fn observer(mtm: MainThreadMarker) -> Retained<TrafficLightObserver> {
 /// Wire the window-level backstop observer (once) and a per-button synchronous frame observer for
 /// this window's buttons (once each). Idempotent; called from `apply` on the main thread.
 fn install_observers(ns_window: &NSWindow) {
+    remember_observed_window(ns_window);
     let Some(mtm) = MainThreadMarker::new() else {
         return;
     };
@@ -355,13 +397,7 @@ fn apply_all_scheduled(app: &tauri::AppHandle) {
             if delay_ms > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             }
-            let inner = handle.clone();
-            let _ = handle.run_on_main_thread(move || {
-                use tauri::Manager;
-                for (_, window) in inner.webview_windows() {
-                    apply(&window);
-                }
-            });
+            let _ = handle.run_on_main_thread(apply_all_ns);
         });
     }
 }
