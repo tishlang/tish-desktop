@@ -25,8 +25,8 @@
     "@tishlang/tish-desktop-shared": "file:../../packages/shared"
   },
   "devDependencies": {
-    "@tishlang/vite-plugin-tish": "file:../../../tish/npm/vite-plugin-tish",
+    "@tishlang/vite-plugin-tish": "3.10.3",
     "vite": "^6.0.0",
-    "@tishlang/tish": "3.9.2"
+    "@tishlang/tish": "3.10.3"
   }
 }

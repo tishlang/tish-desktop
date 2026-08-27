@@ -73,11 +73,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Checkout path-dep siblings
-        id: siblings
+      - name: Stub absent platform siblings
         uses: ./.github/actions/tish-siblings
-        with:
-          head-ref: ${{ github.head_ref }}
 
       # The nested cargo target dir the tish compiler uses for the example shells: it resolves to
       # <runtime crate>/../../target — inside the npm package — and is only used if that directory
@@ -181,11 +178,8 @@ jobs:
           rustc --print cfg -C target-cpu=native --target aarch64-apple-darwin \
             | grep -E 'target_feature="(neon|aes|sha2|sha3)"' || true
 
-      - name: Checkout path-dep siblings
-        id: siblings
+      - name: Stub absent platform siblings
         uses: ./.github/actions/tish-siblings
-        with:
-          head-ref: ${{ github.head_ref }}
 
       # The nested cargo target dir the tish compiler uses for the example shells: it resolves to
       # <runtime crate>/../../target — inside the npm package — and is only used if that directory
