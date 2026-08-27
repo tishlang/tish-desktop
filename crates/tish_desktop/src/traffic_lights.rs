@@ -23,7 +23,7 @@ use objc2::runtime::{AnyObject, NSObject};
 use objc2::{define_class, msg_send, sel, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSButton, NSView, NSViewFrameDidChangeNotification, NSWindow, NSWindowButton,
-    NSWindowDidUpdateNotification,
+    NSWindowDidUpdateNotification, NSWindowWillCloseNotification,
 };
 use objc2_foundation::{
     ns_string, MainThreadMarker, NSDictionary, NSKeyValueChangeKey, NSKeyValueObservingOptions,
@@ -157,19 +157,11 @@ fn restore_default(ns_window: &NSWindow) {
     }
 }
 
-fn with_ns_window<F: FnOnce(&NSWindow)>(window: &tauri::WebviewWindow, f: F) {
-    let Ok(ns_window_ptr) = window.ns_window() else {
-        return;
-    };
-    if ns_window_ptr.is_null() {
-        return;
-    }
-    // SAFETY: on macOS Tauri returns this webview window's live `NSWindow*`. We only read/write
-    // AppKit view geometry, and only from the main thread (Tauri delivers the setup call and window
-    // events on the main thread on macOS; the command path dispatches via run_on_main_thread).
-    let ns_window: &NSWindow = unsafe { &*(ns_window_ptr as *const NSWindow) };
-    f(ns_window);
-}
+// NOTE: there is deliberately no `WebviewWindow` -> `NSWindow` helper here any more. Everything in
+// this module runs from an AppKit callback, and `WebviewWindow::ns_window()` dispatches a
+// `WindowMessage` that re-enters wry's `handle_user_message`; taking `windows.0.borrow()` there
+// while wry's event dispatch holds `borrow_mut()` aborts the process. Windows are reached through
+// the notification's own object, or through `NSApplication::windows()`.
 
 thread_local! {
     // Reentrancy guard: our own `setFrameOrigin` synchronously posts NSViewFrameDidChange / KVO,
@@ -181,18 +173,19 @@ thread_local! {
     static APPLYING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-fn window_key(ns_window: &NSWindow) -> usize {
-    ns_window as *const NSWindow as usize
-}
-
-fn remember_observed_window(ns_window: &NSWindow) {
-    OBSERVED_WINDOWS.with(|s| {
-        s.borrow_mut().insert(window_key(ns_window));
-    });
-}
-
-fn is_observed_window(ns_window: &NSWindow) -> bool {
-    OBSERVED_WINDOWS.with(|s| s.borrow().contains(&window_key(ns_window)))
+/// A window this chrome manages: one of THIS process's windows carrying the three standard
+/// title-bar buttons. Panels, sheets and borderless windows have no `standardWindowButton`, so they
+/// fall out here.
+///
+/// Deliberately does NOT consult Tauri to decide. Every caller runs inside an AppKit callback, and
+/// `WebviewWindow::ns_window()` / `webview_windows()` dispatch a `WindowMessage` that re-enters
+/// wry's `handle_user_message` — which takes `windows.0.borrow()` while wry's own event dispatch
+/// already holds `borrow_mut()`, aborting the process with `RefCell already mutably borrowed`.
+///
+/// Gating on prior observation instead would be circular: a window is only ever recorded from
+/// `install_observers`, which is only reached through this check.
+fn is_managed_window(ns_window: &NSWindow) -> bool {
+    standard_buttons(ns_window).is_some()
 }
 
 /// Reposition from an AppKit `NSWindow` without calling back into Tauri.
@@ -218,25 +211,50 @@ fn apply_from_object(obj: Option<&AnyObject>) {
         return;
     };
     if let Some(window) = obj.downcast_ref::<NSWindow>() {
-        if is_observed_window(window) && standard_buttons(window).is_some() {
+        if is_managed_window(window) {
             apply_ns(window);
         }
         return;
     }
     if let Some(view) = obj.downcast_ref::<NSView>() {
         if let Some(window) = view.window() {
-            if is_observed_window(&window) && standard_buttons(&window).is_some() {
+            if is_managed_window(&window) {
                 apply_ns(&window);
             }
         }
     }
 }
 
-/// Apply the active inset (or restore the OS default) to this window. Idempotent and cheap; called
-/// on window creation, on window events, and (via the observers) on every title-bar relayout.
-#[allow(dead_code)]
-pub fn apply(window: &tauri::WebviewWindow) {
-    with_ns_window(window, apply_ns);
+/// Drop every per-window registration made by `install_observers`, on `NSWindowWillClose` — while
+/// the buttons are still alive and their observers still removable.
+///
+/// Without this, the KVO registration outlives the button it observes, which is the documented
+/// recipe for AppKit's *"deallocated while key value observers were still registered"* abort, and
+/// `OBSERVED_BUTTONS` keeps raw pointers that a later allocation can reuse — silently suppressing
+/// observer setup for a new window's buttons.
+fn forget_window(ns_window: &NSWindow) {
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
+    let Some(buttons) = standard_buttons(ns_window) else {
+        return;
+    };
+    let center = NSNotificationCenter::defaultCenter();
+    let observer = observer(mtm);
+    for button in &buttons {
+        let key = Retained::as_ptr(button) as usize;
+        if !OBSERVED_BUTTONS.with(|set| set.borrow_mut().remove(&key)) {
+            continue;
+        }
+        unsafe {
+            center.removeObserver_name_object(
+                &observer,
+                Some(NSViewFrameDidChangeNotification),
+                Some(button),
+            );
+            button.removeObserver_forKeyPath(&observer, ns_string!("frame"));
+        }
+    }
 }
 
 // ---- Relayout observers: re-assert the inset the instant macOS resets the buttons ----
@@ -254,7 +272,6 @@ thread_local! {
         const { RefCell::new(None) };
     // Buttons we've already wired frame-change observers to (by pointer), so we do it once each.
     static OBSERVED_BUTTONS: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
-    static OBSERVED_WINDOWS: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
 }
 
 define_class!(
@@ -271,7 +288,21 @@ define_class!(
         fn on_window_relayout(&self, note: Option<&NSNotification>) {
             // Apply via the notification's NSWindow/NSView — never `webview_windows()` /
             // `ns_window()`, which re-enter wry while a close already holds `borrow_mut`.
-            apply_from_object(note.and_then(|n| n.object()).as_deref());
+            guard_objc_callback("onWindowRelayout:", || {
+                apply_from_object(note.and_then(|n| n.object()).as_deref());
+            });
+        }
+
+        #[unsafe(method(onWindowWillClose:))]
+        fn on_window_will_close(&self, note: Option<&NSNotification>) {
+            guard_objc_callback("onWindowWillClose:", || {
+                let Some(obj) = note.and_then(|n| n.object()) else {
+                    return;
+                };
+                if let Some(window) = obj.downcast_ref::<NSWindow>() {
+                    forget_window(window);
+                }
+            });
         }
 
         // KVO on each button's `frame`: fires SYNCHRONOUSLY on ANY frame change, including the
@@ -285,10 +316,21 @@ define_class!(
             _change: Option<&NSDictionary<NSKeyValueChangeKey, AnyObject>>,
             _context: *mut c_void,
         ) {
-            apply_from_object(object);
+            guard_objc_callback("observeValueForKeyPath:", || apply_from_object(object));
         }
     }
 );
+
+/// Run an ObjC callback body so a panic can never cross the `extern "C"` boundary.
+///
+/// Unwinding out of a `define_class!` method is instant `abort()` — that is how the wry `RefCell`
+/// re-entrancy took the whole app down. Chrome decoration is cosmetic and must never be fatal, so a
+/// panic here degrades to a logged error and default macOS traffic lights.
+pub(crate) fn guard_objc_callback(what: &str, f: impl FnOnce()) {
+    if std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).is_err() {
+        eprintln!("[traffic_lights] panic in {what}; skipping this event's chrome update");
+    }
+}
 
 fn apply_all_ns() {
     let Some(mtm) = MainThreadMarker::new() else {
@@ -296,7 +338,7 @@ fn apply_all_ns() {
     };
     let app = NSApplication::sharedApplication(mtm);
     for window in app.windows().iter() {
-        if is_observed_window(&window) && standard_buttons(&window).is_some() {
+        if is_managed_window(&window) {
             apply_ns(&window);
         }
     }
@@ -320,7 +362,6 @@ fn observer(mtm: MainThreadMarker) -> Retained<TrafficLightObserver> {
 /// Wire the window-level backstop observer (once) and a per-button synchronous frame observer for
 /// this window's buttons (once each). Idempotent; called from `apply` on the main thread.
 fn install_observers(ns_window: &NSWindow) {
-    remember_observed_window(ns_window);
     let Some(mtm) = MainThreadMarker::new() else {
         return;
     };
@@ -338,6 +379,13 @@ fn install_observers(ns_window: &NSWindow) {
                 &observer,
                 sel!(onWindowRelayout:),
                 Some(NSWindowDidUpdateNotification),
+                None,
+            );
+            // Teardown hook: drop this window's per-button observers while they are still valid.
+            center.addObserver_selector_name_object(
+                &observer,
+                sel!(onWindowWillClose:),
+                Some(NSWindowWillCloseNotification),
                 None,
             );
         }
