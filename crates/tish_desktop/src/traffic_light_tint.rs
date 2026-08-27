@@ -23,11 +23,11 @@
 //! removed on its own.
 
 use objc2::rc::Retained;
-use objc2::runtime::NSObject;
+use objc2::runtime::{AnyObject, NSObject};
 use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadOnly};
 use objc2_app_kit::{
-    NSBezierPath, NSButton, NSColor, NSView, NSViewFrameDidChangeNotification, NSWindow,
-    NSWindowButton, NSWindowDidBecomeKeyNotification, NSWindowDidResignKeyNotification,
+    NSApplication, NSBezierPath, NSButton, NSColor, NSView, NSViewFrameDidChangeNotification,
+    NSWindow, NSWindowButton, NSWindowDidBecomeKeyNotification, NSWindowDidResignKeyNotification,
     NSWindowDidUpdateNotification, NSWindowOrderingMode,
 };
 use objc2_foundation::{
@@ -196,37 +196,71 @@ fn with_ns_window<F: FnOnce(&NSWindow)>(window: &tauri::WebviewWindow, f: F) {
     f(ns_window);
 }
 
-/// Apply the active tint (or strip overlays) to this window's buttons, and wire the relayout observer
-/// so the overlays keep following the buttons. Idempotent and cheap.
-pub fn apply(window: &tauri::WebviewWindow) {
+fn window_key(ns_window: &NSWindow) -> usize {
+    ns_window as *const NSWindow as usize
+}
+
+fn remember_observed_window(ns_window: &NSWindow) {
+    OBSERVED_WINDOWS.with(|s| {
+        s.borrow_mut().insert(window_key(ns_window));
+    });
+}
+
+fn is_observed_window(ns_window: &NSWindow) -> bool {
+    OBSERVED_WINDOWS.with(|s| s.borrow().contains(&window_key(ns_window)))
+}
+
+fn apply_ns(ns_window: &NSWindow) {
     if APPLYING.with(|f| f.get()) {
         return;
     }
     APPLYING.with(|f| f.set(true));
     if let Some(mtm) = MainThreadMarker::new() {
         let config = CONFIG.lock().unwrap().clone();
-        with_ns_window(window, |ns_window| {
-            install_observers(ns_window);
-            // Tint only when this window is focused (key); otherwise the overlays hide and the
-            // native buttons grey out. Re-evaluated on every apply, incl. the focus-change observers.
-            let is_key = ns_window.isKeyWindow();
-            if let Some(buttons) = standard_buttons(ns_window) {
-                match &config {
-                    Some(cfg) => {
-                        apply_button(mtm, &buttons[0], cfg.close, cfg.diameter, is_key);
-                        apply_button(mtm, &buttons[1], cfg.minimize, cfg.diameter, is_key);
-                        apply_button(mtm, &buttons[2], cfg.zoom, cfg.diameter, is_key);
-                    }
-                    None => {
-                        for button in &buttons {
-                            apply_button(mtm, button, None, 0.0, is_key);
-                        }
+        install_observers(ns_window);
+        let is_key = ns_window.isKeyWindow();
+        if let Some(buttons) = standard_buttons(ns_window) {
+            match &config {
+                Some(cfg) => {
+                    apply_button(mtm, &buttons[0], cfg.close, cfg.diameter, is_key);
+                    apply_button(mtm, &buttons[1], cfg.minimize, cfg.diameter, is_key);
+                    apply_button(mtm, &buttons[2], cfg.zoom, cfg.diameter, is_key);
+                }
+                None => {
+                    for button in &buttons {
+                        apply_button(mtm, button, None, 0.0, is_key);
                     }
                 }
             }
-        });
+        }
     }
     APPLYING.with(|f| f.set(false));
+}
+
+fn apply_from_object(obj: Option<&AnyObject>) {
+    let Some(obj) = obj else {
+        return;
+    };
+    if let Some(window) = obj.downcast_ref::<NSWindow>() {
+        if is_observed_window(window) && standard_buttons(window).is_some() {
+            apply_ns(window);
+        }
+        return;
+    }
+    if let Some(view) = obj.downcast_ref::<NSView>() {
+        if let Some(window) = view.window() {
+            if is_observed_window(&window) && standard_buttons(&window).is_some() {
+                apply_ns(&window);
+            }
+        }
+    }
+}
+
+/// Apply the active tint (or strip overlays) to this window's buttons, and wire the relayout observer
+/// so the overlays keep following the buttons. Idempotent and cheap.
+#[allow(dead_code)]
+pub fn apply(window: &tauri::WebviewWindow) {
+    with_ns_window(window, apply_ns);
 }
 
 // ---- Relayout observer: keep overlays aligned + on top the instant a button moves -----------------
@@ -234,6 +268,7 @@ pub fn apply(window: &tauri::WebviewWindow) {
 thread_local! {
     static RELAYOUT_OBSERVER: RefCell<Option<Retained<TintObserver>>> = const { RefCell::new(None) };
     static OBSERVED_BUTTONS: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
+    static OBSERVED_WINDOWS: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
 }
 
 define_class!(
@@ -247,8 +282,8 @@ define_class!(
 
     impl TintObserver {
         #[unsafe(method(onRelayout:))]
-        fn on_relayout(&self, _note: Option<&NSNotification>) {
-            reapply_all();
+        fn on_relayout(&self, note: Option<&NSNotification>) {
+            apply_from_object(note.and_then(|n| n.object()).as_deref());
         }
     }
 );
@@ -260,13 +295,15 @@ impl TintObserver {
     }
 }
 
-fn reapply_all() {
-    let Some(app) = OBSERVER_APP.get() else {
+fn apply_all_ns() {
+    let Some(mtm) = MainThreadMarker::new() else {
         return;
     };
-    use tauri::Manager;
-    for (_, window) in app.webview_windows() {
-        apply(&window);
+    let app = NSApplication::sharedApplication(mtm);
+    for window in app.windows().iter() {
+        if is_observed_window(&window) && standard_buttons(&window).is_some() {
+            apply_ns(&window);
+        }
     }
 }
 
@@ -281,6 +318,7 @@ fn observer(mtm: MainThreadMarker) -> Retained<TintObserver> {
 /// Wire a window-level relayout backstop (once) + a per-button frame observer (once each), so an
 /// overlay re-mirrors its button the moment macOS / `traffic_lights` moves it. Idempotent.
 fn install_observers(ns_window: &NSWindow) {
+    remember_observed_window(ns_window);
     let Some(mtm) = MainThreadMarker::new() else {
         return;
     };
@@ -346,13 +384,7 @@ fn apply_all_scheduled(app: &tauri::AppHandle) {
             if delay_ms > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             }
-            let inner = handle.clone();
-            let _ = handle.run_on_main_thread(move || {
-                use tauri::Manager;
-                for (_, window) in inner.webview_windows() {
-                    apply(&window);
-                }
-            });
+            let _ = handle.run_on_main_thread(apply_all_ns);
         });
     }
 }
