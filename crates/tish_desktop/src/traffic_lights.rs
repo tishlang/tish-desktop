@@ -360,7 +360,7 @@ fn observer(mtm: MainThreadMarker) -> Retained<TrafficLightObserver> {
 }
 
 /// Wire the window-level backstop observer (once) and a per-button synchronous frame observer for
-/// this window's buttons (once each). Idempotent; called from `apply` on the main thread.
+/// this window's buttons (once each). Idempotent; called from `apply_ns` on the main thread.
 fn install_observers(ns_window: &NSWindow) {
     let Some(mtm) = MainThreadMarker::new() else {
         return;
@@ -429,8 +429,11 @@ pub fn init(app: &tauri::AppHandle) {
     // real cause of that reset — the window TITLE being rewritten on file-select, which invalidates
     // the title bar — is now fixed at the source (native title reflects the workspace only). A forever
     // main-thread poll only starved the run loop (a multi-second beachball at boot, when macOS is
-    // already relaying the title bar hard). Positioning is now purely event-driven: window
-    // create/reveal, Resized/Moved/Focused, the theme push schedule, and the relayout observers below.
+    // already relaying the title bar hard). Positioning is event-driven: the scheduled sweep the host
+    // triggers on every inset/tint push and on `reapply` at window reveal -- which is ALSO what seeds
+    // the per-window observers -- plus the relayout observers below. There is no window-create hook
+    // and no Resized/Moved/Focused handler for traffic lights; claiming otherwise is what made the
+    // seeding regression invisible.
 }
 
 /// Apply the current config to every window NOW, then a few more times as the window settles.
