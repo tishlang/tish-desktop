@@ -7,6 +7,7 @@
     "frontendDist": "./dist-placeholder"
   },
   "app": {
+    "macOSPrivateApi": true,
     "withGlobalTauri": true,
     "windows": [],
     "security": {

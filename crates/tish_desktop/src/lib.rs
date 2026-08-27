@@ -88,6 +88,17 @@ fn emit_event_to(event: &str, payload: serde_json::Value, window: Option<&str>) 
     }
 }
 
+/// `AppHandle::emit` from inside `on_window_event` re-enters wry's window map on the
+/// main thread (`RefCell already mutably borrowed`) and kills the whole process — every
+/// window dies with it. Off-thread emit uses the event-loop proxy instead of running
+/// `handle_user_message` inline.
+fn emit_from_window_event(app: &tauri::AppHandle, event: &'static str, payload: serde_json::Value) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let _ = app.emit(event, payload);
+    });
+}
+
 /// `useExtensions(["id", ...])` — record enabled extension ids for the next run.
 pub fn use_extensions(args: &[Value]) -> Value {
     let ids: Vec<String> = match args.first() {
@@ -269,15 +280,38 @@ pub fn pending_native_roots(_args: &[Value]) -> Value {
 }
 
 pub fn list_windows(_args: &[Value]) -> Value {
+    if let Some(app) = local_invoke::APP_HANDLE.lock().clone() {
+        return ok_json(serde_json::json!(windows::list_labels(&app)));
+    }
     ok_json(serde_json::json!([]))
 }
 
-pub fn focus_window(_args: &[Value]) -> Value {
-    err_str("focusWindow: use broker invoke window.focus after run()")
+pub fn focus_window(args: &[Value]) -> Value {
+    let Some(app) = local_invoke::APP_HANDLE.lock().clone() else {
+        return err_str("focusWindow: host is not running");
+    };
+    let label = arg_str(args, 0).map(|s| s.to_string());
+    let result = match label.as_deref() {
+        Some(l) => windows::focus(&app, l),
+        None => windows::focus_last(&app),
+    };
+    match result {
+        Ok(()) => ok_json(serde_json::json!({ "ok": true })),
+        Err(e) => err_str(e),
+    }
 }
 
-pub fn close_window(_args: &[Value]) -> Value {
-    err_str("closeWindow: use broker invoke window.close after run()")
+pub fn close_window(args: &[Value]) -> Value {
+    let Some(app) = local_invoke::APP_HANDLE.lock().clone() else {
+        return err_str("closeWindow: host is not running");
+    };
+    let Some(label) = arg_str(args, 0) else {
+        return err_str("closeWindow(label): label required");
+    };
+    match windows::close_from_broker(&app, &label, windows::caller_label().as_deref()) {
+        Ok(()) => ok_json(serde_json::json!({ "ok": true })),
+        Err(e) => err_str(e),
+    }
 }
 
 /// `run(config?)` — start Tauri event loop (blocks until app exits).
@@ -354,6 +388,8 @@ pub fn run(args: &[Value]) -> Value {
             hidden_title: false,
             decorations: true,
             layout: None,
+            visible: true,
+            transparent: false,
         });
     }
 
@@ -433,7 +469,7 @@ fn build_and_run(
 
     if plugins.single_instance {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            let _ = windows::focus(app, "main");
+            let _ = windows::focus_last(app);
             // A second launch (`<binary> <path>` / Finder "Open With" on a packaged build) delivers
             // its args here — forward file/folder paths to the running instance (open-paths event).
             // Skip argv[0] (the binary) and any -flags; app_open tags each path with isDir.
@@ -505,22 +541,27 @@ fn build_and_run(
         .on_window_event(|window, event| match event {
             WindowEvent::ThemeChanged(theme) => {
                 let theme = format!("{theme:?}").to_lowercase();
-                let _ = window.app_handle().emit(
+                emit_from_window_event(
+                    window.app_handle(),
                     "theme:changed",
-                    serde_json::json!({ "theme": theme }),
+                    serde_json::json!({ "theme": theme, "label": window.label() }),
                 );
             }
-            // Per-window lifecycle → let the app tear down that window's resources (ptys, sessions).
-            WindowEvent::CloseRequested { .. } => {
-                let _ = window.app_handle().emit(
-                    "window-close",
-                    serde_json::json!({ "label": window.label() }),
-                );
+            WindowEvent::Focused(true) => {
+                windows::note_focused(window.label());
             }
             WindowEvent::Destroyed => {
-                let _ = window.app_handle().emit(
+                let label = window.label().to_string();
+                windows::on_destroyed(&label);
+                emit_from_window_event(
+                    window.app_handle(),
+                    "window-close",
+                    serde_json::json!({ "label": label }),
+                );
+                emit_from_window_event(
+                    window.app_handle(),
                     "window-destroyed",
-                    serde_json::json!({ "label": window.label() }),
+                    serde_json::json!({ "label": label }),
                 );
             }
             _ => {}
@@ -578,7 +619,7 @@ fn build_and_run(
                     } else {
                         let _ = h.emit("menu:action", serde_json::json!({ "id": id }));
                         if id == "menu:show" {
-                            let _ = windows::focus(&h, "main");
+                            let _ = windows::focus_last(&h);
                         }
                     }
                 });
@@ -605,7 +646,7 @@ fn build_and_run(
                         if id == "tray:quit" {
                             app.exit(0);
                         } else if id == "tray:show" {
-                            let _ = windows::focus(app, "main");
+                            let _ = windows::focus_last(app);
                         }
                     })
                     .on_tray_icon_event(move |tray, event| {
@@ -616,7 +657,7 @@ fn build_and_run(
                         } = event
                         {
                             let app = tray.app_handle();
-                            let _ = windows::focus(app, "main");
+                            let _ = windows::focus_last(app);
                         }
                     })
                     .build(app)?;
@@ -625,6 +666,10 @@ fn build_and_run(
 
             for spec in &window_specs {
                 windows::create_from_spec(&handle, spec)?;
+            }
+
+            if std::env::var("TISH_WINDOW_LIFECYCLE_TEST").as_deref() == Ok("1") {
+                windows::spawn_lifecycle_selftest(handle.clone());
             }
 
             if tick_ms > 0 {
