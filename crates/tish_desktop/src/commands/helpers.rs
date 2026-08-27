@@ -25,14 +25,13 @@ pub fn permission_state_str(state: PermissionState) -> &'static str {
     }
 }
 
-/// Resolves the target window for a command, defaulting to `"main"`.
+/// Resolves the target window: `args.label`, else the invoking webview's label.
+/// Never a silent `"main"` fallback unless the caller really is `main`.
 pub fn window_for(
     app: &AppHandle,
     args: &serde_json::Value,
 ) -> Result<tauri::WebviewWindow, String> {
-    let label = args.get("label").and_then(|v| v.as_str()).unwrap_or("main");
-    app.get_webview_window(label)
-        .ok_or_else(|| format!("window not found: {label}"))
+    crate::windows::resolve(app, args, crate::windows::caller_label().as_deref())
 }
 
 /// Checks that `name` is present in the app's granted permission list.

@@ -17,9 +17,10 @@ pub(crate) mod webview_cap;
 mod window_extra;
 
 use serde_json::json;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use crate::state::AppState;
+use crate::windows;
 
 #[tauri::command]
 pub fn desktop_protocol() -> serde_json::Value {
@@ -29,10 +30,12 @@ pub fn desktop_protocol() -> serde_json::Value {
 #[tauri::command]
 pub async fn desktop_invoke(
     app: AppHandle,
+    window: WebviewWindow,
     cmd: String,
     args: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
     let args = args.unwrap_or(json!({}));
+    let caller = window.label().to_string();
     // A Tish `handle()` command is app logic (fs / process / http / index) that can block for a
     // long time; run it OFF the main thread so the webview never beachballs. The rest — state.*,
     // CapProviders, and the window/menu/dialog glue — is fast and (on macOS) main-thread-only, so
@@ -44,15 +47,16 @@ pub async fn desktop_invoke(
     // with a large ms is merely slow). Gated on TISH_DESKTOP_TRACE_INVOKE=1 so it's silent by default.
     let trace = std::env::var("TISH_DESKTOP_TRACE_INVOKE").as_deref() == Ok("1");
     if trace {
-        eprintln!("[desktop_invoke] → {cmd} (handler={is_handler})");
+        eprintln!("[desktop_invoke] → {cmd} (handler={is_handler}, caller={caller})");
     }
     let started = std::time::Instant::now();
     let out = if is_handler {
         let app2 = app.clone();
         let cmd2 = cmd.clone();
+        let caller2 = caller.clone();
         match tauri::async_runtime::spawn_blocking(move || {
             let state = app2.state::<AppState>();
-            dispatch(&app2, state.inner(), &cmd2, args)
+            dispatch(&app2, state.inner(), &cmd2, args, Some(&caller2))
         })
         .await
         {
@@ -61,7 +65,7 @@ pub async fn desktop_invoke(
         }
     } else {
         let state = app.state::<AppState>();
-        dispatch(&app, state.inner(), &cmd, args)
+        dispatch(&app, state.inner(), &cmd, args, Some(&caller))
     };
     if trace {
         eprintln!(
@@ -77,13 +81,15 @@ type ExtraDispatch =
     fn(&AppHandle, &AppState, &str, &serde_json::Value) -> Option<Result<serde_json::Value, String>>;
 
 /// In-process entry for shell / nested WK `brokerInvoke` when Tauri `AppHandle` is live.
+/// Nested calls inherit the invoking webview from `desktop_invoke` (thread-local).
 pub fn invoke_for_handle(
     app: &AppHandle,
     state: &AppState,
     cmd: &str,
     args: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    dispatch(app, state, cmd, args)
+    let caller = windows::caller_label();
+    dispatch(app, state, cmd, args, caller.as_deref())
 }
 
 /// Legacy modules after CapProviders. `dialog.*` / `notification.*` / `store.*` /
@@ -103,6 +109,22 @@ const LEGACY_MODULES: &[ExtraDispatch] = &[
 ];
 
 fn dispatch(
+    app: &AppHandle,
+    state: &AppState,
+    cmd: &str,
+    args: serde_json::Value,
+    caller: Option<&str>,
+) -> Result<serde_json::Value, String> {
+    let prev = windows::caller_label();
+    if caller.is_some() {
+        windows::set_caller_label(caller);
+    }
+    let result = dispatch_inner(app, state, cmd, args);
+    windows::set_caller_label(prev.as_deref());
+    result
+}
+
+fn dispatch_inner(
     app: &AppHandle,
     state: &AppState,
     cmd: &str,
