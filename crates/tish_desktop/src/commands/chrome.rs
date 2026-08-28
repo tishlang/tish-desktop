@@ -172,7 +172,9 @@ fn dock_set_icon(app: &AppHandle, args: &Value) -> Result<Value, String> {
     {
         let handle = app.clone();
         handle
-            .run_on_main_thread(move || crate::app_icon::set_dock_icon(&path))
+            .run_on_main_thread(move || {
+                let _ = crate::app_icon::set_dock_icon(&path);
+            })
             .map_err(|e| e.to_string())?;
         return Ok(json!({ "ok": true }));
     }
