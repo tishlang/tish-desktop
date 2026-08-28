@@ -17,13 +17,6 @@ name: NPM release
 on:
   release:
     types: [published, edited]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag to (re)publish, e.g. v0.1.0"
-        required: true
-        type: string
-
 jobs:
   publish:
     name: Publish @tishlang/tish-desktop*
