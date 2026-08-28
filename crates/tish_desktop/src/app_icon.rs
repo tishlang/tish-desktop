@@ -1,12 +1,13 @@
-//! macOS dock-icon override, for DEV RUNS ONLY.
+//! macOS dock-icon override.
 //!
 //! In a packaged app the dock icon comes from the bundle: `Info.plist`'s `CFBundleIconFile` ->
 //! `Resources/icon.icns`. macOS composites that through the system icon mask, so it is already
 //! correct — and it is on screen from the moment the app bounces, before any Rust runs.
 //!
-//! Tauri only overrides it under `#[cfg(all(dev, target_os = "macos"))]` (see `tauri::app`), i.e.
-//! `tauri dev`, where there is no bundle and the embedded `tauri.conf.json` icon stands in. That
-//! is the ONLY case a host needs to reassert its own icon, so that is the only case we do it.
+//! Tauri overrides it at Ready under `#[cfg(all(dev, target_os = "macos"))]` (see `tauri::app`) —
+//! and the `dev` cfg is emitted for plain-cargo builds, so this happens in PACKAGED apps too, not
+//! just `tauri dev`. The crate's embedded icon is a transparent placeholder, so whatever Tauri
+//! sets at Ready is invisible: EVERY build must reassert at Ready or the dock goes blank.
 //!
 //! Tauri's override runs on `RuntimeRunEvent::Ready`, so `reassert_on_ready` -- called from the
 //! host's run-event handler for `RunEvent::Ready` -- lands immediately after it, deterministically.
@@ -14,7 +15,9 @@
 //! boot is well past the last 2000 ms tick, and the host's icon would show first and then be
 //! replaced by Tauri's embedded one.
 //!
-//! Doing it in release was actively harmful: `setApplicationIconImage:` draws the NSImage RAW,
+//! The pre-Ready timed schedule stays dev-only: there the bundle's system-masked `.icns` is
+//! already on screen and correct, and replacing it early was the original "icon flash".
+//! `setApplicationIconImage:` draws the NSImage RAW,
 //! with no system mask, so a host whose `RunConfig.icon` is a full-bleed square (the common case —
 //! it doubles as the tray image) had its correctly-masked bundle icon replaced by a hard-cornered
 //! square a beat after launch. That swap is the "icon flash".
@@ -42,35 +45,65 @@ fn bundle_supplies_icon() -> bool {
     is_app && has_icon
 }
 
-/// Set the process's dock icon from a PNG (or any NSImage-readable) file. No-op off the main thread
-/// or if the image can't be loaded (best-effort branding, never fatal).
-pub fn set_dock_icon(path: &str) {
+/// Set the process's dock icon from a PNG (or any NSImage-readable) file. Returns whether an
+/// image was actually loaded and set — callers with a fallback must know. No-op off the main
+/// thread or if the image can't be loaded (best-effort branding, never fatal).
+pub fn set_dock_icon(path: &str) -> bool {
     let Some(mtm) = MainThreadMarker::new() else {
-        return;
+        return false;
     };
     let ns_path = NSString::from_str(path);
     // initWithContentsOfFile: returns nil for an unreadable path — tolerate it.
     let image = unsafe { NSImage::initWithContentsOfFile(NSImage::alloc(), &ns_path) };
     let Some(image) = image else {
         eprintln!("[app_icon] could not load dock icon at {path}");
-        return;
+        return false;
     };
     let app = NSApplication::sharedApplication(mtm);
     unsafe { app.setApplicationIconImage(Some(&image)) };
+    true
+}
+
+/// The bundle's own icon file (`Info.plist` `CFBundleIconFile` under `Contents/Resources`),
+/// tolerating the extensionless convention. None for a loose binary or an iconless bundle.
+fn bundle_icns_path() -> Option<String> {
+    let bundle = NSBundle::mainBundle();
+    let bundle_path = bundle.bundlePath().to_string();
+    if !bundle_path.ends_with(".app") {
+        return None;
+    }
+    let key = NSString::from_str("CFBundleIconFile");
+    let name = bundle.objectForInfoDictionaryKey(&key)?;
+    let name = name.downcast::<NSString>().ok()?.to_string();
+    let mut path = format!("{bundle_path}/Contents/Resources/{name}");
+    if !std::path::Path::new(&path).exists() {
+        path.push_str(".icns");
+    }
+    std::path::Path::new(&path).exists().then_some(path)
 }
 
 /// Reassert the host's dock icon right after Tauri sets its own.
 ///
-/// Tauri's dev-only override happens on `RuntimeRunEvent::Ready` (`tauri::app::on_event_loop_event`),
-/// which the host observes as `RunEvent::Ready`. Running here is exact rather than a race: no delay
-/// can be "late enough" in general, because `Ready` waits on the event loop coming up.
+/// Tauri's `#[cfg(dev)]` override happens on `RuntimeRunEvent::Ready`
+/// (`tauri::app::on_event_loop_event`), which the host observes as `RunEvent::Ready` — and the
+/// `dev` cfg is emitted for plain-cargo builds, so it fires in PACKAGED apps too, not just dev
+/// runs. Since the crate's embedded icon is a transparent placeholder, whatever Tauri set at
+/// Ready is invisible: a packaged app that declines to reassert here ships a BLANK dock icon.
+/// That is exactly what v1.3.x did in production when this function still returned early for
+/// bundles.
+///
+/// So: unconditional, and never allowed to leave the transparent image standing. If the host's
+/// own icon fails to load, fall back to the bundle's `.icns` (`CFBundleIconFile`), which macOS
+/// showed from launch until Ready.
 ///
 /// Must be called on the main thread — the run-event handler already is.
 pub fn reassert_on_ready(path: &str) {
-    if bundle_supplies_icon() {
+    if set_dock_icon(path) {
         return;
     }
-    set_dock_icon(path);
+    if let Some(icns) = bundle_icns_path() {
+        let _ = set_dock_icon(&icns);
+    }
 }
 
 /// Apply the host's dock icon, in dev only.
@@ -93,7 +126,9 @@ pub fn set_dock_icon_scheduled(app: &tauri::AppHandle, path: String) {
             if delay_ms > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             }
-            let _ = app.run_on_main_thread(move || set_dock_icon(&path));
+            let _ = app.run_on_main_thread(move || {
+                let _ = set_dock_icon(&path);
+            });
         });
     }
 }
