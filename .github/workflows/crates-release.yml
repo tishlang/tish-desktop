@@ -15,13 +15,6 @@ on:
   release:
     types: [published, edited]
   # Resume a throttled / partial run: already-published versions are skipped.
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag to (re)publish, e.g. v0.1.0"
-        required: true
-        type: string
-
 permissions:
   contents: write
 
