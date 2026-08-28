@@ -22,12 +22,18 @@ thread_local! {
 
 struct ManagerState {
     last_focused: Option<String>,
+    /// Open windows in creation order, `(label, title)`. Kept HERE, off to the side of Tauri,
+    /// because the Dock-menu callback (`applicationDockMenu:`) must not call into wry: AppKit
+    /// invokes it mid-run-loop, and `webview_windows()` re-enters wry's window map — the same
+    /// `RefCell already mutably borrowed` abort the observer rework fixed.
+    rows: Vec<(String, String)>,
 }
 
 impl ManagerState {
     fn new() -> Self {
         Self {
             last_focused: None,
+            rows: Vec::new(),
         }
     }
 }
@@ -93,11 +99,33 @@ pub fn unregister_surface(label: &str) {
     }
 }
 
-fn register_label(label: &str) {
+fn register_label(label: &str, title: &str) {
     let mut mgr = MANAGER.lock();
     if mgr.last_focused.is_none() {
         mgr.last_focused = Some(label.to_string());
     }
+    if !mgr.rows.iter().any(|(l, _)| l == label) {
+        mgr.rows.push((label.to_string(), title.to_string()));
+    }
+}
+
+/// Keep the Dock-menu row title in sync when the host retitles a window (`window.title`).
+pub fn note_title(label: &str, title: &str) {
+    let mut mgr = MANAGER.lock();
+    if let Some(row) = mgr.rows.iter_mut().find(|(l, _)| l == label) {
+        row.1 = title.to_string();
+    }
+}
+
+/// Snapshot for the Dock menu: `(label, title, focused)`. Reads only MANAGER — safe from
+/// AppKit callbacks, never touches Tauri.
+pub fn window_rows() -> Vec<(String, String, bool)> {
+    let mgr = MANAGER.lock();
+    let focused = mgr.last_focused.clone();
+    mgr.rows
+        .iter()
+        .map(|(l, t)| (l.clone(), t.clone(), focused.as_deref() == Some(l.as_str())))
+        .collect()
 }
 
 pub fn note_focused(label: &str) {
@@ -206,7 +234,10 @@ pub fn create_from_spec(app: &AppHandle, spec: &WindowSpec) -> Result<(), String
 
     let win = builder.build().map_err(|e| e.to_string())?;
     register_surface(&spec);
-    register_label(&spec.label);
+    register_label(
+        &spec.label,
+        spec.title.as_deref().unwrap_or(&spec.label),
+    );
 
     let label_for_drop = spec.label.clone();
     let app_for_drop = app.clone();
@@ -275,6 +306,7 @@ pub fn on_destroyed(label: &str) {
     if mgr.last_focused.as_deref() == Some(label) {
         mgr.last_focused = None;
     }
+    mgr.rows.retain(|(l, _)| l != label);
 }
 
 pub fn list_labels(app: &AppHandle) -> Vec<String> {
