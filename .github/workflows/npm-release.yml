@@ -16,7 +16,11 @@ name: NPM release
 
 on:
   release:
-    types: [published, edited]
+    # `published` fires when a release is created (including directly as a full release).
+    # `released` fires when a PRE-RELEASE IS PROMOTED to a full release -- the path sem-cut
+    # releases take -- and is NOT covered by `published` or (for a CLI/API promotion) `edited`.
+    # Without it, promoting v1.3.0 published nothing and the automation silently sat out.
+    types: [published, edited, released]
   workflow_dispatch:
     inputs:
       tag:
