@@ -187,6 +187,7 @@ fn window_title(app: &AppHandle, args: &Value) -> Result<Value, String> {
         .and_then(|v| v.as_str())
         .ok_or("title required")?;
     win.set_title(title).map_err(|e| e.to_string())?;
+    crate::windows::note_title(win.label(), title);
     Ok(json!({ "ok": true }))
 }
 

@@ -20,6 +20,8 @@ mod windows;
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
 mod app_icon;
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod dock;
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
 mod traffic_lights;
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
 mod traffic_light_tint;
@@ -579,6 +581,11 @@ fn build_and_run(
             {
                 traffic_lights::init(&handle);
                 traffic_light_tint::init(&handle);
+                // Dock icon menu: "New Window" + the open-window list, as the reference IDE's
+                // Tauri build shipped. Best-effort; a failure only keeps the default menu.
+                if let Err(e) = dock::install(&handle) {
+                    eprintln!("[dock] menu not installed: {e}");
+                }
                 if let Some(ref p) = icon_path {
                     app_icon::set_dock_icon_scheduled(&handle, p.clone());
                 }
