@@ -59,17 +59,18 @@ pub fn set_dock_icon(path: &str) {
     unsafe { app.setApplicationIconImage(Some(&image)) };
 }
 
-/// Reassert the host's dock icon right after Tauri sets its own.
+/// Reassert the host's dock icon right after the framework sets its embedded one on Ready.
 ///
-/// Tauri's dev-only override happens on `RuntimeRunEvent::Ready` (`tauri::app::on_event_loop_event`),
-/// which the host observes as `RunEvent::Ready`. Running here is exact rather than a race: no delay
-/// can be "late enough" in general, because `Ready` waits on the event loop coming up.
+/// The embedded-icon set on `RuntimeRunEvent::Ready` is compiled in whenever the crate is built
+/// with the `dev` cfg — which a host building with plain cargo gets in EVERY build, packaged or
+/// not (there is no Tauri CLI run to flip it off). So this must run unconditionally: with the
+/// embedded icon now a transparent placeholder, skipping the reassert in a packaged app leaves an
+/// INVISIBLE dock icon, because the framework's set still fires and replaces the bundle's .icns.
+/// Running on the host's own Ready observation is exact rather than a race: no delay can be "late
+/// enough" in general, because Ready waits on the event loop coming up.
 ///
 /// Must be called on the main thread — the run-event handler already is.
 pub fn reassert_on_ready(path: &str) {
-    if bundle_supplies_icon() {
-        return;
-    }
     set_dock_icon(path);
 }
 
