@@ -15,7 +15,7 @@ use crate::state::{AppState, WindowSpec};
 /// slate-950 — matches example UI chrome so the native layer isn't white.
 const WINDOW_BG: Color = Color(0x02, 0x06, 0x17, 255);
 
-/// Invoking webview for the current `desktop_invoke` (and nested `brokerInvoke`).
+// Invoking webview for the current `desktop_invoke` (and nested `brokerInvoke`).
 thread_local! {
     static CALLER_LABEL: RefCell<Option<String>> = RefCell::new(None);
 }
