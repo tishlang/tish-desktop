@@ -25,9 +25,24 @@
 //! The tray icon is separate, via Tauri's `TrayIconBuilder::icon` — this is only the dock. objc2,
 //! so apple + macos only.
 
+use std::cell::RefCell;
+
+use objc2::rc::Retained;
 use objc2::AnyThread;
 use objc2_app_kit::{NSApplication, NSImage};
 use objc2_foundation::{MainThreadMarker, NSBundle, NSString};
+
+// The last icon this module applied: (source path, the exact NSImage instance set). Main-thread
+// only (set_dock_icon bails off-main), so a thread_local RefCell suffices — no locks.
+//
+// Why this exists: on macOS 26 every `setApplicationIconImage:` with a NEW NSImage instance makes
+// AppKit composite a fresh dock tile (multi-appearance, f16, GPU-backed) that is cached by image
+// identity and never evicted — ~30MB of IOAccelerator memory pinned per call. A host that
+// re-asserts its icon on a timer therefore leaks unboundedly. Skipping the set when our image is
+// still the one installed makes repeated re-asserts free.
+thread_local! {
+    static LAST_ICON: RefCell<Option<(String, Retained<NSImage>)>> = const { RefCell::new(None) };
+}
 
 /// Whether the running process is a packaged `.app` whose `Info.plist` declares an icon.
 ///
@@ -48,10 +63,33 @@ fn bundle_supplies_icon() -> bool {
 /// Set the process's dock icon from a PNG (or any NSImage-readable) file. Returns whether an
 /// image was actually loaded and set — callers with a fallback must know. No-op off the main
 /// thread or if the image can't be loaded (best-effort branding, never fatal).
+///
+/// Idempotent: when the requested path is the one already applied AND the application icon still
+/// points at the exact NSImage instance we set, this returns true without decoding or setting
+/// anything. The pointer compare (not the path compare alone) is load-bearing — if something
+/// replaced the icon out from under us (Tauri's Ready override, AppKit), `applicationIconImage`
+/// no longer returns our instance and we re-apply, so restore-after-clobber semantics survive.
 pub fn set_dock_icon(path: &str) -> bool {
     let Some(mtm) = MainThreadMarker::new() else {
         return false;
     };
+    let app = NSApplication::sharedApplication(mtm);
+    let already_applied = LAST_ICON.with(|cell| {
+        let cache = cell.borrow();
+        let Some((cached_path, cached_img)) = cache.as_ref() else {
+            return false;
+        };
+        if cached_path != path {
+            return false;
+        }
+        match app.applicationIconImage() {
+            Some(current) => Retained::as_ptr(&current) == Retained::as_ptr(cached_img),
+            None => false,
+        }
+    });
+    if already_applied {
+        return true;
+    }
     let ns_path = NSString::from_str(path);
     // initWithContentsOfFile: returns nil for an unreadable path — tolerate it.
     let image = unsafe { NSImage::initWithContentsOfFile(NSImage::alloc(), &ns_path) };
@@ -59,8 +97,10 @@ pub fn set_dock_icon(path: &str) -> bool {
         eprintln!("[app_icon] could not load dock icon at {path}");
         return false;
     };
-    let app = NSApplication::sharedApplication(mtm);
     unsafe { app.setApplicationIconImage(Some(&image)) };
+    LAST_ICON.with(|cell| {
+        *cell.borrow_mut() = Some((path.to_string(), image));
+    });
     true
 }
 
