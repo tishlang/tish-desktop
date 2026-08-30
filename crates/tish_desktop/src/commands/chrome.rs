@@ -42,6 +42,7 @@ pub fn try_dispatch(
         "notification.show" => notification_show(app, state, args),
         "opener.open" => opener_open(app, state, args),
         // macOS traffic-light chrome (theme-driven inset + color tint); no-op off apple/macos.
+        "window.setTransparent" => window_set_transparent(app, args),
         "window.trafficLightInset" => traffic_light_inset(app, args),
         "window.reapplyTrafficLightInset" => reapply_traffic_light_inset(app),
         "window.trafficLightTint" => traffic_light_tint_cmd(app, args),
@@ -52,6 +53,26 @@ pub fn try_dispatch(
 }
 
 // ---- traffic-light chrome (apple/macos does the work; everything else is a successful no-op) ----
+
+/// `window.setTransparent({ transparent })` — flip window transparency at runtime on every managed
+/// window: NSWindow.isOpaque + background color + the WKWebView's drawsBackground, then refresh the
+/// shadow. Lets hosts default to the CHEAP opaque window and opt into see-through chrome only while
+/// a theme wants it — a permanently transparent window recomposites every display frame on macOS
+/// and feeds the macOS 26 WebKit IOAccelerator slab leak. No-op off apple/macos.
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+fn window_set_transparent(app: &AppHandle, args: &Value) -> Result<Value, String> {
+    let transparent = args
+        .get("transparent")
+        .and_then(|v| v.as_bool())
+        .ok_or("transparent bool required")?;
+    crate::window_transparent::set_transparent(app, transparent);
+    Ok(json!({ "ok": true, "transparent": transparent }))
+}
+#[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
+fn window_set_transparent(_app: &AppHandle, _args: &Value) -> Result<Value, String> {
+    Ok(json!({ "ok": true, "unsupported": true }))
+}
+
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
 fn traffic_light_inset(app: &AppHandle, args: &Value) -> Result<Value, String> {
     crate::traffic_lights::set_inset(
