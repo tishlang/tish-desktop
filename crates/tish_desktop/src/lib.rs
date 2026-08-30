@@ -25,6 +25,8 @@ mod dock;
 mod traffic_lights;
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
 mod traffic_light_tint;
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod window_transparent;
 
 use std::sync::Arc;
 
