@@ -80,6 +80,19 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// Turn the decoded URI path into a filesystem path. A URI path always starts with `/`, so an
+/// absolute Windows path arrives as `/C:/Users/…` — and `\C:\Users` is not a path Windows
+/// accepts (ERROR_INVALID_NAME), which made every packaged resource 404 there. Strip the slash in
+/// front of a drive letter; POSIX paths pass through untouched.
+fn fs_path(decoded: &str) -> String {
+    let b = decoded.as_bytes();
+    if b.len() >= 3 && b[0] == b'/' && b[1].is_ascii_alphabetic() && b[2] == b':' {
+        decoded[1..].to_string()
+    } else {
+        decoded.to_string()
+    }
+}
+
 fn err(code: u16, msg: &str) -> Response<Vec<u8>> {
     Response::builder()
         .status(code)
@@ -97,6 +110,7 @@ pub fn serve(raw_path: &str, allowed_segment: &str) -> Response<Vec<u8>> {
         eprintln!("[resource-protocol] forbidden: {decoded}");
         return err(403, "forbidden");
     }
+    let decoded = fs_path(&decoded);
     match std::fs::read(&decoded) {
         Ok(bytes) => Response::builder()
             .status(200)
@@ -119,7 +133,10 @@ mod tests {
 
     #[test]
     fn rejects_traversal_and_out_of_segment_paths() {
-        assert!(!resource_allowed("/Users/x/.dune/extensions/../secret", SEG));
+        assert!(!resource_allowed(
+            "/Users/x/.dune/extensions/../secret",
+            SEG
+        ));
         assert!(!resource_allowed("/etc/passwd", SEG));
         assert!(!resource_allowed("/Users/x/project/src/main.rs", SEG));
     }
@@ -130,6 +147,17 @@ mod tests {
             "/Users/x/.dune/extensions/pub.ext-1.0.0/media/main.css",
             SEG
         ));
+    }
+
+    #[test]
+    fn fs_path_strips_the_slash_before_a_windows_drive_letter() {
+        assert_eq!(
+            fs_path("/C:/Users/x/ui/index.html"),
+            "C:/Users/x/ui/index.html"
+        );
+        assert_eq!(fs_path("/d:/t/app.js"), "d:/t/app.js");
+        assert_eq!(fs_path("/Users/x/ui/index.html"), "/Users/x/ui/index.html");
+        assert_eq!(fs_path("/c/not-a-drive"), "/c/not-a-drive");
     }
 
     #[test]
