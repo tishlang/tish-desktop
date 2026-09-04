@@ -65,11 +65,16 @@ fn shell_exec(state: &AppState, args: &Value) -> Result<Value, String> {
             .ok_or_else(|| format!("shell command not allow-listed: {name}"))?
     };
 
-    let output = std::process::Command::new(&entry.cmd)
-        .args(entry.args_prefix.iter())
-        .args(extra_args.iter())
-        .output()
-        .map_err(|e| e.to_string())?;
+    let mut command = std::process::Command::new(&entry.cmd);
+    command.args(entry.args_prefix.iter()).args(extra_args.iter());
+    // Windows: a child of a GUI-subsystem app gets its own console window unless created with
+    // CREATE_NO_WINDOW — an allow-listed helper otherwise flashes a terminal and steals focus.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    let output = command.output().map_err(|e| e.to_string())?;
 
     Ok(json!({
         "ok": true,
