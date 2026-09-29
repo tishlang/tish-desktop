@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+    # labeled/unlabeled so adding `run-all-examples` re-runs the gated jobs without a re-push.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main, master]
 
@@ -79,12 +81,15 @@ jobs:
       # The nested cargo target dir the tish compiler uses for the example shells: it resolves to
       # <runtime crate>/../../target — inside the npm package — and is only used if that directory
       # already EXISTS, else every `tish build` gets its own scratch target and recompiles Tauri.
+      # Keyed per example: rust-examples caches byo-ui / basic under their own keys, so the two
+      # jobs never race to save one shared key with only their own example's target inside.
       - name: Cache the tish nested target dir
         uses: actions/cache@v4
         with:
-          path: examples/*/node_modules/@tishlang/tish/target
-          key: tish-nested-target-${{ runner.os }}-${{ hashFiles('examples/*/package.json') }}
+          path: examples/hybrid/node_modules/@tishlang/tish/target
+          key: tish-nested-target-${{ runner.os }}-hybrid-${{ hashFiles('examples/hybrid/package.json') }}
           restore-keys: |
+            tish-nested-target-${{ runner.os }}-hybrid-
             tish-nested-target-${{ runner.os }}-
 
       - name: Check (default features)
@@ -105,19 +110,7 @@ jobs:
           # (doctor smoke) invoke tools that shell out to `tish` directly.
           echo "$(cd examples/hybrid/node_modules/.bin && pwd)" >> "$GITHUB_PATH"
           npm --prefix examples/hybrid run build:shell
-
-      - name: Typed shell --check warn (byo-ui + basic)
-        # These two exercise the same host through thinner surfaces. They add ~7 min for little
-        # extra signal on a PR, so they run on main — where a regression still lands before any
-        # release — and on demand via the run-all-examples label.
-        if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-all-examples')
-        run: |
-          npm --prefix examples/byo-ui install
-          npm --prefix examples/basic install
-          mkdir -p examples/byo-ui/node_modules/@tishlang/tish/target
-          mkdir -p examples/basic/node_modules/@tishlang/tish/target
-          npm --prefix examples/byo-ui run build:shell
-          npm --prefix examples/basic run build:shell
+      # byo-ui and basic build in the rust-examples job below, in parallel with this one.
 
       - name: Hybrid Phase 2 tree + SC4 scripts
         run: npm --prefix examples/hybrid run check:tree
@@ -134,6 +127,66 @@ jobs:
           grep -nE "attach_app|broadcast_event" \
             crates/tish_desktop/src/platform/apple.rs \
             crates/tish_desktop/src/local_invoke.rs
+
+  rust-examples:
+    # byo-ui and basic exercise the same host as hybrid through thinner surfaces. They add
+    # ~7 min for little extra signal on a PR, so they run on main — where a regression still
+    # lands before any release — and on demand via the run-all-examples label. They used to be
+    # one sequential step at the tail of the rust job (13 min wall on main); as their own matrix
+    # they run alongside it, each with the same toolchain, caches and system deps.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-all-examples')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [byo-ui, basic]
+    env:
+      # See the rust job — fast nested profile for compile-and-link verification.
+      TISH_FAST_NATIVE_BUILD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned to the toolchain the project develops against (same as the rust job).
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+
+      # No sccache here either — see the rust job.
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          cache-workspace-crates: "true"
+
+      - name: Install Tauri Linux system deps
+        # Same packages as the rust job; the nested Tauri build needs them too.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
+            librsvg2-dev libayatana-appindicator3-dev \
+            build-essential file libssl-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Stub absent platform siblings
+        uses: ./.github/actions/tish-siblings
+
+      # Same nested target dir as the rust job, keyed per example (see the comment there).
+      - name: Cache the tish nested target dir
+        uses: actions/cache@v4
+        with:
+          path: examples/${{ matrix.shell }}/node_modules/@tishlang/tish/target
+          key: tish-nested-target-${{ runner.os }}-${{ matrix.shell }}-${{ hashFiles(format('examples/{0}/package.json', matrix.shell)) }}
+          restore-keys: |
+            tish-nested-target-${{ runner.os }}-${{ matrix.shell }}-
+            tish-nested-target-${{ runner.os }}-
+
+      - name: Typed shell --check warn (${{ matrix.shell }})
+        run: |
+          npm --prefix examples/${{ matrix.shell }} install
+          mkdir -p examples/${{ matrix.shell }}/node_modules/@tishlang/tish/target
+          npm --prefix examples/${{ matrix.shell }} run build:shell
 
   rust-macos:
     runs-on: macos-15
