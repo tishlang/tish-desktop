@@ -2,7 +2,7 @@
   "name": "@tishlang/tish-app-api",
   "version": "0.1.0",
   "description": "Alias of @tishlang/tish-desktop-api — invoke, listen, state.*, Platform",
-  "license": "PIF",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",

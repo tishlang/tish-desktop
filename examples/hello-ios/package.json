@@ -2,7 +2,7 @@
   "name": "hello-ios-example",
   "private": true,
   "version": "0.0.1",
-  "license": "PIF",
+  "license": "MIT",
   "description": "Cross-device iOS demo: native \u2194 webview parity via BrokerCore (tish-desktop) + tish:ios host (tish-apple)",
   "dependencies": {
     "tish-ios": "npm:@tishlang/tish-ios@1.2.0"

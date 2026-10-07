@@ -2,7 +2,7 @@
   "name": "@tishlang/tish-desktop",
   "version": "0.1.0",
   "description": "Tish Desktop CLI — init, dev, build, info, icon, distribute",
-  "license": "PIF",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",

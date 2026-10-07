@@ -68,7 +68,7 @@ jobs:
             fi
             rm -rf /tmp/publish-pkg
             cp -r "$dir" /tmp/publish-pkg
-            # Ship PIF license text with every tarball.
+            # Ship the MIT license text with every tarball.
             cp LICENSE /tmp/publish-pkg/LICENSE
             (
               cd /tmp/publish-pkg

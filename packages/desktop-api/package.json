@@ -2,7 +2,7 @@
   "name": "@tishlang/tish-desktop-api",
   "version": "0.1.0",
   "description": "Core UI bridge and app-api façade (invoke, listen, state.*) — no UI kit dependency",
-  "license": "PIF",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",

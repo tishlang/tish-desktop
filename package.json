@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Tish Mode monorepo \u2014 app runtime workspace. Publishable packages live under @tishlang/tish-desktop* and crates tishlang_desktop / tishlang_broker / tishlang_app.",
-  "license": "PIF",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tishlang/tish-desktop.git"

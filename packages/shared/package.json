@@ -2,7 +2,7 @@
   "name": "@tishlang/tish-desktop-shared",
   "version": "0.1.0",
   "description": "Shared Tish helpers and desktop event name constants",
-  "license": "PIF",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
