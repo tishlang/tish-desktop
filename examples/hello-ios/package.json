@@ -5,7 +5,7 @@
   "license": "MIT",
   "description": "Cross-device iOS demo: native \u2194 webview parity via BrokerCore (tish-desktop) + tish:ios host (tish-apple)",
   "dependencies": {
-    "tish-ios": "npm:@tishlang/tish-ios@1.2.0"
+    "tish-ios": "npm:@tishlang/tish-ios@3.0.0"
   },
   "scripts": {
     "build": "tish build --target native --native-backend rust --crate-type staticlib --ios-triple aarch64-apple-ios-sim --platform ios --surface native src/main.tish -o dist/hello-ios",
