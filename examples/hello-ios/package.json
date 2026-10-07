@@ -17,6 +17,6 @@
     "dev": "bash scripts/run-sim.sh"
   },
   "devDependencies": {
-    "@tishlang/tish": "3.10.3"
+    "@tishlang/tish": "4.0.1"
   }
 }

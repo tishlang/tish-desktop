@@ -39,12 +39,12 @@ tauri-build = { version = "2", features = [] }
 # Must match the `tish` CLI's Value ABI (same physical crate), so this version and the
 # @tishlang/tish the examples build with are ONE pin -- move them together or the
 # generated shells link two copies of tishlang_core and fail on mismatched Value types.
-tishlang_core = { version = "3.9", features = ["send-values"] }
+tishlang_core = { version = "4.0.1", features = ["send-values"] }
 tishlang_broker = { path = "../tish_broker" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon", "devtools", "image-png", "macos-private-api"] }
-tishlang_macos = { version = "1.2", optional = true }
+tishlang_macos = { version = "3.0.0", optional = true }
 # macOS window-chrome (traffic-light inset + tint), gated on platform-apple. Versions pinned to the 3.0 train.
 objc2 = { version = "0.6", optional = true }
 objc2-foundation = { version = "0.3", optional = true, features = ["NSBundle", "NSString", "NSObject", "NSGeometry", "NSNotification", "NSKeyValueObserving", "NSDictionary", "NSArray", "NSValue"] }
