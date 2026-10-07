@@ -36,12 +36,12 @@
     "@tishlang/tish-desktop-shared": "file:../../packages/shared",
     "@tishlang/tish-desktop-ui-theme": "file:../../packages/ui-theme",
     "lattish": "4.0.3",
-    "tish-macos": "npm:@tishlang/tish-macos@1.2.0",
+    "tish-macos": "npm:@tishlang/tish-macos@3.0.0",
     "tish-tailwind": "npm:@tishlang/tish-tailwind@1.0.0"
   },
   "devDependencies": {
     "@tishlang/vite-plugin-tish": "3.10.3",
     "vite": "^6.0.0",
-    "@tishlang/tish": "3.10.3"
+    "@tishlang/tish": "4.0.1"
   }
 }
