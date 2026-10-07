@@ -19,6 +19,6 @@ Desktop is a **consumer + thin adapter**. Hard problems land in owning repos.
 
 **Policy:** no dual-process hybrid, no desktop-local resolver fork, no default `TISH_NATIVE_OPT=0` in templates.
 
-**License note:** tish-apple may pull Apple PIF / SDK-related constraints; redistributors of hybrid builds with `platform-apple` must review tish-apple LICENSE for their distribution channel.
+**License note:** tish-apple may pull Apple SDK-related constraints; redistributors of hybrid builds with `platform-apple` must review tish-apple LICENSE for their distribution channel.
 
 **React-like UI** → **lattish**, not tish upstream.
