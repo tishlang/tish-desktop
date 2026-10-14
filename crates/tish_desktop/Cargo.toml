@@ -54,7 +54,9 @@ tish-lin = { path = "../../../tish-lin/crates/tish-lin", optional = true }
 tish-android = { path = "../../../tish-android/crates/tish-android", optional = true }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-deep-link = "2"
+# <2.6.2: 2.6.2 does not compile on Linux against rust-ini 0.21.3 (E0063, ParseOption missing
+# fields; tauri-apps/plugins-workspace#3710). Lift once a fixed release ships.
+tauri-plugin-deep-link = ">=2, <2.6.2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-clipboard-manager = "2"
