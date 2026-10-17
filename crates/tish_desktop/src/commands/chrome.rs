@@ -388,6 +388,12 @@ fn menu_context(app: &AppHandle, state: &AppState, args: &Value) -> Result<Value
             menu.append(&sep).map_err(|e| e.to_string())?;
             continue;
         }
+        if let Some(role) = item.get("predefined").and_then(|v| v.as_str()) {
+            let text = item.get("label").and_then(|v| v.as_str());
+            let mi = super::menu_set::predefined_item(app, role, text)?;
+            menu.append(&mi).map_err(|e| e.to_string())?;
+            continue;
+        }
         let id = item
             .get("id")
             .and_then(|v| v.as_str())

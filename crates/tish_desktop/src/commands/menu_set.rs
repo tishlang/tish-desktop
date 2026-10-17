@@ -92,7 +92,7 @@ fn append_item(app: &AppHandle, parent: &Submenu<tauri::Wry>, item: &Value) -> R
     }
 }
 
-fn predefined_item(
+pub(super) fn predefined_item(
     app: &AppHandle,
     role: &str,
     text: Option<&str>,
