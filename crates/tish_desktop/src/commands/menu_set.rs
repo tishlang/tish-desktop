@@ -1,7 +1,14 @@
 //! `menu.set` — replace the app-wide menu from a JSON `menus` array.
 //!
 //! Shape: `{ menus: [ { label, items: [ { id, label, accelerator?, enabled?,
-//! checked?, separator?, items? (nested submenu) }, ... ] }, ... ] }`.
+//! checked?, separator?, predefined?, items? (nested submenu) }, ... ] }, ... ] }`.
+//!
+//! `predefined` builds a native role item instead of a custom one: `undo`, `redo`, `cut`,
+//! `copy`, `paste`, `selectAll` (plus `minimize`, `hide`, `hideOthers`, `showAll`,
+//! `fullscreen`, `closeWindow`, `quit`). On macOS these are NSMenuItems with the standard
+//! selectors (`paste:` …) sent down the responder chain, so the focused WKWebView handles
+//! them natively — no `execCommand("paste")` permission bubble. They emit no `menu:action`;
+//! `label` optionally overrides the default title.
 //! Selection arrives as the existing `menu:action` event (wired in `lib.rs`).
 
 use serde_json::Value;
@@ -54,6 +61,12 @@ fn append_item(app: &AppHandle, parent: &Submenu<tauri::Wry>, item: &Value) -> R
         return parent.append(&sep).map_err(|e| e.to_string());
     }
 
+    if let Some(role) = item.get("predefined").and_then(|v| v.as_str()) {
+        let text = item.get("label").and_then(|v| v.as_str());
+        let mi = predefined_item(app, role, text)?;
+        return parent.append(&mi).map_err(|e| e.to_string());
+    }
+
     let label = item.get("label").and_then(|v| v.as_str()).unwrap_or("Item").to_string();
 
     if item.get("items").and_then(|v| v.as_array()).is_some() {
@@ -77,4 +90,29 @@ fn append_item(app: &AppHandle, parent: &Submenu<tauri::Wry>, item: &Value) -> R
         let mi = MenuItem::with_id(app, id, label, enabled, accelerator).map_err(|e| e.to_string())?;
         parent.append(&mi).map_err(|e| e.to_string())
     }
+}
+
+fn predefined_item(
+    app: &AppHandle,
+    role: &str,
+    text: Option<&str>,
+) -> Result<PredefinedMenuItem<tauri::Wry>, String> {
+    let r = match role {
+        "undo" => PredefinedMenuItem::undo(app, text),
+        "redo" => PredefinedMenuItem::redo(app, text),
+        "cut" => PredefinedMenuItem::cut(app, text),
+        "copy" => PredefinedMenuItem::copy(app, text),
+        "paste" => PredefinedMenuItem::paste(app, text),
+        "selectAll" | "select_all" => PredefinedMenuItem::select_all(app, text),
+        "minimize" => PredefinedMenuItem::minimize(app, text),
+        "hide" => PredefinedMenuItem::hide(app, text),
+        "hideOthers" | "hide_others" => PredefinedMenuItem::hide_others(app, text),
+        "showAll" | "show_all" => PredefinedMenuItem::show_all(app, text),
+        "fullscreen" => PredefinedMenuItem::fullscreen(app, text),
+        "closeWindow" | "close_window" => PredefinedMenuItem::close_window(app, text),
+        "quit" => PredefinedMenuItem::quit(app, text),
+        "separator" => PredefinedMenuItem::separator(app),
+        other => return Err(format!("unknown predefined menu item: {other}")),
+    };
+    r.map_err(|e| e.to_string())
 }
