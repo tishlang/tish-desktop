@@ -15,7 +15,7 @@
 //! Transparency alone is not enough for shaped chrome: a TITLED NSWindow's theme frame still clips
 //! the content to the system's rounded corners and draws a rounded-rect shadow, so a see-through
 //! theme renders inside a fake rounded window. While transparent the window therefore drops
-//! `NSWindowStyleMask::Titled` (keeping resizable / miniaturizable / closable / full-size content):
+//! the title bar (tao `set_decorations(false)`, keeping resizable / miniaturizable / closable / full-size content):
 //! the page's own alpha is the window's geometry and the shadow follows it. Traffic lights go with
 //! the title bar, so the host draws its own caption controls (`window.setTransparent` reports
 //! `shaped: true`). Going opaque restores `Titled` — the overlay title bar settings persist.
@@ -25,12 +25,23 @@
 
 use objc2::msg_send;
 use objc2::runtime::AnyObject;
-use objc2_app_kit::{NSApplication, NSColor, NSView, NSWindow, NSWindowStyleMask};
+use objc2_app_kit::{NSApplication, NSColor, NSView, NSWindow};
+use tauri::Manager;
 use objc2_foundation::{ns_string, MainThreadMarker, NSNumber};
 
 /// Flip transparency on every managed workbench window. Safe to call from any thread.
 pub fn set_transparent(app: &tauri::AppHandle, transparent: bool) {
     let handle = app.clone();
+    // Title bar on/off goes through tao (set_decorations) so its own bookkeeping stays in sync;
+    // poking NSWindow.styleMask directly is undone by tao.
+    for (label, w) in handle.webview_windows() {
+        let r = w.set_decorations(!transparent);
+        if !transparent {
+            let _ = w.set_title_bar_style(tauri::TitleBarStyle::Overlay);
+        }
+        let _ = w.set_shadow(true);
+        eprintln!("[window.setTransparent] {label}: transparent={transparent} decorations={} -> {:?}", !transparent, r);
+    }
     let _ = handle.run_on_main_thread(move || apply_all_ns(transparent));
 }
 
@@ -49,16 +60,9 @@ fn apply_all_ns(transparent: bool) {
 }
 
 fn apply_ns(window: &NSWindow, transparent: bool) {
-    let mut mask = window.styleMask();
-    if transparent {
-        mask.remove(NSWindowStyleMask::Titled);
-        mask.insert(NSWindowStyleMask::FullSizeContentView);
-    } else {
-        mask.insert(NSWindowStyleMask::Titled);
-    }
-    window.setStyleMask(mask);
     window.setHasShadow(true);
     window.setOpaque(!transparent);
+    eprintln!("[window.setTransparent] ns styleMask={:#x} opaque={}", window.styleMask().0, window.isOpaque());
     let color = if transparent {
         unsafe { NSColor::clearColor() }
     } else {
