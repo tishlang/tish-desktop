@@ -52,6 +52,12 @@ struct Inset {
 /// Active inset, or `None` for the untouched macOS default. Set by `set_traffic_light_inset`.
 static CONFIG: Mutex<Option<Inset>> = Mutex::new(None);
 
+/// The host's current inset as (pad_x, pad_y, spacing) — reused for the standalone buttons a
+/// shaped (borderless) window carries (window_transparent.rs).
+pub(crate) fn current_inset() -> Option<(f64, f64, Option<f64>)> {
+    CONFIG.lock().unwrap().map(|i| (i.pad_x, i.pad_y, i.spacing))
+}
+
 /// The untouched-default title-bar container height + button origins, captured ONCE before we first
 /// move anything, so switching back to a no-inset theme can restore the exact OS default. The
 /// container height is size-independent (title-bar height); button origins are in their (relative)

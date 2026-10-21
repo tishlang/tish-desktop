@@ -25,7 +25,12 @@
 
 use objc2::msg_send;
 use objc2::runtime::AnyObject;
-use objc2_app_kit::{NSApplication, NSColor, NSView, NSWindow};
+use objc2::sel;
+use objc2_app_kit::{
+    NSApplication, NSAutoresizingMaskOptions, NSColor, NSView, NSWindow, NSWindowButton,
+    NSWindowStyleMask,
+};
+use objc2_foundation::{NSObjectProtocol, NSPoint};
 use tauri::Manager;
 use objc2_foundation::{ns_string, MainThreadMarker, NSNumber};
 
@@ -35,14 +40,20 @@ pub fn set_transparent(app: &tauri::AppHandle, transparent: bool) {
     // Title bar on/off goes through tao (set_decorations) so its own bookkeeping stays in sync;
     // poking NSWindow.styleMask directly is undone by tao.
     for (label, w) in handle.webview_windows() {
-        let r = w.set_decorations(!transparent);
+        let _ = w.set_decorations(!transparent);
         if !transparent {
             let _ = w.set_title_bar_style(tauri::TitleBarStyle::Overlay);
         }
         let _ = w.set_shadow(true);
-        eprintln!("[window.setTransparent] {label}: transparent={transparent} decorations={} -> {:?}", !transparent, r);
     }
     let _ = handle.run_on_main_thread(move || apply_all_ns(transparent));
+    // tao applies its decoration style mask ASYNC on the main queue, after the pass above — which
+    // clobbers the Closable/Miniaturizable bits the shaped window's traffic lights need. Re-apply
+    // once it has landed (idempotent: buttons are replaced, not duplicated).
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        let _ = handle.run_on_main_thread(move || apply_all_ns(transparent));
+    });
 }
 
 fn apply_all_ns(transparent: bool) {
@@ -61,8 +72,15 @@ fn apply_all_ns(transparent: bool) {
 
 fn apply_ns(window: &NSWindow, transparent: bool) {
     window.setHasShadow(true);
+    if transparent {
+        // tao's borderless mask is Borderless|Resizable; close/minimize need their bits back for
+        // the standalone traffic lights below to work.
+        let mut mask = window.styleMask();
+        mask.insert(NSWindowStyleMask::Closable | NSWindowStyleMask::Miniaturizable);
+        window.setStyleMask(mask);
+    }
+    sync_traffic_lights(window, transparent);
     window.setOpaque(!transparent);
-    eprintln!("[window.setTransparent] ns styleMask={:#x} opaque={}", window.styleMask().0, window.isOpaque());
     let color = if transparent {
         unsafe { NSColor::clearColor() }
     } else {
@@ -76,8 +94,17 @@ fn apply_ns(window: &NSWindow, transparent: bool) {
     window.invalidateShadow();
 }
 
+/// A real WKWebView (wry's WryWebView subclass included) — NOT wry's WryWebViewParent container,
+/// which matches a name search but has no `drawsBackground` key (KVC on it throws).
+fn is_wk_webview(view: &NSView) -> bool {
+    match objc2::runtime::AnyClass::get(c"WKWebView") {
+        Some(cls) => view.isKindOfClass(cls),
+        None => false,
+    }
+}
+
 fn has_webview(view: &NSView) -> bool {
-    if view.class().name().to_bytes().windows(9).any(|w| w == b"WKWebView") {
+    if is_wk_webview(view) {
         return true;
     }
     view.subviews().iter().any(|sub| has_webview(&sub))
@@ -87,7 +114,7 @@ fn has_webview(view: &NSView) -> bool {
 /// creation for `transparent: true`. KVC because objc2 has no WebKit binding here and the setter is
 /// what WKWebView exposes to AppKit hosts.
 fn set_webview_draws_background(view: &NSView, draws: bool) {
-    let is_webview = view.class().name().to_bytes().windows(9).any(|w| w == b"WKWebView");
+    let is_webview = is_wk_webview(view);
     if is_webview {
         let value = NSNumber::numberWithBool(draws);
         let _: () = unsafe {
@@ -97,5 +124,60 @@ fn set_webview_draws_background(view: &NSView, draws: bool) {
     }
     for sub in view.subviews().iter() {
         set_webview_draws_background(&sub, draws);
+    }
+}
+
+/// Tag on the standalone traffic lights a shaped window carries, so they can be found and removed.
+const SHAPED_BUTTON_TAG: isize = 0x7154_4c00;
+
+/// A borderless window has no title bar and so no traffic lights. Put the REAL AppKit buttons back
+/// (`+[NSWindow standardWindowButton:forStyleMask:]` — the system's own close/minimize/zoom
+/// controls, standalone) on top of the content, pinned top-left at the host's inset, wired straight
+/// to the window. Going opaque removes them (the restored title bar brings its own).
+fn sync_traffic_lights(window: &NSWindow, shaped: bool) {
+    let Some(content) = window.contentView() else {
+        return;
+    };
+    for sub in content.subviews().iter() {
+        if sub.tag() >= SHAPED_BUTTON_TAG && sub.tag() < SHAPED_BUTTON_TAG + 3 {
+            sub.removeFromSuperview();
+        }
+    }
+    if !shaped {
+        return;
+    }
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
+    let (pad_x, pad_y, spacing) = crate::traffic_lights::current_inset().unwrap_or((12.0, 12.0, None));
+    let kinds = [
+        (NSWindowButton::CloseButton, sel!(performClose:)),
+        (NSWindowButton::MiniaturizeButton, sel!(performMiniaturize:)),
+        (NSWindowButton::ZoomButton, sel!(performZoom:)),
+    ];
+    let height = content.frame().size.height;
+    let flipped = content.isFlipped();
+    let mut x = pad_x;
+    for (i, (kind, action)) in kinds.into_iter().enumerate() {
+        let Some(button) = NSWindow::standardWindowButton_forStyleMask(
+            kind,
+            NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Miniaturizable | NSWindowStyleMask::Resizable,
+            mtm,
+        ) else {
+            continue;
+        };
+        let size = button.frame().size;
+        let y = if flipped { pad_y } else { height - pad_y - size.height };
+        button.setFrameOrigin(NSPoint::new(x, y));
+        // Pin to the top-left corner across resizes.
+        let top = if flipped { NSAutoresizingMaskOptions::ViewMaxYMargin } else { NSAutoresizingMaskOptions::ViewMinYMargin };
+        button.setAutoresizingMask(NSAutoresizingMaskOptions::ViewMaxXMargin | top);
+        button.setTag(SHAPED_BUTTON_TAG + i as isize);
+        unsafe {
+            button.setTarget(Some(window));
+            button.setAction(Some(action));
+        }
+        content.addSubview(&button);
+        x += size.width + spacing.unwrap_or(6.0);
     }
 }
