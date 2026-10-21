@@ -66,7 +66,9 @@ fn window_set_transparent(app: &AppHandle, args: &Value) -> Result<Value, String
         .and_then(|v| v.as_bool())
         .ok_or("transparent bool required")?;
     crate::window_transparent::set_transparent(app, transparent);
-    Ok(json!({ "ok": true, "transparent": transparent }))
+    // `shaped`: the window has no system title bar / rounded clip while transparent — the host
+    // draws its own caption controls.
+    Ok(json!({ "ok": true, "transparent": transparent, "shaped": transparent }))
 }
 #[cfg(not(all(feature = "platform-apple", target_os = "macos")))]
 fn window_set_transparent(_app: &AppHandle, _args: &Value) -> Result<Value, String> {
