@@ -131,6 +131,10 @@ thread_local! {
 }
 
 fn standard_buttons(window: &NSWindow) -> Option<[Retained<NSButton>; 3]> {
+    // A shaped (borderless) window carries the system buttons itself (shaped_controls.rs).
+    if let Some(buttons) = crate::shaped_controls::buttons(window) {
+        return Some(buttons);
+    }
     Some([
         window.standardWindowButton(NSWindowButton::CloseButton)?,
         window.standardWindowButton(NSWindowButton::MiniaturizeButton)?,

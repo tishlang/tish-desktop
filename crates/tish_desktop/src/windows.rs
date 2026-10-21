@@ -233,6 +233,11 @@ pub fn create_from_spec(app: &AppHandle, spec: &WindowSpec) -> Result<(), String
     }
 
     let win = builder.build().map_err(|e| e.to_string())?;
+    // A transparent window is a SHAPED window: drop the titled frame's rounded clip + shadow.
+    #[cfg(all(feature = "platform-apple", target_os = "macos"))]
+    if spec.transparent {
+        crate::window_transparent::set_transparent(app, true);
+    }
     register_surface(&spec);
     register_label(
         &spec.label,

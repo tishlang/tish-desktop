@@ -27,6 +27,8 @@ mod traffic_lights;
 mod traffic_light_tint;
 #[cfg(all(feature = "platform-apple", target_os = "macos"))]
 mod window_transparent;
+#[cfg(all(feature = "platform-apple", target_os = "macos"))]
+mod shaped_controls;
 
 use std::sync::Arc;
 
